@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sett-sidebar: #1a2d46;
+  --sett-primary: #6dbe22;
+  --sett-background: #f8f8f8;
+}
+
+body {
+  @apply bg-sett-background text-sett-text-primary antialiased;
+}
+
+/* 4px / 8px grid alignment */
+@layer utilities {
+  .grid-4 { @apply gap-1; }
+  .grid-8 { @apply gap-2; }
+}
+
+/* Green calendar icon for date inputs */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(55%) sepia(60%) saturate(500%) hue-rotate(45deg) brightness(95%);
+  cursor: pointer;
+}
+
+/* Style date input placeholder text (mm/dd/yyyy) */
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field,
+input[type="date"]::-webkit-datetime-edit-text {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+}
+
+input[type="date"]:invalid::-webkit-datetime-edit {
+  color: #A3A3A3;
+}

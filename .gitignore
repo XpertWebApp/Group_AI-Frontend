@@ -1,0 +1,67 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build / cache
+.next
+out
+dist
+build
+.turbo
+*.tsbuildinfo
+
+# Environment (do not commit secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Debug / logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Testing
+coverage
+.nyc_output
+
+# Vercel
+.vercel
+
+# IDE / editor (optional; uncomment if you want to ignore)
+# .idea
+# .vscode
+# *.swp
+# *.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Nano temp files
+*.save
+
+# Static design/reference files
+public/Figma/
+public/Backend_Implementationdone.docx
+public/# SETT Backend — Frontend Integration Reference.docx
+
+# Documents — block all except README.md
+*.pdf
+*.docx
+*.doc
+
+# Misc
+*.pem
+*.md
+!README.md
+*.mmd
+*.dbml
+*.pdf
+*.docx
+*.txt
