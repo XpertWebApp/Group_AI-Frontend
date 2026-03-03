@@ -1,0 +1,67 @@
+export const mockDashboardStats = [
+  { label: 'TOTAL REQUESTS', value: 245, change: '+3.2%', trend: 'up' as const },
+  { label: 'PENDING INQUIRIES', value: 186, change: '+3.2%', trend: 'up' as const },
+  { label: 'OUTSTANDING', value: 142, change: '-1.2%', trend: 'down' as const },
+  { label: 'DECLINED', value: 23, change: '-0.8%', trend: 'down' as const },
+];
+
+export const mockRecentOffers = [
+  { id: 'a1b2c3d4-0001-4000-8000-000000000001', proposalId: 'sett 001', destination: 'The Old Town Hotel', createdOn: '25 Dec, 2024', status: 'Pending' },
+  { id: 'a1b2c3d4-0002-4000-8000-000000000002', proposalId: 'sett 002', destination: 'City Resort', createdOn: '24 Dec, 2024', status: 'Accepted' },
+  { id: 'a1b2c3d4-0003-4000-8000-000000000003', proposalId: 'sett 003', destination: 'Beach Villa', createdOn: '23 Dec, 2024', status: 'Declined' },
+];
+
+export const mockBookingRequests = [
+  {
+    id: 'req-1',
+    offerId: '2458',
+    customer: 'TechCorp International',
+    destination: 'New York',
+    checkIn: '22/04/2026',
+    checkOut: '19/04/2026',
+    rooms: 10,
+    totalSell: 63900,
+    margin: 9100,
+    status: 'pending',
+    createdAt: '2025-01-15',
+  },
+  {
+    id: 'req-2',
+    offerId: '2459',
+    customer: 'Global Events Ltd',
+    destination: 'London',
+    checkIn: '01/05/2026',
+    checkOut: '05/05/2026',
+    rooms: 5,
+    totalSell: 42000,
+    margin: 5200,
+    status: 'draft',
+    createdAt: '2025-01-14',
+  },
+  {
+    id: 'req-3',
+    offerId: '2460',
+    customer: 'Summit Group',
+    destination: 'Paris',
+    checkIn: '10/06/2026',
+    checkOut: '15/06/2026',
+    rooms: 20,
+    totalSell: 125000,
+    margin: 18000,
+    status: 'sent',
+    createdAt: '2025-01-13',
+  },
+  {
+    id: 'req-4',
+    offerId: '2461',
+    customer: 'Apex Travel',
+    destination: 'Dubai',
+    checkIn: '20/07/2026',
+    checkOut: '25/07/2026',
+    rooms: null,
+    totalSell: null,
+    margin: null,
+    status: 'declined',
+    createdAt: '2025-01-12',
+  },
+];

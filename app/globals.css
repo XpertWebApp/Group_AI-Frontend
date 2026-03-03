@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sett-sidebar: #1a2d46;
+  --sett-primary: #6dbe22;
+  --sett-background: #f8f8f8;
+}
+
+body {
+  @apply bg-sett-background text-sett-text-primary antialiased;
+}
+
+/* 4px / 8px grid alignment */
+@layer utilities {
+  .grid-4 { @apply gap-1; }
+  .grid-8 { @apply gap-2; }
+}
