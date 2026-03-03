@@ -8,6 +8,7 @@ import { authApi } from '@/lib/api/auth';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { logout as logoutAction } from '@/lib/store/slices/authSlice';
 import { Menu } from 'lucide-react';
+import { AppLayoutProvider } from '@/app/(dashboard)/AppLayoutContext';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -34,12 +35,12 @@ export function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex">
-      <Sidebar
-        onLogoutClick={() => setLogoutOpen(true)}
-        isMobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
-      />
+    <AppLayoutProvider value={{ onLogoutClick: () => setLogoutOpen(true) }}>
+      <div className="min-h-screen flex overflow-hidden">
+        <Sidebar
+          isMobileOpen={mobileOpen}
+          onMobileClose={() => setMobileOpen(false)}
+        />
       <div className="flex-1 flex flex-col lg:ml-sidebar min-h-screen">
         <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-3 bg-sett-card border-b border-sett-border lg:hidden">
           <button
@@ -51,13 +52,16 @@ export function AppLayout({ children }: AppLayoutProps) {
             <Menu className="w-6 h-6" />
           </button>
         </div>
-        <main className="flex-1 p-4 md:p-6 bg-sett-background">{children}</main>
+        <main className="flex-1 p-4 md:p-6 bg-sett-background overflow-auto min-h-0">
+          {children}
+        </main>
       </div>
+    </div>
       <LogoutModal
         open={logoutOpen}
         onClose={() => setLogoutOpen(false)}
         onConfirm={handleLogoutConfirm}
       />
-    </div>
+    </AppLayoutProvider>
   );
 }

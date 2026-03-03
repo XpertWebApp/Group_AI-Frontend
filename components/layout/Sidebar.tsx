@@ -9,12 +9,12 @@ import {
   PlusCircle,
   FileText,
   Settings,
-  LogOut,
   Search,
 } from 'lucide-react';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -25,13 +25,12 @@ const navItems = [
 ];
 
 interface SidebarProps {
-  onLogoutClick?: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
   children?: ReactNode;
 }
 
-export function Sidebar({ onLogoutClick, isMobileOpen = false, onMobileClose }: SidebarProps) {
+export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const user = useAppSelector((s) => s.auth.user);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,10 +45,14 @@ export function Sidebar({ onLogoutClick, isMobileOpen = false, onMobileClose }: 
       <div className="flex flex-col h-full">
         <div className="p-6 border-b border-white/10">
           <Link href="/dashboard" className="block" onClick={onMobileClose}>
-            <span className="text-2xl font-bold text-sett-primary">SETT</span>
-            <p className="text-xs text-white/80 mt-0.5">
-              Solutions that Empower Travel & Trade
-            </p>
+            <Image
+              src="/icons/sett_logo.svg"
+              alt="SETT Logo"
+              width={140}
+              height={40}
+              className="h-auto w-auto"
+            />
+
           </Link>
         </div>
         <div className="p-3">
@@ -66,7 +69,12 @@ export function Sidebar({ onLogoutClick, isMobileOpen = false, onMobileClose }: 
         </div>
         <nav className="flex-1 px-3 py-2 space-y-0.5">
           {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/');
+            const matchingHref = navItems
+              .filter(
+                (n) => pathname === n.href || pathname.startsWith(n.href + '/')
+              )
+              .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+            const isActive = matchingHref === href;
             return (
               <Link
                 key={href}
@@ -84,14 +92,6 @@ export function Sidebar({ onLogoutClick, isMobileOpen = false, onMobileClose }: 
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={onLogoutClick}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/90 hover:bg-white/10 hover:text-white transition-colors"
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            Logout
-          </button>
         </nav>
         <div className="p-4 border-t border-white/10">
           <div className="flex items-center gap-3">

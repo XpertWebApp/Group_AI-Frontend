@@ -2,11 +2,16 @@ import { apiClient, getApiError } from './client';
 import type { ApiResponse, AuthResponse } from '@/types';
 
 export const authApi = {
-  async login(email: string, password: string): Promise<AuthResponse> {
-    const { data } = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', {
-      email,
-      password,
-    });
+  async login(
+    email: string,
+    password: string,
+    rememberMe?: boolean
+  ): Promise<AuthResponse> {
+    const { data } = await apiClient.post<ApiResponse<AuthResponse>>(
+      '/auth/login',
+      { email, password, rememberMe },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
     if (!data.success || !data.data) {
       throw new Error(data.message || 'Login failed');
     }

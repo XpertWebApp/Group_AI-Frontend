@@ -1,8 +1,9 @@
 'use client';
 
-import { Bell } from 'lucide-react';
+import { Bell, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { NotificationsModal } from '@/components/ui/NotificationsModal';
+import { useAppLayout } from '@/app/(dashboard)/AppLayoutContext';
 
 interface HeaderProps {
   title: string;
@@ -13,6 +14,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const { onLogoutClick } = useAppLayout();
 
   return (
     <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-sett-border">
@@ -39,6 +41,16 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         >
           <Bell className="w-5 h-5 text-sett-text-secondary" />
         </button>
+        {onLogoutClick && (
+          <button
+            type="button"
+            onClick={onLogoutClick}
+            className="p-2 rounded-lg hover:bg-sett-border/50 transition-colors text-sett-text-secondary hover:text-sett-text-primary"
+            aria-label="Logout"
+          >
+            <LogOut className="w-5 h-5" />
+          </button>
+        )}
         {actions}
       </div>
       <NotificationsModal

@@ -25,11 +25,11 @@ Production-ready Next.js (App Router) frontend for **SETT – Sport & Events Tou
 ```bash
 npm install
 cp .env.example .env.local
-# Edit .env.local: set NEXT_PUBLIC_API_URL to your backend (e.g. http://localhost:3001/api/v1)
+# Edit .env.local: set NEXT_PUBLIC_API_URL to your backend (e.g. http://localhost:4000/api/v1)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Use the login page to sign in (backend must have auth and user seed).
+Open [http://localhost:4000](http://localhost:4000). Use the login page to sign in (backend must have auth and user seed).
 
 ### Build
 
@@ -67,7 +67,7 @@ npm start
 
 ## API Integration
 
-- **Base URL**: `NEXT_PUBLIC_API_URL` (default `http://localhost:3001/api/v1`)
+- **Base URL**: `NEXT_PUBLIC_API_URL` (default `http://localhost:4000/api/v1`)
 - **Auth**: Access token in `Authorization: Bearer <token>`, refresh on 401
 - **Endpoints used**: `/auth/login`, `/auth/refresh`, `/auth/logout`, `/requests`, `/proposals`, `/hotels/search`
 - All API calls go through `lib/api/*`; components do not call axios directly.
