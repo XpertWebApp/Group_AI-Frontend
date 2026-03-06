@@ -19,7 +19,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
   return (
     <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-sett-border">
       <div>
-        <h1 className="text-heading-md font-bold text-sett-text-primary">{title}</h1>
+        <h1 className="text-heading-sm font-bold text-sett-text-primary tracking-tight">{title}</h1>
         {subtitle && (
           <p className="text-body text-sett-text-secondary mt-0.5">{subtitle}</p>
         )}

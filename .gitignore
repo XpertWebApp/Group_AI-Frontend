@@ -43,5 +43,9 @@ coverage
 .DS_Store
 Thumbs.db
 
+# Static design/reference files
+public/Figma/
+public/Backend_Implementationdone.docx
+
 # Misc
 *.pem

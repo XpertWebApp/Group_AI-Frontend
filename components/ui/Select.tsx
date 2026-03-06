@@ -19,7 +19,7 @@ interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, options, placeholder, ...props }, ref) => {
     return (
-      <div className="w-full">
+      <div>
         {label && (
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
             {label}
@@ -29,7 +29,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             ref={ref}
             className={cn(
-              'w-full px-3 py-2.5 rounded-input border bg-white text-sett-text-primary text-body appearance-none pr-9',
+              'w-full px-3 py-2.5 rounded-[14px] border bg-white text-sett-text-secondary text-body appearance-none pr-9',
               'focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               error ? 'border-red-500' : 'border-sett-border',

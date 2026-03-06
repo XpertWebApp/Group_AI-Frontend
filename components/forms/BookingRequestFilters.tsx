@@ -1,8 +1,9 @@
 'use client';
 
-import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Search, Plus } from 'lucide-react';
+import Link from 'next/link';
 
 const statusOptions = [
   { value: '', label: 'All Status' },
@@ -37,31 +38,35 @@ export function BookingRequestFilters({
   onDateRangeChange,
 }: BookingRequestFiltersProps) {
   return (
-    <div className="flex flex-col lg:flex-row gap-4 mb-6">
+    <div className="flex items-center gap-3.5">
       <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-muted" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sett-text-secondary" />
         <input
           type="search"
           placeholder="Search by customer, destination, or ID..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-9 pr-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary"
+          className="w-full pl-9 pr-3 py-3 rounded-[14px] border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-secondary focus:outline-none focus:ring-2 focus:ring-sett-primary"
         />
       </div>
-      <div className="flex flex-wrap gap-3">
-        <Select
-          options={dateOptions}
-          value={dateRange}
-          onChange={(e) => onDateRangeChange(e.target.value)}
-          className="min-w-[140px]"
-        />
-        <Select
-          options={statusOptions}
-          value={status}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className="min-w-[140px]"
-        />
-      </div>
+      <Select
+        options={dateOptions}
+        value={dateRange}
+        onChange={(e) => onDateRangeChange(e.target.value)}
+        className="w-[144px]"
+      />
+      <Select
+        options={statusOptions}
+        value={status}
+        onChange={(e) => onStatusChange(e.target.value)}
+        className="w-[144px]"
+      />
+      <Link href="/booking-requests/create">
+        <Button variant="primary" size="md">
+          <Plus className="w-4 h-4 mr-1" />
+          Create Request
+        </Button>
+      </Link>
     </div>
   );
 }

@@ -10,8 +10,8 @@ export const apiClient = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
-  withCredentials: true,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -35,7 +35,7 @@ apiClient.interceptors.response.use(
           const { data } = await axios.post<{ data: { accessToken: string } }>(
             `${baseURL}/auth/refresh`,
             { refreshToken },
-            { withCredentials: true }
+            { headers: { 'ngrok-skip-browser-warning': 'true' } }
           );
           const newToken = data?.data?.accessToken;
           if (newToken && typeof window !== 'undefined') {

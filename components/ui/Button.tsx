@@ -3,7 +3,7 @@
 import { forwardRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 
-type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'destructive' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,9 +15,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-sett-primary text-white shadow-button hover:bg-sett-primary-hover active:bg-sett-primary-active disabled:opacity-50 disabled:pointer-events-none',
+    'bg-sett-primary text-white shadow-[0px_8px_20px_0px_rgba(0,0,0,0.13)] hover:bg-sett-primary-hover active:bg-sett-primary-active disabled:opacity-50 disabled:pointer-events-none',
   secondary:
     'bg-white border border-sett-border text-sett-text-primary hover:bg-sett-background active:bg-sett-border disabled:opacity-50 disabled:pointer-events-none',
+  outline:
+    'bg-transparent border border-sett-primary text-sett-primary hover:bg-sett-light-green-bg disabled:opacity-50 disabled:pointer-events-none',
   destructive:
     'bg-sett-destructive text-white hover:bg-sett-destructive-hover disabled:opacity-50 disabled:pointer-events-none',
   ghost:

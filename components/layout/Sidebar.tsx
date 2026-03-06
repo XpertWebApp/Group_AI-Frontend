@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Users,
   PlusCircle,
-  FileText,
   Settings,
   Search,
 } from 'lucide-react';
@@ -20,7 +19,6 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/booking-requests', label: 'Group Requests', icon: Users },
   { href: '/booking-requests/create', label: 'Create Request', icon: PlusCircle },
-  { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -104,7 +102,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             </div>
           </div>
         </div>
-        <p className="px-4 pb-4 text-xs text-white/50">2026 S-E-T-T All Rights Reserved</p>
+        <p className="px-4 pb-4 text-xs text-white/50">2026 S-E-T-T | All Rights Reserved</p>
       </div>
     </>
   );

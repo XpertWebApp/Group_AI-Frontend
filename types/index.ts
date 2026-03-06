@@ -43,20 +43,45 @@ export interface RoomsConfig {
 
 export interface BookingRequest {
   id: string;
+  referenceNumber?: number;
   externalRequestId?: string | null;
+
+  // Step 1: Trip Details
+  destinationId: number;
+  destinationName?: string | null;
+  checkinDate: string;
+  checkoutDate?: string | null;
+  nights: number;
+  starRating?: number | null;
+  budgetRange?: string | null;
+  budget?: number | null;
+  groupType?: string | null;
+  groupSize?: number | null;
+  currencyCode?: string | null;
+  nationalityCode?: string | null;
+
+  // Step 2: Room & Accommodations
+  rooms?: RoomsConfig | null;
+  breakfastPreference?: string | null;
+  hotelLocation?: string | null;
+  specialRequirements?: string | null;
+
+  // Step 3: Customer Details
   companyName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
-  currencyCode?: string | null;
-  destinationName?: string | null;
-  destinationId: number;
-  checkinDate: string;
-  nights: number;
-  rooms?: RoomsConfig | null;
+  guestListFileKey?: string | null;
+  customerNotes?: string | null;
+
+  // Step 4: Policies
+  termsAndConditions?: string | null;
+  cancellationConditions?: string | null;
+
+  // System
   status: BookingRequestStatus;
-  budget?: number | null;
-  specialRequirements?: string | null;
   createdAt: string;
   updatedAt?: string | null;
 }

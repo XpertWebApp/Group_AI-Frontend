@@ -11,19 +11,19 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  pending: 'bg-sett-pending text-sett-text-primary',
-  draft: 'bg-sett-draft text-sett-text-primary',
-  sent: 'bg-sett-sent text-green-800',
-  approved: 'bg-sett-sent text-green-800',
-  declined: 'bg-sett-declined text-red-800',
-  default: 'bg-sett-border text-sett-text-secondary',
+  pending: 'bg-[#f7f7f7] border border-[#e6eaf0] text-sett-text-primary',
+  draft: 'bg-[#f7f7f7] border border-[#e6eaf0] text-sett-text-primary',
+  sent: 'bg-[#f7faeb] border border-[#d5e39b] text-[#667f00] opacity-60',
+  approved: 'bg-[#f7faeb] border border-[#d5e39b] text-[#667f00] opacity-60',
+  declined: 'bg-[#ffeaeb] border border-[#feb1b5] text-[#fb2c36]',
+  default: 'bg-sett-border text-sett-text-secondary border border-sett-border',
 };
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-0.5 rounded-badge text-caption font-medium',
+        'inline-flex items-center px-2.5 py-1 rounded-badge text-body font-medium',
         variantClasses[variant],
         className
       )}
