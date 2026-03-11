@@ -286,7 +286,7 @@ export default function RequestDetailPage() {
       <Header title="Create Request" />
 
       {/* ── Breadcrumb ── */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={() => router.push('/booking-requests')}
@@ -295,7 +295,7 @@ export default function RequestDetailPage() {
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
-        <span className="text-sett-border">|</span>
+        <span className="text-sett-border hidden sm:inline">|</span>
         <span className="text-heading-sm font-bold text-sett-text-primary">
           Offer #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
@@ -307,7 +307,7 @@ export default function RequestDetailPage() {
       </div>
 
       {/* ════════════════════ REQUEST SUMMARY CARD ════════════════════ */}
-      <div className="bg-sett-card rounded-card border border-sett-border p-6">
+      <div className="bg-sett-card rounded-card border border-sett-border p-4 sm:p-6">
         {/* Section header */}
         <div className="flex items-center justify-between">
           <div className="flex items-start gap-3">
@@ -332,19 +332,19 @@ export default function RequestDetailPage() {
         {/* ── Trip Details ── */}
         <div className="mb-6 mt-6">
           <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Trip Details</h3>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
                 <MapPin className="w-4 h-4 text-sett-text-accent shrink-0" />
                 {request.destinationName || '—'}
               </div>
-              <span className="text-sett-text-accent">·</span>
+              <span className="text-sett-text-accent hidden sm:inline">·</span>
               <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
                 <Calendar className="w-4 h-4 text-sett-text-accent shrink-0" />
                 {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
               </div>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="text-center">
                 <p className="text-label text-sett-text-accent uppercase tracking-wide">
                   Hotel Category
@@ -389,7 +389,7 @@ export default function RequestDetailPage() {
           <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">
             Room & Accommodations
           </h3>
-          <div className="grid grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
             {[
               { label: 'SINGLE', value: rooms?.single },
               { label: 'DOUBLE', value: rooms?.double },
@@ -417,14 +417,14 @@ export default function RequestDetailPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="border border-sett-border rounded-card p-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+            <div className="border border-sett-border rounded-card p-3 sm:p-4 text-center">
               <p className="text-body font-semibold text-sett-text-primary">{breakfastLabel}</p>
               <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
                 Breakfast Preference
               </p>
             </div>
-            <div className="border border-sett-border rounded-card p-4 text-center">
+            <div className="border border-sett-border rounded-card p-3 sm:p-4 text-center">
               <p className="text-body font-semibold text-sett-text-primary">{locationLabel}</p>
               <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
                 Hotel Location
@@ -451,7 +451,7 @@ export default function RequestDetailPage() {
           <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">
             Customer Details
           </h3>
-          <div className="grid grid-cols-3 gap-x-6 gap-y-4 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-3">
             <div>
               <div className="flex items-center gap-1.5 mb-1">
                 <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
@@ -563,7 +563,7 @@ export default function RequestDetailPage() {
       </div>
 
       {/* ════════════════════ HOTELS + SIDEBAR ════════════════════ */}
-      <div className="flex gap-6">
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* Left: Hotels + Services */}
         <div className="flex-1 min-w-0 space-y-6">
           {/* Hotels */}
@@ -613,41 +613,55 @@ export default function RequestDetailPage() {
 
             {services.length > 0 && (
               <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-sett-border bg-sett-fill">
-                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                        Service
-                      </th>
-                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                        Net &euro;
-                      </th>
-                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                        Markup
-                      </th>
-                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                        Sell &euro;
-                      </th>
-                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                        Qty
-                      </th>
-                      <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                        Total &euro;
-                      </th>
-                      <th className="w-20" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {services.map((service) => (
-                      <ServiceRow
-                        key={service.id}
-                        service={service}
-                        onEdit={() => setEditingService(service)}
-                        onDelete={() => setRemoveServiceTarget(service.id)}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full min-w-[600px]">
+                    <thead>
+                      <tr className="border-b border-sett-border bg-sett-fill">
+                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                          Service
+                        </th>
+                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                          Net &euro;
+                        </th>
+                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                          Markup
+                        </th>
+                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                          Sell &euro;
+                        </th>
+                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                          Qty
+                        </th>
+                        <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                          Total &euro;
+                        </th>
+                        <th className="w-20" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {services.map((service) => (
+                        <ServiceRow
+                          key={service.id}
+                          service={service}
+                          onEdit={() => setEditingService(service)}
+                          onDelete={() => setRemoveServiceTarget(service.id)}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-sett-border">
+                  {services.map((service) => (
+                    <ServiceCard
+                      key={service.id}
+                      service={service}
+                      onEdit={() => setEditingService(service)}
+                      onDelete={() => setRemoveServiceTarget(service.id)}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -655,7 +669,7 @@ export default function RequestDetailPage() {
 
         {/* Right sidebar — only show when proposal exists with hotels */}
         {proposal && hotels.length > 0 && (
-          <div className="w-72 shrink-0 space-y-4">
+          <div className="w-full lg:w-72 shrink-0 space-y-4">
             {/* View on map */}
             <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
               <h4 className="text-body font-bold text-sett-text-primary px-5 pt-4 pb-2">
@@ -701,11 +715,11 @@ export default function RequestDetailPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               <button
                 type="button"
                 onClick={() => setPreviewOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
               >
                 <Eye className="w-4 h-4" />
                 Preview PDF
@@ -713,7 +727,7 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 onClick={() => setSaveDraftOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
               >
                 <Save className="w-4 h-4" />
                 Save Draft
@@ -721,7 +735,7 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 onClick={() => setSendOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-primary rounded-card text-body font-medium text-white hover:bg-sett-primary/90 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-primary rounded-card text-body font-medium text-white hover:bg-sett-primary/90 transition-colors"
               >
                 <Send className="w-4 h-4" />
                 Approve &amp; Send
@@ -729,7 +743,7 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 onClick={() => setDeclineOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-destructive rounded-card text-body font-medium text-sett-destructive hover:bg-red-50 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-destructive rounded-card text-body font-medium text-sett-destructive hover:bg-red-50 transition-colors"
               >
                 <XCircle className="w-4 h-4" />
                 Mark as Declined
@@ -1044,27 +1058,27 @@ function HotelCard({
   return (
     <div className="bg-sett-card rounded-card border border-sett-border">
       {/* Hotel header — dark navy */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#1B2B44] rounded-t-card">
-        <div className="flex items-center gap-2">
-          <h4 className="text-body font-bold text-white">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-[#1B2B44] rounded-t-card">
+        <div className="flex items-center gap-2 min-w-0">
+          <h4 className="text-body font-bold text-white truncate">
             {hotel.hotelName || hotel.hotelCode}
           </h4>
-          <div className="flex gap-0.5">
+          <div className="flex gap-0.5 shrink-0">
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
             ))}
           </div>
           {saving && (
-            <span className="text-caption text-white/70 ml-2 animate-pulse">Saving...</span>
+            <span className="text-caption text-white/70 ml-2 animate-pulse shrink-0">Saving...</span>
           )}
         </div>
         <button
           type="button"
           onClick={onRemove}
-          className="flex items-center gap-1.5 text-body text-white/80 hover:text-white font-medium transition-colors"
+          className="flex items-center gap-1.5 text-body text-white/80 hover:text-white font-medium transition-colors shrink-0 ml-2"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          Remove
+          <span className="hidden sm:inline">Remove</span>
         </button>
       </div>
 
@@ -1077,78 +1091,138 @@ function HotelCard({
         </div>
       )}
 
-      {/* Room table */}
+      {/* Room table — desktop */}
       {roomEntries.length > 0 ? (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-sett-border">
-              <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Room Type
-              </th>
-              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Net &euro;
-              </th>
-              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Markup
-              </th>
-              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Sell &euro;
-              </th>
-              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Qty
-              </th>
-              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Nights
-              </th>
-              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                Total &euro;
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {roomEntries.map(([type, detail]) => {
-              const net = Number(detail.net ?? 0);
-              const sell = Number(detail.sell ?? 0);
-              const qty = detail.qty ?? 1;
-              const nights = detail.nights ?? 1;
-              const markup = net > 0 ? ((sell - net) / net) * 100 : 0;
-              const total = sell * qty * nights;
-              return (
-                <tr key={type} className="border-b border-sett-border last:border-0">
-                  <td className="px-4 py-2.5 text-body text-sett-text-primary">{type}</td>
-                  <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
-                    {net.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={sell.toFixed(2)}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (!isNaN(val) && val >= 0) handleSellChange(type, val);
-                      }}
-                      className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
-                    />
-                  </td>
-                  <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
-                    {qty}
-                  </td>
-                  <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
-                    {nights}
-                  </td>
-                  <td className="px-4 py-2.5 text-body text-sett-primary text-right font-semibold">
-                    {total.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <>
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full min-w-[600px]">
+            <thead>
+              <tr className="border-b border-sett-border">
+                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Room Type
+                </th>
+                <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Net &euro;
+                </th>
+                <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Markup
+                </th>
+                <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Sell &euro;
+                </th>
+                <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Qty
+                </th>
+                <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Nights
+                </th>
+                <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  Total &euro;
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {roomEntries.map(([type, detail]) => {
+                const net = Number(detail.net ?? 0);
+                const sell = Number(detail.sell ?? 0);
+                const qty = detail.qty ?? 1;
+                const nights = detail.nights ?? 1;
+                const markup = net > 0 ? ((sell - net) / net) * 100 : 0;
+                const total = sell * qty * nights;
+                return (
+                  <tr key={type} className="border-b border-sett-border last:border-0">
+                    <td className="px-4 py-2.5 text-body text-sett-text-primary">{type}</td>
+                    <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
+                      {net.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={sell.toFixed(2)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val >= 0) handleSellChange(type, val);
+                        }}
+                        className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
+                      />
+                    </td>
+                    <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
+                      {qty}
+                    </td>
+                    <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
+                      {nights}
+                    </td>
+                    <td className="px-4 py-2.5 text-body text-sett-primary text-right font-semibold">
+                      {total.toLocaleString('en', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {/* Room cards — mobile */}
+        <div className="md:hidden divide-y divide-sett-border">
+          {roomEntries.map(([type, detail]) => {
+            const net = Number(detail.net ?? 0);
+            const sell = Number(detail.sell ?? 0);
+            const qty = detail.qty ?? 1;
+            const nights = detail.nights ?? 1;
+            const markup = net > 0 ? ((sell - net) / net) * 100 : 0;
+            const total = sell * qty * nights;
+            return (
+              <div key={type} className="p-3 space-y-2">
+                <p className="text-body font-medium text-sett-text-primary">{type}</p>
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
+                    <p className="text-sett-text-primary mt-0.5">{net.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Markup</span>
+                    <div className="mt-0.5">
+                      <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Sell</span>
+                    <div className="mt-0.5">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={sell.toFixed(2)}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val) && val >= 0) handleSellChange(type, val);
+                        }}
+                        className="w-full max-w-[80px] px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Qty</span>
+                    <p className="text-sett-text-primary mt-0.5">{qty}</p>
+                  </div>
+                  <div>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Nights</span>
+                    <p className="text-sett-text-primary mt-0.5">{nights}</p>
+                  </div>
+                  <div>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Total</span>
+                    <p className="text-sett-primary font-semibold mt-0.5">{total.toLocaleString('en', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        </>
       ) : (
         <div className="px-4 py-3">
           <p className="text-body text-sett-text-secondary">
@@ -1222,5 +1296,61 @@ function ServiceRow({
         </div>
       </td>
     </tr>
+  );
+}
+
+/* ─────────────── Service Card (mobile) ─────────────── */
+
+function ServiceCard({
+  service,
+  onEdit,
+  onDelete,
+}: {
+  service: ProposalService;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const buy = Number(service.buyPrice ?? 0);
+  const sell = Number(service.sellPrice ?? 0);
+  const qty = service.quantity ?? 1;
+  const markup = buy > 0 ? ((sell - buy) / buy) * 100 : 0;
+  const total = sell * qty;
+
+  return (
+    <div className="p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-body font-medium text-sett-text-primary">{service.serviceName ?? '—'}</p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onEdit} className="text-sett-text-accent hover:text-sett-primary transition-colors">
+            <SquarePen className="w-4 h-4" />
+          </button>
+          <button type="button" onClick={onDelete} className="text-sett-text-accent hover:text-sett-destructive transition-colors">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-sm">
+        <div>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
+          <p className="text-sett-text-primary mt-0.5">{buy.toFixed(2)}</p>
+        </div>
+        <div>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Markup</span>
+          <p className="text-sett-text-primary mt-0.5">{markup.toFixed(0)}%</p>
+        </div>
+        <div>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Sell</span>
+          <p className="text-sett-text-primary mt-0.5">{sell.toFixed(2)}</p>
+        </div>
+        <div>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Qty</span>
+          <p className="text-sett-text-primary mt-0.5">{qty}</p>
+        </div>
+        <div>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Total</span>
+          <p className="text-sett-primary font-semibold mt-0.5">{total.toLocaleString('en', { minimumFractionDigits: 2 })}</p>
+        </div>
+      </div>
+    </div>
   );
 }

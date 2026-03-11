@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, MapPin, Star, Check, AlertTriangle, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Check, AlertTriangle, X, SlidersHorizontal } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
@@ -40,6 +40,7 @@ export default function AddHotelPage() {
   const [maxPrice, setMaxPrice] = useState(3000);
   const [amenityFilters, setAmenityFilters] = useState<string[]>([]);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const amenityOptions = [
     'Free Cancellation',
@@ -179,7 +180,7 @@ export default function AddHotelPage() {
       <Header title="Create Request" />
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={() => router.push(`/booking-requests/${requestId}`)}
@@ -188,11 +189,11 @@ export default function AddHotelPage() {
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
-        <span className="text-sett-border">|</span>
+        <span className="text-sett-border hidden sm:inline">|</span>
         <span className="text-body text-sett-text-secondary">
           Offer #{request?.referenceNumber ?? requestId.slice(0, 4)}
         </span>
-        <span className="text-sett-border">|</span>
+        <span className="text-sett-border hidden sm:inline">|</span>
         <span className="text-heading-sm font-bold text-sett-text-primary">Add Hotel</span>
         {request && (
           <Badge variant={getStatusBadgeVariant(request.status)} className="ml-auto">
@@ -234,129 +235,147 @@ export default function AddHotelPage() {
 
       {/* Results */}
       {phase === 'done' && searchResponse && (
-        <div className="flex gap-6">
-          {/* ── Left Sidebar: Filters ── */}
-          <aside className="w-[220px] shrink-0">
-            <h3 className="text-heading-sm font-bold text-sett-text-primary mb-4">Trip Details</h3>
-
-            <div className="space-y-4">
-              {/* Destination */}
-              <div>
-                <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-                  Destination
-                </label>
-                <div className="w-full px-3 py-2 rounded-input border border-sett-border bg-sett-fill text-body text-sett-text-secondary truncate">
-                  {request?.destinationName || '—'}
-                </div>
-              </div>
-
-              {/* Stay Dates */}
-              <div>
-                <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-                  Stay Dates
-                </label>
-                <div className="w-full px-3 py-2 rounded-input border border-sett-border bg-sett-fill text-body text-sett-text-secondary">
-                  {request?.checkinDate
-                    ? new Date(request.checkinDate).toLocaleDateString('en-GB')
-                    : '—'}
-                  {' - '}
-                  {request?.checkoutDate
-                    ? new Date(request.checkoutDate).toLocaleDateString('en-GB')
-                    : '—'}
-                </div>
-              </div>
-
-              {/* Star Rating */}
-              <div>
-                <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-                  Star Rating
-                </label>
-                <div className="space-y-1.5">
-                  {[5, 4, 3].map((star) => (
-                    <label key={star} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={starFilters.includes(star)}
-                        onChange={() => toggleStar(star)}
-                        className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
-                      />
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: star }).map((_, i) => (
-                          <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
-                        ))}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Per Night */}
-              <div>
-                <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-                  Price Per Night
-                </label>
-                <input
-                  type="range"
-                  min={0}
-                  max={3000}
-                  step={50}
-                  value={maxPrice}
-                  onChange={(e) => setMaxPrice(Number(e.target.value))}
-                  className="w-full accent-sett-primary"
-                />
-                <div className="flex justify-between text-caption text-sett-text-accent mt-1">
-                  <span>&euro;0</span>
-                  <span>&euro;{maxPrice.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Amenities */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-label font-medium text-sett-text-primary uppercase tracking-wide">
-                    Amenities
-                  </label>
-                  <button
-                    type="button"
-                    className="text-caption text-sett-primary hover:underline font-medium"
-                    onClick={() => setAmenityFilters([])}
-                  >
-                    View all
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {amenityOptions.map((amenity) => (
-                    <label key={amenity} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={amenityFilters.includes(amenity)}
-                        onChange={() => toggleAmenity(amenity)}
-                        className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
-                      />
-                      <span className="text-body text-sett-text-secondary">{amenity}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Toggle alternatives */}
-            {altResults.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowAlternatives(!showAlternatives)}
-                className={cn(
-                  'w-full mt-4 px-3 py-2 rounded-input border text-body font-medium transition-colors',
-                  showAlternatives
-                    ? 'bg-sett-primary text-white border-sett-primary'
-                    : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-primary/5'
-                )}
-              >
-                {showAlternatives
-                  ? 'Show Main Results'
-                  : `Show Alternatives (${altResults.length})`}
-              </button>
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* ── Mobile filter toggle ── */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className="lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {filtersOpen ? 'Hide Filters' : 'Show Filters'}
+            {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
+              <span className="w-2 h-2 rounded-full bg-sett-primary" />
             )}
+          </button>
+
+          {/* ── Left Sidebar: Filters ── */}
+          <aside className={cn(
+            'lg:w-[220px] shrink-0',
+            filtersOpen ? 'block' : 'hidden lg:block'
+          )}>
+            <div className="bg-sett-card rounded-card border border-sett-border p-4 lg:p-0 lg:bg-transparent lg:border-0">
+              <h3 className="text-heading-sm font-bold text-sett-text-primary mb-4">Trip Details</h3>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-4">
+                {/* Destination */}
+                <div>
+                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                    Destination
+                  </label>
+                  <div className="w-full px-3 py-2 rounded-input border border-sett-border bg-sett-fill text-body text-sett-text-secondary truncate">
+                    {request?.destinationName || '—'}
+                  </div>
+                </div>
+
+                {/* Stay Dates */}
+                <div>
+                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                    Stay Dates
+                  </label>
+                  <div className="w-full px-3 py-2 rounded-input border border-sett-border bg-sett-fill text-body text-sett-text-secondary">
+                    {request?.checkinDate
+                      ? new Date(request.checkinDate).toLocaleDateString('en-GB')
+                      : '—'}
+                    {' - '}
+                    {request?.checkoutDate
+                      ? new Date(request.checkoutDate).toLocaleDateString('en-GB')
+                      : '—'}
+                  </div>
+                </div>
+
+                {/* Star Rating */}
+                <div>
+                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                    Star Rating
+                  </label>
+                  <div className="space-y-1.5">
+                    {[5, 4, 3].map((star) => (
+                      <label key={star} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={starFilters.includes(star)}
+                          onChange={() => toggleStar(star)}
+                          className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
+                        />
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: star }).map((_, i) => (
+                            <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
+                          ))}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Price Per Night */}
+                <div>
+                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                    Price Per Night
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={3000}
+                    step={50}
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(Number(e.target.value))}
+                    className="w-full accent-sett-primary"
+                  />
+                  <div className="flex justify-between text-caption text-sett-text-accent mt-1">
+                    <span>&euro;0</span>
+                    <span>&euro;{maxPrice.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Amenities */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-label font-medium text-sett-text-primary uppercase tracking-wide">
+                      Amenities
+                    </label>
+                    <button
+                      type="button"
+                      className="text-caption text-sett-primary hover:underline font-medium"
+                      onClick={() => setAmenityFilters([])}
+                    >
+                      View all
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 lg:flex-col lg:gap-x-0">
+                    {amenityOptions.map((amenity) => (
+                      <label key={amenity} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={amenityFilters.includes(amenity)}
+                          onChange={() => toggleAmenity(amenity)}
+                          className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
+                        />
+                        <span className="text-body text-sett-text-secondary">{amenity}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Toggle alternatives */}
+              {altResults.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAlternatives(!showAlternatives)}
+                  className={cn(
+                    'w-full mt-4 px-3 py-2 rounded-input border text-body font-medium transition-colors',
+                    showAlternatives
+                      ? 'bg-sett-primary text-white border-sett-primary'
+                      : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-primary/5'
+                  )}
+                >
+                  {showAlternatives
+                    ? 'Show Main Results'
+                    : `Show Alternatives (${altResults.length})`}
+                </button>
+              )}
+            </div>
           </aside>
 
           {/* ── Right: Hotel Results ── */}
@@ -420,9 +439,9 @@ function HotelResultCard({
             : 'border-sett-border'
       )}
     >
-      <div className="flex">
+      <div className="flex flex-col sm:flex-row">
         {/* ── Hotel Image ── */}
-        <div className="w-[240px] min-h-[200px] shrink-0 relative bg-sett-fill overflow-hidden rounded-l-card">
+        <div className="w-full sm:w-[200px] md:w-[240px] h-[180px] sm:h-auto sm:min-h-[200px] shrink-0 relative bg-sett-fill overflow-hidden rounded-t-card sm:rounded-t-none sm:rounded-l-card">
           <img
             src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
             alt={hotel.hotelName}
@@ -436,7 +455,7 @@ function HotelResultCard({
         {/* ── Hotel Info ── */}
         <div className="flex-1 min-w-0">
           {/* Header row */}
-          <div className="flex items-start justify-between px-4 pt-4 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between px-3 sm:px-4 pt-3 sm:pt-4 pb-2 gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="text-body font-bold text-sett-text-primary">
@@ -474,7 +493,7 @@ function HotelResultCard({
             </div>
 
             {/* Action area */}
-            <div className="flex flex-col items-end gap-1.5 shrink-0 ml-4">
+            <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1.5 shrink-0">
               {isAdded ? (
                 <span className="flex items-center gap-1 text-body text-sett-primary font-semibold">
                   <Check className="w-4 h-4" /> Added
@@ -498,9 +517,9 @@ function HotelResultCard({
             </div>
           </div>
 
-          {/* ── Room Table ── */}
-          <div className="px-4 pb-4">
-            <table className="w-full">
+          {/* ── Room Table (desktop) ── */}
+          <div className="hidden sm:block px-4 pb-4 overflow-x-auto">
+            <table className="w-full min-w-[400px]">
               <thead>
                 <tr>
                   <th className="text-left text-label text-sett-text-accent uppercase tracking-wide py-1.5 pr-2 font-medium">
@@ -566,9 +585,46 @@ function HotelResultCard({
             </table>
           </div>
 
+          {/* ── Room cards (mobile) ── */}
+          <div className="sm:hidden px-3 pb-3 space-y-2">
+            {(best.roomDescriptions && best.roomDescriptions.length > 0
+              ? best.roomDescriptions
+              : ['Standard Room']
+            ).map((desc, i) => {
+              const perNight = best.buyingPricePerRoomPerNight;
+              const total = perNight * nights;
+              return (
+                <div key={i} className="border-t border-sett-border/50 pt-2">
+                  <p className="text-body text-sett-text-primary font-medium">{desc}</p>
+                  <div className="grid grid-cols-3 gap-2 mt-1.5 text-sm">
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Supplier</span>
+                      <p className="mt-0.5">
+                        <span className="inline-flex px-1.5 py-0.5 rounded bg-[#f0f2f5] text-caption text-sett-text-accent font-medium">
+                          {best.supplierCode || '—'}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Meal</span>
+                      <p className="text-sett-text-secondary mt-0.5">{best.mealName || 'Room Only'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Per Night</span>
+                      <p className="text-sett-text-primary mt-0.5">&euro;{perNight.toFixed(2)}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-1">
+                    <span className="text-body text-sett-text-primary font-semibold">Total: &euro;{total.toFixed(2)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           {/* Notes / cancel info */}
           {(best.cancelDeadline || hotel.note) && (
-            <div className="px-4 pb-3 space-y-1">
+            <div className="px-3 sm:px-4 pb-3 space-y-1">
               {best.cancelDeadline && (
                 <p className="text-caption text-sett-text-accent">
                   Cancel before: {new Date(best.cancelDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
