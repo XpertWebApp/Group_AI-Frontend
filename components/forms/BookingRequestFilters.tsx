@@ -4,21 +4,7 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Search, Plus } from 'lucide-react';
 import Link from 'next/link';
-
-const statusOptions = [
-  { value: '', label: 'All Status' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'sent', label: 'Sent' },
-  { value: 'declined', label: 'Declined' },
-];
-
-const dateOptions = [
-  { value: '', label: 'All Time' },
-  { value: 'this_month', label: 'This Month' },
-  { value: 'this_quarter', label: 'This Quarter' },
-  { value: 'this_year', label: 'This Year' },
-];
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface BookingRequestFiltersProps {
   search: string;
@@ -37,13 +23,30 @@ export function BookingRequestFilters({
   dateRange,
   onDateRangeChange,
 }: BookingRequestFiltersProps) {
+  const { t } = useLanguage();
+
+  const statusOptions = [
+    { value: '', label: t.requests.allStatus },
+    { value: 'pending', label: t.requests.pending },
+    { value: 'draft', label: t.requests.draft },
+    { value: 'sent', label: t.requests.sent },
+    { value: 'declined', label: t.requests.declined },
+  ];
+
+  const dateOptions = [
+    { value: '', label: t.requests.allTime },
+    { value: 'this_month', label: t.requests.thisMonth },
+    { value: 'this_quarter', label: t.requests.thisQuarter },
+    { value: 'this_year', label: t.requests.thisYear },
+  ];
+
   return (
     <div className="flex items-center gap-3.5">
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sett-text-secondary" />
         <input
           type="search"
-          placeholder="Search by customer, destination, or ID..."
+          placeholder={t.requests.searchPlaceholder}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-9 pr-3 py-3 rounded-[14px] border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-secondary focus:outline-none focus:ring-2 focus:ring-sett-primary"
@@ -62,9 +65,9 @@ export function BookingRequestFilters({
         className="w-[144px]"
       />
       <Link href="/booking-requests/create">
-        <Button variant="primary" size="md">
+        <Button variant="primary" size="md" className="text-white">
           <Plus className="w-4 h-4 mr-1" />
-          Create Request
+          {t.nav.createRequest}
         </Button>
       </Link>
     </div>

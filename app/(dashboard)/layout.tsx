@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { LanguageProvider } from '@/lib/i18n/LanguageContext';
 
 export default function DashboardLayout({
   children,
@@ -28,5 +29,9 @@ export default function DashboardLayout({
     if (!token) return null;
   }
 
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <LanguageProvider>
+      <AppLayout>{children}</AppLayout>
+    </LanguageProvider>
+  );
 }

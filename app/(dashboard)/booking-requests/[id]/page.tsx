@@ -1,8 +1,27 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Calendar, Star, Pencil, Building2, FileText, Phone, Mail, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  Star,
+  Pencil,
+  Building2,
+  FileText,
+  Phone,
+  Mail,
+  Users,
+  Eye,
+  Save,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  SquarePen,
+  Send,
+  XCircle,
+} from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
@@ -44,8 +63,12 @@ export default function RequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+
   // Modal states
   const [addServiceOpen, setAddServiceOpen] = useState(false);
+  const [editingService, setEditingService] = useState<ProposalService | null>(null);
+  const [removeServiceTarget, setRemoveServiceTarget] = useState<string | null>(null);
   const [removeHotelTarget, setRemoveHotelTarget] = useState<string | null>(null);
   const [saveDraftOpen, setSaveDraftOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
@@ -58,7 +81,6 @@ export default function RequestDetailPage() {
       const req = await requestsApi.get(id);
       if (req) setRequest(req);
 
-      // Try to load the proposal for this request
       const proposals = await proposalsApi.list();
       const linked = proposals.find((p) => p.requestId === id);
       if (linked) {
@@ -97,22 +119,14 @@ export default function RequestDetailPage() {
     return { totalPurchase, totalSell, markupEur, margin };
   }, [hotels, services]);
 
-  const handleCreateProposal = async () => {
-    setActionLoading(true);
-    try {
-      const result = await requestsApi.createProposal(id, {});
-      const full = await proposalsApi.get(result.id);
-      if (full) setProposal(full);
-    } catch {
-      // ignore
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  const handlePricingUpdate = useCallback((hotelId: string, updatedHotel: ProposalHotel) => {
+    setProposal((p) =>
+      p ? { ...p, hotels: (p.hotels ?? []).map((h) => (h.id === hotelId ? updatedHotel : h)) } : null
+    );
+  }, []);
 
   const handleAddHotelsClick = async () => {
     if (!proposal) {
-      // Create a proposal first, then navigate
       setActionLoading(true);
       try {
         const result = await requestsApi.createProposal(id, {});
@@ -143,11 +157,57 @@ export default function RequestDetailPage() {
     if (!proposal) return;
     setActionLoading(true);
     try {
-      const added = await proposalsApi.addService(proposal.id, payload);
+      const { service, proposal: updatedProposal } = await proposalsApi.addService(proposal.id, payload);
       setProposal((p) =>
-        p ? { ...p, services: [...(p.services ?? []), added] } : null
+        p
+          ? {
+              ...p,
+              ...updatedProposal,
+              services: [...(p.services ?? []), service],
+              hotels: p.hotels,
+            }
+          : null
       );
       setAddServiceOpen(false);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditService = async (payload: Parameters<typeof proposalsApi.addService>[1]) => {
+    if (!proposal || !editingService) return;
+    setActionLoading(true);
+    try {
+      const { service, proposal: updatedProposal } = await proposalsApi.updateService(
+        proposal.id,
+        editingService.id,
+        payload
+      );
+      setProposal((p) =>
+        p
+          ? {
+              ...p,
+              ...updatedProposal,
+              services: (p.services ?? []).map((s) => (s.id === editingService.id ? service : s)),
+              hotels: p.hotels,
+            }
+          : null
+      );
+      setEditingService(null);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveService = async (serviceId: string) => {
+    if (!proposal) return;
+    setActionLoading(true);
+    try {
+      await proposalsApi.removeService(proposal.id, serviceId);
+      setProposal((p) =>
+        p ? { ...p, services: (p.services ?? []).filter((s) => s.id !== serviceId) } : null
+      );
+      setRemoveServiceTarget(null);
     } finally {
       setActionLoading(false);
     }
@@ -183,8 +243,7 @@ export default function RequestDetailPage() {
     setActionLoading(true);
     try {
       await proposalsApi.update(proposal.id, {} as never);
-      // Update local state - mark as declined via status update
-      setProposal((p) => p ? { ...p, status: 'declined' as never } : null);
+      setProposal((p) => (p ? { ...p, status: 'declined' as never } : null));
       setDeclineOpen(false);
       router.push('/booking-requests');
     } finally {
@@ -212,14 +271,24 @@ export default function RequestDetailPage() {
     );
   }
 
-  const breakfastLabel = request.breakfastPreference === 'BB' ? 'With Breakfast' : request.breakfastPreference === 'RO' ? 'Without Breakfast' : '—';
-  const locationLabel = request.hotelLocation === 'central' ? 'Central Location' : request.hotelLocation === 'outside_city_center' ? 'Outside City Center' : '—';
+  const breakfastLabel =
+    request.breakfastPreference === 'BB'
+      ? 'With Breakfast'
+      : request.breakfastPreference === 'RO'
+        ? 'Without Breakfast'
+        : '—';
+  const locationLabel =
+    request.hotelLocation === 'central'
+      ? 'Central Location'
+      : request.hotelLocation === 'outside_city_center'
+        ? 'Outside City Center'
+        : '—';
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6 pb-8">
       <Header title="Create Request" />
 
-      {/* Back + Offer ID */}
+      {/* ── Breadcrumb ── */}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -233,340 +302,470 @@ export default function RequestDetailPage() {
         <span className="text-heading-sm font-bold text-sett-text-primary">
           Offer #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
+        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
+          {(proposal?.status ?? request.status)
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase())}
+        </Badge>
       </div>
 
-      {/* Main content area */}
-      <div className="flex gap-6">
-        {/* Left column: Request summary + Hotels + Services */}
-        <div className="flex-1 space-y-6 min-w-0">
-          {/* Request Summary card */}
-          <div className="bg-sett-card rounded-card border border-sett-border p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-start gap-3">
-                <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-heading-sm font-bold text-sett-text-primary">Request Summary</h2>
-                    <Pencil className="w-4 h-4 text-sett-text-accent" />
-                  </div>
-                  <p className="text-body text-sett-text-accent mt-0.5">Booking details for this offer</p>
-                </div>
-              </div>
-              <Button variant="primary" onClick={handleAddHotelsClick} isLoading={actionLoading}>
-                Add Hotels
-              </Button>
-            </div>
-
-            {/* Trip Details */}
-            <div className="mb-6">
-              <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Trip Details</h3>
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
-                    <MapPin className="w-4 h-4 text-sett-text-accent" />
-                    {request.destinationName || '—'}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
-                    <Calendar className="w-4 h-4 text-sett-text-accent" />
-                    {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className="text-label text-sett-text-accent uppercase tracking-wide">Hotel Category</p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-body text-sett-text-secondary">({request.starRating}-Star)</span>
-                      {request.starRating && <StarRating rating={request.starRating} />}
-                    </div>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-label text-sett-text-accent uppercase tracking-wide">Budget Range</p>
-                    <p className="text-body text-sett-text-secondary mt-0.5">{request.budgetRange || '—'}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-label text-sett-text-accent uppercase tracking-wide">Group Type</p>
-                    <p className="text-body text-sett-text-secondary mt-0.5 capitalize">{request.groupType || '—'}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-label text-sett-text-accent uppercase tracking-wide">Guests</p>
-                    <p className="text-body text-sett-text-secondary mt-0.5">{request.groupSize ?? '—'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <hr className="border-sett-border mb-6" />
-
-            {/* Room & Accommodations */}
-            <div className="mb-6">
-              <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Room & Accommodations</h3>
-              <div className="grid grid-cols-4 gap-4 mb-4">
-                {[
-                  { label: 'SINGLE', value: rooms?.single },
-                  { label: 'DOUBLE', value: rooms?.double },
-                  { label: 'TRIPLE', value: rooms?.triple },
-                  { label: 'QUADRUPLE', value: rooms?.quadruple },
-                ].map((room) => (
-                  <div key={room.label} className="border border-sett-border rounded-card p-4 text-center">
-                    <p className="text-heading-sm font-bold text-sett-text-primary">{room.value || '—'}</p>
-                    <p className="text-label text-sett-text-accent uppercase tracking-wide">{room.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {rooms?.extraRoomsNote && (
-                <div className="bg-[#f0f5ff] rounded-card px-4 py-3 mb-4">
-                  <span className="font-semibold text-body text-sett-text-primary">Extras: </span>
-                  <span className="text-body text-sett-text-secondary">{rooms.extraRoomsNote}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="border border-sett-border rounded-card p-4 text-center">
-                  <p className="text-body font-semibold text-sett-text-primary">{breakfastLabel}</p>
-                  <p className="text-label text-sett-text-accent uppercase tracking-wide">Breakfast Preference</p>
-                </div>
-                <div className="border border-sett-border rounded-card p-4 text-center">
-                  <p className="text-body font-semibold text-sett-text-primary">{locationLabel}</p>
-                  <p className="text-label text-sett-text-accent uppercase tracking-wide">Hotel Location</p>
-                </div>
-              </div>
-
-              {request.specialRequirements && (
-                <div className="bg-[#f0f5ff] rounded-card px-4 py-3">
-                  <span className="font-semibold text-body text-sett-text-primary">Special requirement: </span>
-                  <span className="text-body text-sett-text-secondary">{request.specialRequirements}</span>
-                </div>
-              )}
-            </div>
-
-            <hr className="border-sett-border mb-6" />
-
-            {/* Customer Details */}
-            <div className="mb-6">
-              <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Customer Details</h3>
-              <div className="grid grid-cols-3 gap-4 mb-3">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
-                    <span className="text-label text-sett-text-accent uppercase tracking-wide">Company Name</span>
-                  </div>
-                  <p className="text-body text-sett-text-primary">{request.companyName || '—'}</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <FileText className="w-3.5 h-3.5 text-sett-text-accent" />
-                    <span className="text-label text-sett-text-accent uppercase tracking-wide">Guest List</span>
-                  </div>
-                  {request.guestListFileKey ? (
-                    <a href="#" className="text-body text-sett-primary hover:underline">{request.guestListFileKey}</a>
-                  ) : (
-                    <p className="text-body text-sett-text-secondary">—</p>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Users className="w-3.5 h-3.5 text-sett-text-accent" />
-                    <span className="text-label text-sett-text-accent uppercase tracking-wide">Contact Person</span>
-                  </div>
-                  <p className="text-body text-sett-text-primary">
-                    {[request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—'}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4 mb-3">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Mail className="w-3.5 h-3.5 text-sett-text-accent" />
-                    <span className="text-label text-sett-text-accent uppercase tracking-wide">Email Address</span>
-                  </div>
-                  <p className="text-body text-sett-text-primary">{request.contactEmail || '—'}</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Phone className="w-3.5 h-3.5 text-sett-text-accent" />
-                    <span className="text-label text-sett-text-accent uppercase tracking-wide">Phone Number</span>
-                  </div>
-                  <p className="text-body text-sett-text-primary">{request.contactPhone || '—'}</p>
-                </div>
-              </div>
-              {request.customerNotes && (
-                <div className="bg-[#f0f5ff] rounded-card px-4 py-3">
-                  <span className="font-semibold text-body text-sett-text-primary">Special requirement: </span>
-                  <span className="text-body text-sett-text-secondary">{request.customerNotes}</span>
-                </div>
-              )}
-            </div>
-
-            <hr className="border-sett-border mb-6" />
-
-            {/* Policies */}
+      {/* ════════════════════ REQUEST SUMMARY CARD ════════════════════ */}
+      <div className="bg-sett-card rounded-card border border-sett-border p-6">
+        {/* Section header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-start gap-3">
+            <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
             <div>
-              <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Policies</h3>
-              {request.termsAndConditions && (
-                <div className="bg-sett-fill rounded-card px-4 py-3 mb-3">
-                  <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">Terms & Conditions</p>
-                  <p className="text-body text-sett-text-secondary whitespace-pre-line">{request.termsAndConditions}</p>
-                </div>
-              )}
-              {request.cancellationConditions && (
-                <div className="bg-sett-fill rounded-card px-4 py-3">
-                  <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">Cancellation Conditions</p>
-                  <p className="text-body text-sett-text-secondary whitespace-pre-line">{request.cancellationConditions}</p>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <h2 className="text-heading-sm font-bold text-sett-text-primary">
+                  Request Summary
+                </h2>
+                <Pencil className="w-4 h-4 text-sett-text-accent cursor-pointer hover:text-sett-text-primary" />
+              </div>
+              <p className="text-body text-sett-text-accent mt-0.5">
+                Booking details for this offer
+              </p>
             </div>
           </div>
+        </div>
 
-          {/* Hotels Section - only show when proposal exists */}
-          {proposal && (
-            <div className="bg-sett-card rounded-card border border-sett-border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-heading-sm font-bold text-sett-text-primary">Hotels</h3>
-                <Button variant="primary" size="sm" onClick={handleAddHotelsClick}>
-                  + Add Hotel
-                </Button>
+        {/* Collapsible content */}
+        {!summaryCollapsed && (
+          <>
+        {/* ── Trip Details ── */}
+        <div className="mb-6 mt-6">
+          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Trip Details</h3>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
+                <MapPin className="w-4 h-4 text-sett-text-accent shrink-0" />
+                {request.destinationName || '—'}
               </div>
-
-              {hotels.length === 0 ? (
-                <p className="text-body text-sett-text-accent py-4">No hotels added yet. Click &quot;Add Hotels&quot; to search and add hotels.</p>
-              ) : (
-                <div className="space-y-4">
-                  {hotels.map((hotel) => (
-                    <HotelCard
-                      key={hotel.id}
-                      hotel={hotel}
-                      onRemove={() => setRemoveHotelTarget(hotel.id)}
-                    />
-                  ))}
+              <span className="text-sett-text-accent">·</span>
+              <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
+                <Calendar className="w-4 h-4 text-sett-text-accent shrink-0" />
+                {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
+              </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-center">
+                <p className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Hotel Category
+                </p>
+                <div className="flex items-center gap-1 mt-0.5 justify-center">
+                  <span className="text-body text-sett-text-secondary">
+                    ({request.starRating}-Star)
+                  </span>
+                  {request.starRating && <StarRating rating={request.starRating} />}
                 </div>
-              )}
+              </div>
+              <div className="text-center">
+                <p className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Budget Range
+                </p>
+                <p className="text-body text-sett-text-secondary mt-0.5">
+                  {request.budgetRange || '—'}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Group Type
+                </p>
+                <p className="text-body text-sett-text-secondary mt-0.5 capitalize">
+                  {request.groupType || '—'}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-label text-sett-text-accent uppercase tracking-wide">Guests</p>
+                <p className="text-body text-sett-text-secondary mt-0.5">
+                  {request.groupSize ?? '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr className="border-sett-border mb-6" />
+
+        {/* ── Room & Accommodations ── */}
+        <div className="mb-6">
+          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">
+            Room & Accommodations
+          </h3>
+          <div className="grid grid-cols-4 gap-4 mb-4">
+            {[
+              { label: 'SINGLE', value: rooms?.single },
+              { label: 'DOUBLE', value: rooms?.double },
+              { label: 'TRIPLE', value: rooms?.triple },
+              { label: 'QUADRUPLE', value: rooms?.quadruple },
+            ].map((room) => (
+              <div
+                key={room.label}
+                className="border border-sett-border rounded-card p-4 text-center"
+              >
+                <p className="text-heading-sm font-bold text-sett-text-primary">
+                  {room.value || '—'}
+                </p>
+                <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
+                  {room.label}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {rooms?.extraRoomsNote && (
+            <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mb-4">
+              <span className="font-semibold text-body text-sett-text-primary">Extras: </span>
+              <span className="text-body text-sett-text-secondary">{rooms.extraRoomsNote}</span>
             </div>
           )}
 
-          {/* Additional Services Section */}
-          {proposal && (
-            <div className="bg-sett-card rounded-card border border-sett-border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-heading-sm font-bold text-sett-text-primary">Additional Services</h3>
-                <Button variant="outline" size="sm" onClick={() => setAddServiceOpen(true)}>
-                  + Add Service
-                </Button>
-              </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="border border-sett-border rounded-card p-4 text-center">
+              <p className="text-body font-semibold text-sett-text-primary">{breakfastLabel}</p>
+              <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
+                Breakfast Preference
+              </p>
+            </div>
+            <div className="border border-sett-border rounded-card p-4 text-center">
+              <p className="text-body font-semibold text-sett-text-primary">{locationLabel}</p>
+              <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
+                Hotel Location
+              </p>
+            </div>
+          </div>
 
-              {services.length === 0 ? (
-                <p className="text-body text-sett-text-accent py-4">No services added yet.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-sett-border">
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Service</th>
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Markup %</th>
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Buy</th>
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Sell</th>
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Qty</th>
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Nights</th>
-                        <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 py-2">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {services.map((service) => {
-                        const buy = Number(service.buyPrice ?? 0);
-                        const sell = Number(service.sellPrice ?? 0);
-                        const qty = service.quantity ?? 1;
-                        const markup = buy > 0 ? ((sell - buy) / buy) * 100 : 0;
-                        return (
-                          <tr key={service.id} className="border-b border-sett-border last:border-0">
-                            <td className="px-3 py-2.5 text-body">{service.serviceName ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-body">{markup.toFixed(0)}%</td>
-                            <td className="px-3 py-2.5 text-body">{buy.toFixed(2)}</td>
-                            <td className="px-3 py-2.5 text-body">{sell.toFixed(2)}</td>
-                            <td className="px-3 py-2.5 text-body">{qty}</td>
-                            <td className="px-3 py-2.5 text-body">{service.notes ?? '—'}</td>
-                            <td className="px-3 py-2.5 text-body font-semibold">{(sell * qty).toFixed(2)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          {request.specialRequirements && (
+            <div className="bg-[#EDF4FE] rounded-card px-4 py-3">
+              <span className="font-semibold text-body text-sett-text-primary">
+                Special requirement:{' '}
+              </span>
+              <span className="text-body text-sett-text-secondary">
+                {request.specialRequirements}
+              </span>
             </div>
           )}
         </div>
 
-        {/* Right sidebar: Room Breakdown - only when proposal has hotels */}
+        <hr className="border-sett-border mb-6" />
+
+        {/* ── Customer Details ── */}
+        <div className="mb-6">
+          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">
+            Customer Details
+          </h3>
+          <div className="grid grid-cols-3 gap-x-6 gap-y-4 mb-3">
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
+                <span className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Company Name
+                </span>
+              </div>
+              <p className="text-body text-sett-text-primary font-medium">
+                {request.companyName || '—'}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <FileText className="w-3.5 h-3.5 text-sett-text-accent" />
+                <span className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Guest List
+                </span>
+              </div>
+              {request.guestListFileKey ? (
+                <a href="#" className="text-body text-sett-primary hover:underline font-medium">
+                  {request.guestListFileKey}
+                </a>
+              ) : (
+                <p className="text-body text-sett-text-secondary">—</p>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Users className="w-3.5 h-3.5 text-sett-text-accent" />
+                <span className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Contact Person
+                </span>
+              </div>
+              <p className="text-body text-sett-text-primary font-medium">
+                {[request.firstName, request.lastName].filter(Boolean).join(' ') ||
+                  request.contactName ||
+                  '—'}
+              </p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Mail className="w-3.5 h-3.5 text-sett-text-accent" />
+                <span className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Email Address
+                </span>
+              </div>
+              <p className="text-body text-sett-text-primary">{request.contactEmail || '—'}</p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <Phone className="w-3.5 h-3.5 text-sett-text-accent" />
+                <span className="text-label text-sett-text-accent uppercase tracking-wide">
+                  Phone Number
+                </span>
+              </div>
+              <p className="text-body text-sett-text-primary">{request.contactPhone || '—'}</p>
+            </div>
+          </div>
+          {request.customerNotes && (
+            <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mt-3">
+              <span className="font-semibold text-body text-sett-text-primary">
+                Special requirement:{' '}
+              </span>
+              <span className="text-body text-sett-text-secondary">{request.customerNotes}</span>
+            </div>
+          )}
+        </div>
+
+        <hr className="border-sett-border mb-6" />
+
+        {/* ── Policies ── */}
+        <div>
+          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Policies</h3>
+          {request.termsAndConditions && (
+            <div className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50">
+              <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
+                Terms & Conditions
+              </p>
+              <p className="text-body text-sett-text-secondary whitespace-pre-line">
+                {request.termsAndConditions}
+              </p>
+            </div>
+          )}
+          {request.cancellationConditions && (
+            <div className="bg-sett-fill rounded-card px-4 py-3 border border-sett-border/50">
+              <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
+                Cancellation Conditions
+              </p>
+              <p className="text-body text-sett-text-secondary whitespace-pre-line">
+                {request.cancellationConditions}
+              </p>
+            </div>
+          )}
+        </div>
+          </>
+        )}
+
+        {/* Collapse/Expand toggle */}
+        <div className="flex justify-center mt-4">
+          <button
+            type="button"
+            onClick={() => setSummaryCollapsed(!summaryCollapsed)}
+            className="p-1 rounded-full hover:bg-sett-fill transition-colors text-sett-text-accent hover:text-sett-text-primary"
+            aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
+          >
+            {summaryCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* ════════════════════ HOTELS + SIDEBAR ════════════════════ */}
+      <div className="flex gap-6">
+        {/* Left: Hotels + Services */}
+        <div className="flex-1 min-w-0 space-y-6">
+          {/* Hotels */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-heading-sm font-bold text-sett-text-primary">Hotels</h3>
+              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading}>
+                + Add Hotel
+              </Button>
+            </div>
+
+            {hotels.length === 0 ? (
+              <div className="bg-sett-card rounded-card border border-sett-border p-6 text-center">
+                <p className="text-body text-sett-text-accent">
+                  No hotels added yet. Click &quot;+ Add Hotel&quot; to search and add hotels.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {hotels.map((hotel) => (
+                  <HotelCard
+                    key={hotel.id}
+                    hotel={hotel}
+                    proposalId={proposal!.id}
+                    onPricingUpdate={handlePricingUpdate}
+                    onRemove={() => setRemoveHotelTarget(hotel.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Additional Services */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-heading-sm font-bold text-sett-text-primary">
+                Additional Services
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAddServiceOpen(true)}
+                className="px-4 py-1.5 border border-sett-primary rounded-full text-body text-sett-primary font-medium hover:bg-sett-primary/5 transition-colors"
+              >
+                + Add Service
+              </button>
+            </div>
+
+            {services.length > 0 && (
+              <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-sett-border bg-sett-fill">
+                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                        Service
+                      </th>
+                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                        Net &euro;
+                      </th>
+                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                        Markup
+                      </th>
+                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                        Sell &euro;
+                      </th>
+                      <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                        Qty
+                      </th>
+                      <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                        Total &euro;
+                      </th>
+                      <th className="w-20" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {services.map((service) => (
+                      <ServiceRow
+                        key={service.id}
+                        service={service}
+                        onEdit={() => setEditingService(service)}
+                        onDelete={() => setRemoveServiceTarget(service.id)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right sidebar — only show when proposal exists with hotels */}
         {proposal && hotels.length > 0 && (
-          <div className="w-80 shrink-0 space-y-4">
-            {/* Map placeholder */}
+          <div className="w-72 shrink-0 space-y-4">
+            {/* View on map */}
             <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
-              <div className="h-40 bg-sett-fill flex items-center justify-center text-sett-text-accent text-body">
-                <button
-                  type="button"
-                  className="text-sett-primary hover:underline text-body font-medium"
-                >
-                  View on map
-                </button>
+              <h4 className="text-body font-bold text-sett-text-primary px-5 pt-4 pb-2">
+                View on map
+              </h4>
+              <div className="h-44 bg-sett-fill flex items-center justify-center mx-4 mb-4 rounded-lg overflow-hidden">
+                <MapPin className="w-8 h-8 text-sett-text-accent" />
               </div>
             </div>
 
             {/* Room Breakdown */}
-            <div className="bg-sett-card rounded-card border border-sett-border p-4">
-              <h4 className="text-heading-sm font-bold text-sett-text-primary mb-3">Room Breakdown</h4>
-              <dl className="space-y-2">
+            <div className="bg-sett-card rounded-card border border-sett-border p-5">
+              <h4 className="text-heading-sm font-bold text-sett-text-primary mb-4">
+                Room Breakdown
+              </h4>
+              <dl className="space-y-3">
                 <div className="flex justify-between text-body">
                   <dt className="text-sett-text-secondary">Total Purchase</dt>
-                  <dd className="font-semibold">&euro;{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}</dd>
+                  <dd className="font-semibold text-sett-text-primary">
+                    &euro;{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </dd>
                 </div>
                 <hr className="border-sett-border" />
                 <div className="flex justify-between text-body">
                   <dt className="text-sett-text-secondary">Total Sell</dt>
-                  <dd className="font-semibold">&euro;{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}</dd>
+                  <dd className="font-semibold text-sett-text-primary">
+                    &euro;{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </dd>
                 </div>
                 <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">Markup EUR</dt>
-                  <dd className="font-semibold text-sett-primary">&euro;{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}</dd>
+                  <dt className="text-sett-text-secondary">Margin EUR</dt>
+                  <dd className="font-semibold text-sett-primary">
+                    &euro;{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </dd>
                 </div>
                 <div className="flex justify-between text-body">
                   <dt className="text-sett-text-secondary">Margin %</dt>
-                  <dd className="font-semibold">{totals.margin.toFixed(1)}%</dd>
+                  <dd className="font-semibold text-sett-primary">
+                    {totals.margin.toFixed(1)}%
+                  </dd>
                 </div>
               </dl>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                Preview PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setSaveDraftOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
+              >
+                <Save className="w-4 h-4" />
+                Save Draft
+              </button>
+              <button
+                type="button"
+                onClick={() => setSendOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-primary rounded-card text-body font-medium text-white hover:bg-sett-primary/90 transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Approve &amp; Send
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeclineOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-destructive rounded-card text-body font-medium text-sett-destructive hover:bg-red-50 transition-colors"
+              >
+                <XCircle className="w-4 h-4" />
+                Mark as Declined
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Bottom action bar - only show when proposal exists */}
-      {proposal && (
-        <div className="fixed bottom-0 left-0 right-0 lg:left-[200px] bg-sett-card border-t border-sett-border px-6 py-3 flex items-center justify-between z-40">
-          <Button variant="outline" size="sm" onClick={() => setAddServiceOpen(true)}>
-            + Add Service
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
-              Preview PDF
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setSaveDraftOpen(true)}>
-              Save Draft
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => setSendOpen(true)}>
-              Approve &amp; Send
-            </Button>
-            <Button variant="destructive" size="sm" onClick={() => setDeclineOpen(true)}>
-              Mark as Declined
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Modals */}
+      {/* ════════════════════ MODALS ════════════════════ */}
       <AddServiceModal
         open={addServiceOpen}
         onClose={() => setAddServiceOpen(false)}
         onAdd={handleAddService}
         isLoading={actionLoading}
+      />
+
+      <AddServiceModal
+        open={!!editingService}
+        onClose={() => setEditingService(null)}
+        onAdd={handleEditService}
+        isLoading={actionLoading}
+        initialData={editingService ?? undefined}
+      />
+
+      <ConfirmModal
+        open={!!removeServiceTarget}
+        onClose={() => setRemoveServiceTarget(null)}
+        onConfirm={() => removeServiceTarget && handleRemoveService(removeServiceTarget)}
+        title="Are you sure you want to remove this service?"
+        message="This service will be removed from the offer."
+        confirmLabel="Remove"
+        variant="danger"
       />
 
       <ConfirmModal
@@ -633,80 +832,398 @@ export default function RequestDetailPage() {
   );
 }
 
+/* ─────────────── Markup Dropdown ─────────────── */
+
+const MARKUP_PRESETS = [10, 15, 18, 20, 25] as const;
+
+function MarkupDropdown({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (markup: number) => void;
+}) {
+  const [isCustom, setIsCustom] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  const isPreset = MARKUP_PRESETS.includes(Math.round(value) as typeof MARKUP_PRESETS[number]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setIsCustom(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const handleSelect = (preset: number) => {
+    onChange(preset);
+    setOpen(false);
+    setIsCustom(false);
+  };
+
+  const handleCustomSubmit = () => {
+    const parsed = parseFloat(customValue);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+      onChange(parsed);
+      setOpen(false);
+      setIsCustom(false);
+      setCustomValue('');
+    }
+  };
+
+  return (
+    <div className="relative inline-block" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 px-2 py-1 rounded border border-sett-border hover:border-sett-primary text-body text-sett-text-primary bg-white transition-colors min-w-[72px] justify-between"
+      >
+        <span>{Math.round(value)}%</span>
+        <svg className="w-3 h-3 text-sett-text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 right-0 bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1">
+          {MARKUP_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => handleSelect(preset)}
+              className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors ${
+                Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
+              }`}
+            >
+              {preset}%
+            </button>
+          ))}
+          <hr className="border-sett-border my-1" />
+          {isCustom ? (
+            <div className="px-3 py-1.5 flex items-center gap-1">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={customValue}
+                onChange={(e) => setCustomValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCustomSubmit();
+                  if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
+                }}
+                autoFocus
+                className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
+                placeholder="0-100"
+              />
+              <span className="text-body text-sett-text-accent">%</span>
+              <button
+                type="button"
+                onClick={handleCustomSubmit}
+                className="text-sett-primary text-body font-medium hover:underline ml-1"
+              >
+                OK
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(Math.round(value))); }}
+              className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
+            >
+              Custom...
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────── Hotel Card ─────────────── */
+
+type RoomData = Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>;
 
 function HotelCard({
   hotel,
+  proposalId,
+  onPricingUpdate,
   onRemove,
 }: {
   hotel: ProposalHotel;
+  proposalId: string;
+  onPricingUpdate: (hotelId: string, updatedHotel: ProposalHotel) => void;
   onRemove: () => void;
 }) {
-  const roomEntries = hotel.rooms ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>) : [];
+  const [localRooms, setLocalRooms] = useState<RoomData>(
+    (hotel.rooms as RoomData) ?? {}
+  );
+  const [saving, setSaving] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync local rooms when hotel prop changes (e.g. after API refresh)
+  useEffect(() => {
+    setLocalRooms((hotel.rooms as RoomData) ?? {});
+  }, [hotel.rooms]);
+
+  const roomEntries = Object.entries(localRooms);
+
+  const computeTotalPrice = useCallback((rooms: RoomData): number => {
+    return Object.values(rooms).reduce((sum, detail) => {
+      const sell = Number(detail.sell ?? 0);
+      const qty = detail.qty ?? 1;
+      const nights = detail.nights ?? 1;
+      return sum + sell * qty * nights;
+    }, 0);
+  }, []);
+
+  const persistPricing = useCallback(
+    (updatedRooms: RoomData) => {
+      // Debounce API calls by 800ms
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(async () => {
+        setSaving(true);
+        try {
+          const totalPrice = computeTotalPrice(updatedRooms);
+          const { hotel: updatedHotel } = await proposalsApi.adjustHotelPricing(proposalId, hotel.id, {
+            rooms: updatedRooms,
+            totalPrice,
+            currency: hotel.currency,
+          });
+          onPricingUpdate(hotel.id, updatedHotel);
+        } catch {
+          // Revert on failure
+          setLocalRooms((hotel.rooms as RoomData) ?? {});
+        } finally {
+          setSaving(false);
+        }
+      }, 800);
+    },
+    [proposalId, hotel.id, hotel.currency, hotel.rooms, computeTotalPrice, onPricingUpdate]
+  );
+
+  const handleMarkupChange = useCallback(
+    (roomType: string, newMarkup: number) => {
+      setLocalRooms((prev) => {
+        const detail = prev[roomType];
+        if (!detail) return prev;
+        const net = Number(detail.net ?? 0);
+        const newSell = parseFloat((net * (1 + newMarkup / 100)).toFixed(2));
+        const updated = {
+          ...prev,
+          [roomType]: { ...detail, sell: newSell },
+        };
+        persistPricing(updated);
+        return updated;
+      });
+    },
+    [persistPricing]
+  );
+
+  const handleSellChange = useCallback(
+    (roomType: string, newSell: number) => {
+      setLocalRooms((prev) => {
+        const detail = prev[roomType];
+        if (!detail) return prev;
+        const updated = {
+          ...prev,
+          [roomType]: { ...detail, sell: parseFloat(newSell.toFixed(2)) },
+        };
+        persistPricing(updated);
+        return updated;
+      });
+    },
+    [persistPricing]
+  );
 
   return (
-    <div className="border border-sett-border rounded-card overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-sett-fill">
+    <div className="bg-sett-card rounded-card border border-sett-border">
+      {/* Hotel header — dark navy */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#1B2B44] rounded-t-card">
         <div className="flex items-center gap-2">
-          <h4 className="text-body font-bold text-sett-text-primary">{hotel.hotelName ?? hotel.hotelCode}</h4>
-          {hotel.tid && (
-            <span className="text-label text-sett-text-accent">({hotel.tid})</span>
+          <h4 className="text-body font-bold text-white">
+            {hotel.hotelName ?? hotel.hotelCode}
+          </h4>
+          <div className="flex gap-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
+            ))}
+          </div>
+          {saving && (
+            <span className="text-caption text-white/70 ml-2 animate-pulse">Saving...</span>
           )}
         </div>
         <button
           type="button"
           onClick={onRemove}
-          className="text-body text-sett-destructive hover:underline font-medium"
+          className="flex items-center gap-1.5 text-body text-white/80 hover:text-white font-medium transition-colors"
         >
+          <Trash2 className="w-3.5 h-3.5" />
           Remove
         </button>
       </div>
 
-      {roomEntries.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-sett-border">
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Room Type</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Net</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Markup</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Sell</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Qty</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Nights</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roomEntries.map(([type, detail]) => {
-                const net = Number(detail.net ?? 0);
-                const sell = Number(detail.sell ?? 0);
-                const qty = detail.qty ?? 1;
-                const nights = detail.nights ?? 1;
-                const markup = net > 0 ? ((sell - net) / net * 100).toFixed(0) : '0';
-                return (
-                  <tr key={type} className="border-b border-sett-border last:border-0">
-                    <td className="px-4 py-2.5 text-body capitalize">{type.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-2.5 text-body">{net.toFixed(2)}</td>
-                    <td className="px-4 py-2.5 text-body">{markup}%</td>
-                    <td className="px-4 py-2.5 text-body">{sell.toFixed(2)}</td>
-                    <td className="px-4 py-2.5 text-body">{qty}</td>
-                    <td className="px-4 py-2.5 text-body">{nights}</td>
-                    <td className="px-4 py-2.5 text-body font-semibold">{(sell * qty * nights).toFixed(2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* Address line */}
+      {hotel.hotelName && (
+        <div className="px-4 py-2 border-b border-sett-border">
+          <p className="text-caption text-sett-text-accent">
+            {hotel.hotelCode}
+          </p>
         </div>
       )}
 
-      {roomEntries.length === 0 && (
+      {/* Room table */}
+      {roomEntries.length > 0 ? (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-sett-border">
+              <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Room Type
+              </th>
+              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Net &euro;
+              </th>
+              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Markup
+              </th>
+              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Sell &euro;
+              </th>
+              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Qty
+              </th>
+              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Nights
+              </th>
+              <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                Total &euro;
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {roomEntries.map(([type, detail]) => {
+              const net = Number(detail.net ?? 0);
+              const sell = Number(detail.sell ?? 0);
+              const qty = detail.qty ?? 1;
+              const nights = detail.nights ?? 1;
+              const markup = net > 0 ? ((sell - net) / net) * 100 : 0;
+              const total = sell * qty * nights;
+              return (
+                <tr key={type} className="border-b border-sett-border last:border-0">
+                  <td className="px-4 py-2.5 text-body text-sett-text-primary">{type}</td>
+                  <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
+                    {net.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={sell.toFixed(2)}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val) && val >= 0) handleSellChange(type, val);
+                      }}
+                      className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
+                    {qty}
+                  </td>
+                  <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
+                    {nights}
+                  </td>
+                  <td className="px-4 py-2.5 text-body text-sett-primary text-right font-semibold">
+                    {total.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ) : (
         <div className="px-4 py-3">
           <p className="text-body text-sett-text-secondary">
-            {hotel.currency} {Number(hotel.totalPrice).toFixed(2)}
+            {hotel.currency} {Number(hotel.totalPrice).toLocaleString('en', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      )}
+
+      {/* Cancellation info */}
+      {hotel.freeCancellation && hotel.cancelDeadline && (
+        <div className="px-4 py-2 border-t border-sett-border/50">
+          <p className="text-caption text-sett-primary font-medium">
+            Free cancellation until{' '}
+            {new Date(hotel.cancelDeadline).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })}
           </p>
         </div>
       )}
     </div>
+  );
+}
+
+/* ─────────────── Service Row ─────────────── */
+
+function ServiceRow({
+  service,
+  onEdit,
+  onDelete,
+}: {
+  service: ProposalService;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const buy = Number(service.buyPrice ?? 0);
+  const sell = Number(service.sellPrice ?? 0);
+  const qty = service.quantity ?? 1;
+  const markup = buy > 0 ? ((sell - buy) / buy) * 100 : 0;
+  const total = sell * qty;
+
+  return (
+    <tr className="border-b border-sett-border last:border-0">
+      <td className="px-4 py-2.5 text-body text-sett-text-primary">
+        {service.serviceName ?? '—'}
+      </td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary">{buy.toFixed(2)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary">{markup.toFixed(0)}%</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary">{sell.toFixed(2)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary">{qty}</td>
+      <td className="px-4 py-2.5 text-body text-sett-primary text-right font-semibold">
+        {total.toLocaleString('en', { minimumFractionDigits: 2 })}
+      </td>
+      <td className="px-4 py-2.5 text-right">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-sett-text-accent hover:text-sett-primary transition-colors"
+          >
+            <SquarePen className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-sett-text-accent hover:text-sett-destructive transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }

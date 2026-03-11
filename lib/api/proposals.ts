@@ -52,22 +52,39 @@ export const proposalsApi = {
     proposalId: string,
     hotelId: string,
     payload: AdjustHotelPricingPayload
-  ): Promise<ProposalHotel> {
-    const { data } = await apiClient.post<ApiResponse<ProposalHotel>>(
-      `/proposals/${proposalId}/hotels/${hotelId}/adjust-pricing`,
-      payload
-    );
+  ): Promise<{ hotel: ProposalHotel; proposal: Proposal }> {
+    const { data } = await apiClient.post<
+      ApiResponse<{ hotel: ProposalHotel; proposal: Proposal }>
+    >(`/proposals/${proposalId}/hotels/${hotelId}/adjust-pricing`, payload);
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to adjust pricing');
     return data.data;
   },
 
-  async addService(proposalId: string, payload: AddProposalServicePayload): Promise<ProposalService> {
-    const { data } = await apiClient.post<ApiResponse<ProposalService>>(
-      `/proposals/${proposalId}/services`,
-      payload
-    );
+  async addService(
+    proposalId: string,
+    payload: AddProposalServicePayload
+  ): Promise<{ service: ProposalService; proposal: Proposal }> {
+    const { data } = await apiClient.post<
+      ApiResponse<{ service: ProposalService; proposal: Proposal }>
+    >(`/proposals/${proposalId}/services`, payload);
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to add service');
     return data.data;
+  },
+
+  async updateService(
+    proposalId: string,
+    serviceId: string,
+    payload: Partial<AddProposalServicePayload>
+  ): Promise<{ service: ProposalService; proposal: Proposal }> {
+    const { data } = await apiClient.patch<
+      ApiResponse<{ service: ProposalService; proposal: Proposal }>
+    >(`/proposals/${proposalId}/services/${serviceId}`, payload);
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to update service');
+    return data.data;
+  },
+
+  async removeService(proposalId: string, serviceId: string): Promise<void> {
+    await apiClient.delete(`/proposals/${proposalId}/services/${serviceId}`);
   },
 
   async lock(proposalId: string): Promise<Proposal> {
@@ -100,6 +117,14 @@ export const proposalsApi = {
       payload ?? {}
     );
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to send');
+    return data.data;
+  },
+
+  async previewPdf(proposalId: string): Promise<{ previewUrl: string | null; note?: string }> {
+    const { data } = await apiClient.post<ApiResponse<{ previewUrl: string | null; note?: string }>>(
+      `/proposals/${proposalId}/actions/preview-pdf`
+    );
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to generate preview');
     return data.data;
   },
 };

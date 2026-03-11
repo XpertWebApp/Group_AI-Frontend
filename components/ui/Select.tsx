@@ -22,7 +22,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       <div>
         {label && (
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            {label}
+            {label.endsWith('*') ? (
+              <>
+                {label.slice(0, -1).trimEnd()}{' '}
+                <span className="text-red-500">*</span>
+              </>
+            ) : (
+              label
+            )}
           </label>
         )}
         <div className="relative">

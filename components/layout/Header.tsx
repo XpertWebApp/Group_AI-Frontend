@@ -3,6 +3,7 @@
 import { Bell, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { NotificationsModal } from '@/components/ui/NotificationsModal';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { useAppLayout } from '@/app/(dashboard)/AppLayoutContext';
 
 interface HeaderProps {
@@ -25,6 +26,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
+        <LanguageToggle />
         {onRefresh && (
           <button
             type="button"

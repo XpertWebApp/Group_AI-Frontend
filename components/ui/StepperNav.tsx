@@ -20,28 +20,46 @@ export function StepperNav({ steps, currentStep }: StepperNavProps) {
         {steps.map((step, i) => {
           const isCompleted = i < currentStep;
           const isActive = i === currentStep;
+          const isReached = isCompleted || isActive;
           return (
-            <div key={step.label} className="flex flex-col items-start gap-2">
+            <div key={step.label} className="flex flex-col items-start gap-3">
+              {/* Step icon circle */}
               <div
                 className={cn(
-                  'w-9 h-9 rounded-lg flex items-center justify-center',
-                  isCompleted || isActive
-                    ? 'bg-sett-light-green-bg'
-                    : 'bg-sett-fill'
+                  'w-10 h-10 rounded-xl flex items-center justify-center',
+                  isReached ? 'bg-sett-light-green-bg' : 'bg-[#f5f5f5]'
                 )}
               >
-                <Image src={step.icon} alt="" width={16} height={16} />
+                <Image
+                  src={step.icon}
+                  alt=""
+                  width={18}
+                  height={18}
+                  className={cn(
+                    isReached
+                      ? 'brightness-0 invert-[45%] sepia-[90%] saturate-[400%] hue-rotate-[30deg]'
+                      : 'opacity-40'
+                  )}
+                />
               </div>
+
+              {/* Progress bar — thicker to match Figma */}
               <div
                 className={cn(
-                  'w-full h-1 rounded-full',
-                  isCompleted || isActive ? 'bg-sett-primary' : 'bg-sett-fill'
+                  'w-full h-[12px] rounded-full',
+                  isReached ? 'bg-sett-primary' : 'bg-[#f0f0f0]'
                 )}
               />
+
+              {/* Step label */}
               <span
                 className={cn(
                   'text-body font-medium',
-                  isActive ? 'text-sett-text-secondary' : 'text-sett-text-accent'
+                  isActive
+                    ? 'text-sett-text-secondary'
+                    : isCompleted
+                      ? 'text-sett-text-primary'
+                      : 'text-sett-text-accent'
                 )}
               >
                 {step.label}

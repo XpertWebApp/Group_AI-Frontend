@@ -80,9 +80,9 @@ export default function ProposalPage() {
   const handleAddService = async (payload: Parameters<typeof proposalsApi.addService>[1]) => {
     setActionLoading(true);
     try {
-      const added = await proposalsApi.addService(id, payload);
+      const { service } = await proposalsApi.addService(id, payload);
       setProposal((p) =>
-        p ? { ...p, services: [...(p.services ?? []), added] } : null
+        p ? { ...p, services: [...(p.services ?? []), service] } : null
       );
       setAddServiceOpen(false);
     } finally {

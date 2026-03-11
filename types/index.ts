@@ -2,6 +2,7 @@ export enum BookingRequestStatus {
   PENDING = 'pending',
   DRAFT = 'draft',
   PROCESSING = 'processing',
+  AI_GENERATED = 'ai_generated',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
 }
@@ -84,6 +85,15 @@ export interface BookingRequest {
   status: BookingRequestStatus;
   createdAt: string;
   updatedAt?: string | null;
+
+  // Joined from proposals (included in list response)
+  proposals?: {
+    id: string;
+    status: string;
+    totalBuy: string | number | null;
+    totalSell: string | number | null;
+    sentAt?: string | null;
+  }[];
 }
 
 export interface BookingRequestListItem {
@@ -125,7 +135,10 @@ export interface ProposalHotel {
   tid?: string | null;
   totalPrice: number;
   currency: string;
-  rooms?: Record<string, unknown> | null;
+  freeCancellation?: boolean;
+  cancelDeadline?: string | null;
+  supplierCode?: string | null;
+  rooms?: Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
   createdAt: string;
 }
 
@@ -140,12 +153,127 @@ export interface ProposalService {
   createdAt: string;
 }
 
+// ──── Hotel Search Types ────
+
+export interface HotelBestOption {
+  tid: string;
+  sessionId: string;
+  supplierCode: string;
+  buyingPricePerRoomPerNight: number;
+  currency: string;
+  freeCancellation: boolean;
+  cancelDeadline?: string | null;
+  mealType: string;
+  mealName: string;
+  roomDescriptions: string[];
+}
+
 export interface HotelSearchResult {
   hotelCode: string;
-  name: string;
+  hotelName: string;
+  starRating: number;
+  imageUrl?: string | null;
+  address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;
-  starRating?: number | null;
+  sessionId: string;
+  status: 'include' | 'flag' | 'omit';
+  totalAvailableRooms: number;
+  highestMidRangePrice: number;
+  currency: string;
+  bestOption: HotelBestOption;
+  usableOptions?: unknown[];
+  selectedOptions?: unknown[];
+  note?: string | null;
+  // Legacy compat
+  name?: string;
+}
+
+export interface HotelSearchResponse {
+  requestId: string;
+  sessionId: string;
+  finished: boolean;
+  totalRoomsRequested: number;
+  summary: {
+    total: number;
+    included: number;
+    flagged: number;
+    omitted: number;
+  };
+  results: HotelSearchResult[];
+  alternativeResults: HotelSearchResult[];
+}
+
+export interface RoomBreakdownPrice {
+  date: string;
+  price: number;
+}
+
+export interface RoomBreakdown {
+  roomId: number;
+  description: string;
+  prices: RoomBreakdownPrice[];
+}
+
+export interface CancellationCondition {
+  fromDate: string;
+  toDate: string;
+  amount: number;
+  currency: string;
+  text: string;
+}
+
+export interface OptionDetailParsed {
+  nonRefundable: boolean;
+  cxlDeadline?: string | null;
+  mealType: string;
+  mealName: string;
+  daypricesTotal: number;
+  daypricesCurrency: string;
+  providerPrice: number;
+  essentialInfo?: string | null;
+  roomBreakdown: RoomBreakdown[];
+  cancellationPolicy: {
+    nonRefundable: boolean;
+    deadline?: string | null;
+    conditions: CancellationCondition[];
+    comment?: string | null;
+  };
+  supplements: unknown[];
+}
+
+export interface OptionDetailResult {
+  tid: string;
+  hotelCode: string;
+  cached: boolean;
+  parsed: OptionDetailParsed;
+  data?: unknown;
+}
+
+export interface CalculatePriceResult {
+  buyingPrice: number;
+  sellPrice: number;
+  markupPercent: number;
+}
+
+// ──── Dashboard Types ────
+
+export interface DashboardStats {
+  totalRequests: number;
+  pendingRequests: number;
+  completedThisMonth: number;
+  revenueThisMonth: number;
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  entityId?: string | null;
+  entityType?: string | null;
+  read: boolean;
+  createdAt: string;
 }
 
 export interface ApiResponse<T> {

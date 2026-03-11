@@ -14,6 +14,7 @@ export interface RoomDetail {
 
 export interface AddProposalHotelPayload {
   hotelCode: string;
+  hotelName?: string;
   tid?: string;
   rooms?: Record<string, RoomDetail>;
   currency: string;

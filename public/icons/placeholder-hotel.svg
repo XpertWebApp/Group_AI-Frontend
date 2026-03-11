@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="200" viewBox="0 0 240 200" fill="none">
+  <rect width="240" height="200" fill="#F3F4F6"/>
+  <g transform="translate(88, 60)">
+    <path d="M8 72V16C8 14.9391 8.42143 13.9217 9.17157 13.1716C9.92172 12.4214 10.9391 12 12 12H52C53.0609 12 54.0783 12.4214 54.8284 13.1716C55.5786 13.9217 56 14.9391 56 16V72" stroke="#9CA3AF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M2 72H62" stroke="#9CA3AF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M24 72V52H40V72" stroke="#9CA3AF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="20" y="28" width="10" height="10" rx="1" stroke="#9CA3AF" stroke-width="2"/>
+    <rect x="36" y="28" width="10" height="10" rx="1" stroke="#9CA3AF" stroke-width="2"/>
+  </g>
+</svg>

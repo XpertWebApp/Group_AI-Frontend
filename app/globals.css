@@ -17,3 +17,9 @@ body {
   .grid-4 { @apply gap-1; }
   .grid-8 { @apply gap-2; }
 }
+
+/* Green calendar icon for date inputs */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(55%) sepia(60%) saturate(500%) hue-rotate(45deg) brightness(95%);
+  cursor: pointer;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -8,41 +8,15 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { StepperNav } from '@/components/ui/StepperNav';
 import { RoomCounter } from '@/components/ui/RoomCounter';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 import { cn } from '@/lib/utils/cn';
-
-const STEPS = [
-  { label: 'Trip Details', icon: '/icons/Icon (4).svg' },
-  { label: 'Room & Accommodations', icon: '/icons/Icon (3).svg' },
-  { label: 'Customer Details', icon: '/icons/Icon (9).svg' },
-  { label: 'Policies', icon: '/icons/Icon (7).svg' },
-];
-
-const hotelCategoryOptions = [
-  { value: '', label: 'Select hotel category' },
-  { value: '3', label: '3-Star' },
-  { value: '4', label: '4-Star' },
-  { value: '5', label: '5-Star' },
-];
-
-const budgetRangeOptions = [
-  { value: '', label: 'Select budget range' },
-  { value: 'economy', label: 'Economy' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'premium', label: 'Premium' },
-  { value: 'luxury', label: 'Luxury' },
-];
-
-const groupTypeOptions = [
-  { value: '', label: 'Select group type' },
-  { value: 'business', label: 'Business Group' },
-  { value: 'leisure', label: 'Leisure Group' },
-  { value: 'sports', label: 'Sports Team' },
-  { value: 'conference', label: 'Conference' },
-  { value: 'wedding', label: 'Wedding' },
-];
+import { destinationsApi } from '@/lib/api/destinations';
+import type { Destination } from '@/lib/api/destinations';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface FormData {
   // Step 1: Trip Details
+  destinationId: number;
   destination: string;
   checkInDate: string;
   checkOutDate: string;
@@ -73,6 +47,7 @@ interface FormData {
 }
 
 const defaultFormData: FormData = {
+  destinationId: 0,
   destination: '',
   checkInDate: '',
   checkOutDate: '',
@@ -148,43 +123,38 @@ function RadioOption({
 
 type FieldErrors = Record<string, string>;
 
-function validateStep(step: number, data: FormData): FieldErrors {
+function validateStep(step: number, data: FormData, t: ReturnType<typeof useLanguage>['t']): FieldErrors {
   const errors: FieldErrors = {};
 
   if (step === 0) {
-    if (!data.destination.trim()) errors.destination = 'Destination is required';
-    if (!data.checkInDate) errors.checkInDate = 'Check-in date is required';
-    if (!data.checkOutDate) errors.checkOutDate = 'Check-out date is required';
-    if (data.checkInDate && data.checkOutDate && data.checkOutDate <= data.checkInDate) {
-      errors.checkOutDate = 'Check-out must be after check-in';
+    if (!data.destination.trim()) {
+      errors.destination = t.createForm.destinationRequired;
     }
-    if (!data.hotelCategory) errors.hotelCategory = 'Hotel category is required';
-    if (!data.groupType) errors.groupType = 'Group type is required';
-    if (!data.groupSize.trim()) {
-      errors.groupSize = 'Group size is required';
-    } else if (Number(data.groupSize) < 1) {
-      errors.groupSize = 'Group size must be at least 1';
+    if (!data.checkInDate) errors.checkInDate = t.createForm.checkInRequired;
+    if (!data.checkOutDate) errors.checkOutDate = t.createForm.checkOutRequired;
+    if (data.checkInDate && data.checkOutDate && data.checkOutDate <= data.checkInDate) {
+      errors.checkOutDate = t.createForm.checkOutAfterCheckIn;
     }
   }
 
   if (step === 1) {
     const totalRooms = data.singleRooms + data.doubleRooms + data.tripleRooms + data.quadrupleRooms;
-    if (totalRooms < 1) errors.rooms = 'Select at least one room';
+    if (totalRooms < 1) errors.rooms = t.createForm.selectAtLeastOneRoom;
   }
 
   if (step === 2) {
-    if (!data.companyName.trim()) errors.companyName = 'Company name is required';
-    if (!data.firstName.trim()) errors.firstName = 'First name is required';
-    if (!data.lastName.trim()) errors.lastName = 'Last name is required';
+    if (!data.companyName.trim()) errors.companyName = t.createForm.companyNameRequired;
+    if (!data.firstName.trim()) errors.firstName = t.createForm.firstNameRequired;
+    if (!data.lastName.trim()) errors.lastName = t.createForm.lastNameRequired;
     if (!data.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = t.createForm.emailRequired;
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-      errors.email = 'Enter a valid email address';
+      errors.email = t.createForm.invalidEmail;
     }
     if (!data.phone.trim()) {
-      errors.phone = 'Phone number is required';
+      errors.phone = t.createForm.phoneRequired;
     } else if (data.phone.replace(/[\s\-()]/g, '').length < 7) {
-      errors.phone = 'Enter a valid phone number';
+      errors.phone = t.createForm.invalidPhone;
     }
   }
 
@@ -193,7 +163,15 @@ function validateStep(step: number, data: FormData): FieldErrors {
 
 export default function CreateBookingRequestPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [currentStep, setCurrentStep] = useState(0);
+
+  const STEPS = [
+    { label: t.createForm.stepTripDetails, icon: '/icons/Icon (4).svg' },
+    { label: t.createForm.stepRoomAccommodations, icon: '/icons/Icon (3).svg' },
+    { label: t.createForm.stepCustomerDetails, icon: '/icons/Icon (9).svg' },
+    { label: t.createForm.stepPolicies, icon: '/icons/Icon (7).svg' },
+  ];
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -204,7 +182,7 @@ export default function CreateBookingRequestPage() {
     setFormData((prev) => {
       const next = { ...prev, [field]: value };
       if (attempted) {
-        setErrors(validateStep(currentStep, next));
+        setErrors(validateStep(currentStep, next, t));
       }
       return next;
     });
@@ -212,9 +190,18 @@ export default function CreateBookingRequestPage() {
 
   const handleNext = () => {
     setAttempted(true);
-    const stepErrors = validateStep(currentStep, formData);
+    const stepErrors = validateStep(currentStep, formData, t);
     setErrors(stepErrors);
-    if (Object.keys(stepErrors).length > 0) return;
+    if (Object.keys(stepErrors).length > 0) {
+      // Scroll to first error field
+      setTimeout(() => {
+        const firstError = document.querySelector('.text-red-500');
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
+      return;
+    }
 
     setAttempted(false);
     setErrors({});
@@ -238,7 +225,7 @@ export default function CreateBookingRequestPage() {
       const { requestsApi } = await import('@/lib/api/requests');
       const created = await requestsApi.create({
         // Step 1: Trip Details
-        destinationId: 1, // TODO: implement destination search
+        destinationId: formData.destinationId,
         destinationName: formData.destination,
         checkinDate: formData.checkInDate,
         checkoutDate: formData.checkOutDate || undefined,
@@ -281,7 +268,7 @@ export default function CreateBookingRequestPage() {
 
   return (
     <div className="space-y-6">
-      <Header title="Create Request" />
+      <Header title={t.createForm.title} />
 
       <StepperNav steps={STEPS} currentStep={currentStep} />
 
@@ -312,29 +299,29 @@ export default function CreateBookingRequestPage() {
           variant="secondary"
           onClick={() => router.push('/booking-requests')}
         >
-          Cancel
+          {t.common.cancel}
         </Button>
         <div className="flex items-center gap-2">
           {currentStep > 0 && (
             <Button variant="secondary" onClick={handleBack}>
-              Back
+              {t.common.back}
             </Button>
           )}
           {currentStep < STEPS.length - 1 ? (
-            <Button variant="primary" onClick={handleNext}>
-              Next
+            <Button variant="primary" onClick={handleNext} className="text-white">
+              {t.common.next}
             </Button>
           ) : (
             <>
               <Button variant="outline" onClick={() => {}}>
-                Add Hotels
+                {t.createForm.addHotels}
               </Button>
               <Button
                 variant="primary"
                 onClick={handleSubmit}
                 isLoading={isSubmitting}
               >
-                Create Request
+                {t.createForm.createRequestBtn}
               </Button>
             </>
           )}
@@ -364,31 +351,123 @@ function FieldError({ message }: { message?: string }) {
 }
 
 function TripDetailsStep({ formData, updateField, errors }: StepProps) {
+  const { t } = useLanguage();
+  const [destQuery, setDestQuery] = useState(formData.destination);
+  const [destResults, setDestResults] = useState<Destination[]>([]);
+  const [destLoading, setDestLoading] = useState(false);
+  const [destOpen, setDestOpen] = useState(false);
+  const destWrapperRef = useRef<HTMLDivElement>(null);
+
+  const hotelCategoryOptions = [
+    { value: '', label: t.createForm.selectHotelCategory },
+    { value: '3', label: t.createForm.star3 },
+    { value: '4', label: t.createForm.star4 },
+    { value: '5', label: t.createForm.star5 },
+  ];
+  const budgetRangeOptions = [
+    { value: '', label: t.createForm.selectBudgetRange },
+    { value: 'economy', label: t.createForm.economy },
+    { value: 'standard', label: t.createForm.standard },
+    { value: 'premium', label: t.createForm.premium },
+    { value: 'luxury', label: t.createForm.luxury },
+  ];
+  const groupTypeOptions = [
+    { value: '', label: t.createForm.selectGroupType },
+    { value: 'business', label: t.createForm.businessGroup },
+    { value: 'leisure', label: t.createForm.leisureGroup },
+    { value: 'sports', label: t.createForm.sportsTeam },
+    { value: 'conference', label: t.createForm.conference },
+    { value: 'wedding', label: t.createForm.wedding },
+  ];
+
+  useEffect(() => {
+    if (destQuery.length < 2) {
+      setDestResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setDestLoading(true);
+      try {
+        const results = await destinationsApi.search(destQuery);
+        setDestResults(results);
+        setDestOpen(results.length > 0);
+      } catch {
+        setDestResults([]);
+      } finally {
+        setDestLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [destQuery]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (destWrapperRef.current && !destWrapperRef.current.contains(e.target as Node)) {
+        setDestOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleDestinationSelect = (dest: Destination) => {
+    setDestQuery(dest.name);
+    updateField('destination', dest.name);
+    updateField('destinationId', dest.id);
+    setDestOpen(false);
+    setDestResults([]);
+  };
+
+  const handleDestinationInputChange = (value: string) => {
+    setDestQuery(value);
+    updateField('destination', value);
+    updateField('destinationId', 0);
+  };
+
   return (
     <>
       <SectionHeader
-        title="Trip Details"
-        subtitle="Specify destination, dates, and group information"
+        title={t.createForm.tripDetailsTitle}
+        subtitle={t.createForm.tripDetailsSubtitle}
       />
       <div className="space-y-4">
-        <div>
+        <div ref={destWrapperRef} className="relative">
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            DESTINATION <span className="text-sett-destructive">*</span>
+            {t.createForm.destination} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
-            placeholder="e.g., Barcelona, Spain"
-            value={formData.destination}
-            onChange={(e) => updateField('destination', e.target.value)}
+            placeholder={t.createForm.destinationPlaceholder}
+            value={destQuery}
+            onChange={(e) => handleDestinationInputChange(e.target.value)}
+            onFocus={() => { if (destResults.length > 0) setDestOpen(true); }}
             className={inputClass(!!errors.destination)}
           />
+          {destOpen && destResults.length > 0 && (
+            <ul className="absolute z-50 w-full mt-1 bg-white border border-sett-border rounded-input shadow-lg max-h-60 overflow-y-auto">
+              {destResults.map((dest) => (
+                <li
+                  key={dest.id}
+                  onClick={() => handleDestinationSelect(dest)}
+                  className="px-3 py-2 text-body cursor-pointer hover:bg-sett-fill"
+                >
+                  {dest.name} ({dest.countryCode})
+                </li>
+              ))}
+            </ul>
+          )}
+          {destLoading && (
+            <p className="mt-1 text-caption text-sett-text-muted">{t.createForm.searching}</p>
+          )}
           <FieldError message={errors.destination} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              CHECK-IN DATE <span className="text-sett-destructive">*</span>
+              {t.createForm.checkInDate} <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -400,7 +479,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              CHECK-OUT DATE <span className="text-sett-destructive">*</span>
+              {t.createForm.checkOutDate} <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -414,35 +493,35 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
-            label="HOTEL CATEGORY *"
+            label={`${t.createForm.hotelCategory} *`}
             options={hotelCategoryOptions}
             value={formData.hotelCategory}
             onChange={(e) => updateField('hotelCategory', e.target.value)}
-            placeholder="Select hotel category"
+            placeholder={t.createForm.selectHotelCategory}
             error={errors.hotelCategory}
           />
           <Select
-            label="BUDGET RANGE (OPTIONAL)"
+            label={`${t.createForm.budgetRange} ${t.createForm.optional}`}
             options={budgetRangeOptions}
             value={formData.budgetRange}
             onChange={(e) => updateField('budgetRange', e.target.value)}
-            placeholder="Select budget range"
+            placeholder={t.createForm.selectBudgetRange}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
-            label="GROUP TYPE *"
+            label={`${t.createForm.groupType} *`}
             options={groupTypeOptions}
             value={formData.groupType}
             onChange={(e) => updateField('groupType', e.target.value)}
-            placeholder="Select group type"
+            placeholder={t.createForm.selectGroupType}
             error={errors.groupType}
           />
           <Input
-            label="GROUP SIZE *"
+            label={`${t.createForm.groupSize} *`}
             type="number"
-            placeholder="e.g. 45"
+            placeholder={t.createForm.groupSizePlaceholder}
             value={formData.groupSize}
             onChange={(e) => updateField('groupSize', e.target.value)}
             error={errors.groupSize}
@@ -456,31 +535,32 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
 /* ─────────────── Step 2: Room & Accommodations ─────────────── */
 
 function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
+  const { t } = useLanguage();
   return (
     <>
       <SectionHeader
-        title="Room & Accommodations"
-        subtitle="Select the number of rooms by type"
+        title={t.createForm.roomTitle}
+        subtitle={t.createForm.roomSubtitle}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
         <RoomCounter
-          label="SINGLE ROOM"
+          label={t.createForm.singleRoom}
           value={formData.singleRooms}
           onChange={(v) => updateField('singleRooms', v)}
         />
         <RoomCounter
-          label="DOUBLE ROOM"
+          label={t.createForm.doubleRoom}
           value={formData.doubleRooms}
           onChange={(v) => updateField('doubleRooms', v)}
         />
         <RoomCounter
-          label="TRIPLE ROOM"
+          label={t.createForm.tripleRoom}
           value={formData.tripleRooms}
           onChange={(v) => updateField('tripleRooms', v)}
         />
         <RoomCounter
-          label="QUADRUPLE ROOM"
+          label={t.createForm.quadrupleRoom}
           value={formData.quadrupleRooms}
           onChange={(v) => updateField('quadrupleRooms', v)}
         />
@@ -491,10 +571,10 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
       <div className="space-y-4">
         <div>
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            EXTRA ROOMS <span className="text-sett-text-accent">(OPTIONAL)</span>
+            {t.createForm.extraRooms} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
-            placeholder="Any extra rooms, 5 - bedrooms, 6 - bedrooms, etc"
+            placeholder={t.createForm.extraRoomsPlaceholder}
             value={formData.extraRooms}
             onChange={(e) => updateField('extraRooms', e.target.value)}
             className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
@@ -504,16 +584,16 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              BREAKFAST PREFERENCE <span className="text-sett-destructive">*</span>
+              {t.createForm.breakfastPreference} <span className="text-sett-destructive">*</span>
             </label>
             <div className="flex gap-2">
               <RadioOption
-                label="With Breakfast"
+                label={t.createForm.withBreakfast}
                 selected={formData.breakfastPreference === 'with'}
                 onClick={() => updateField('breakfastPreference', 'with')}
               />
               <RadioOption
-                label="Without Breakfast"
+                label={t.createForm.withoutBreakfast}
                 selected={formData.breakfastPreference === 'without'}
                 onClick={() => updateField('breakfastPreference', 'without')}
               />
@@ -521,16 +601,16 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
           </div>
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              HOTEL LOCATION <span className="text-sett-destructive">*</span>
+              {t.createForm.hotelLocation} <span className="text-sett-destructive">*</span>
             </label>
             <div className="flex gap-2">
               <RadioOption
-                label="Central Location"
+                label={t.createForm.centralLocation}
                 selected={formData.hotelLocation === 'central'}
                 onClick={() => updateField('hotelLocation', 'central')}
               />
               <RadioOption
-                label="Outside City Center"
+                label={t.createForm.outsideCityCenter}
                 selected={formData.hotelLocation === 'outside'}
                 onClick={() => updateField('hotelLocation', 'outside')}
               />
@@ -540,10 +620,10 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
 
         <div>
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            SPECIAL REQUESTS <span className="text-sett-text-accent">(OPTIONAL)</span>
+            {t.createForm.specialRequests} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
-            placeholder="Please list any dietary restrictions or foods to avoid"
+            placeholder={t.createForm.specialRequestsRoomPlaceholder}
             value={formData.specialRequestsRooms}
             onChange={(e) => updateField('specialRequestsRooms', e.target.value)}
             className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
@@ -557,21 +637,22 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
 /* ─────────────── Step 3: Customer Details ─────────────── */
 
 function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
+  const { t } = useLanguage();
   return (
     <>
       <SectionHeader
-        title="Customer Details"
-        subtitle="Contact information for this travel request"
+        title={t.createForm.customerTitle}
+        subtitle={t.createForm.customerSubtitle}
       />
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              COMPANY NAME <span className="text-sett-destructive">*</span>
+              {t.createForm.companyName} <span className="text-sett-destructive">*</span>
             </label>
             <input
               type="text"
-              placeholder="Company Ltd."
+              placeholder={t.createForm.companyNamePlaceholder}
               value={formData.companyName}
               onChange={(e) => updateField('companyName', e.target.value)}
               className={inputClass(!!errors.companyName)}
@@ -580,11 +661,11 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              NAME LIST
+              {t.createForm.nameList}
             </label>
             <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-input border border-dashed border-sett-border bg-white text-body text-sett-text-muted cursor-pointer hover:border-sett-primary transition-colors">
               <span className="text-sett-text-primary font-medium">+</span>
-              Upload File
+              {t.createForm.uploadFile}
               <input
                 type="file"
                 className="hidden"
@@ -597,11 +678,11 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              FIRST NAME <span className="text-sett-destructive">*</span>
+              {t.createForm.firstName} <span className="text-sett-destructive">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g., John"
+              placeholder={t.createForm.firstNamePlaceholder}
               value={formData.firstName}
               onChange={(e) => updateField('firstName', e.target.value)}
               className={inputClass(!!errors.firstName)}
@@ -610,11 +691,11 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              LAST NAME <span className="text-sett-destructive">*</span>
+              {t.createForm.lastName} <span className="text-sett-destructive">*</span>
             </label>
             <input
               type="text"
-              placeholder="e.g., Doe"
+              placeholder={t.createForm.lastNamePlaceholder}
               value={formData.lastName}
               onChange={(e) => updateField('lastName', e.target.value)}
               className={inputClass(!!errors.lastName)}
@@ -626,38 +707,30 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              EMAIL ADDRESS <span className="text-sett-destructive">*</span>
+              {t.createForm.emailAddress} <span className="text-sett-destructive">*</span>
             </label>
             <input
               type="email"
-              placeholder="john@company.com"
+              placeholder={t.createForm.emailPlaceholder}
               value={formData.email}
               onChange={(e) => updateField('email', e.target.value)}
               className={inputClass(!!errors.email)}
             />
             <FieldError message={errors.email} />
           </div>
-          <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              PHONE NUMBER <span className="text-sett-destructive">*</span>
-            </label>
-            <input
-              type="tel"
-              placeholder="+1 234 567 8900"
-              value={formData.phone}
-              onChange={(e) => updateField('phone', e.target.value)}
-              className={inputClass(!!errors.phone)}
-            />
-            <FieldError message={errors.phone} />
-          </div>
+          <PhoneInput
+            value={formData.phone}
+            onChange={(phone) => updateField('phone', phone)}
+            error={errors.phone}
+          />
         </div>
 
         <div>
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            SPECIAL REQUESTS <span className="text-sett-text-accent">(OPTIONAL)</span>
+            {t.createForm.specialRequests} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
-            placeholder="Any special requirements, dietary restrictions, accessibility needs, etc."
+            placeholder={t.createForm.specialRequestsCustomerPlaceholder}
             value={formData.specialRequestsCustomer}
             onChange={(e) => updateField('specialRequestsCustomer', e.target.value)}
             className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
@@ -677,16 +750,17 @@ function PoliciesStep({
   formData: FormData;
   updateField: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <>
       <SectionHeader
-        title="Policies"
-        subtitle="Contact information for this travel request"
+        title={t.createForm.policiesTitle}
+        subtitle={t.createForm.policiesSubtitle}
       />
       <div className="space-y-6">
         <div>
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            TERMS & CONDITIONS
+            {t.createForm.termsAndConditions}
           </label>
           <div className="border border-sett-border rounded-input overflow-hidden">
             <div className="flex items-center gap-1 px-3 py-2 border-b border-sett-border bg-sett-fill">
@@ -720,7 +794,7 @@ function PoliciesStep({
 
         <div>
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            CANCELLATION CONDITIONS
+            {t.createForm.cancellationConditions}
           </label>
           <div className="border border-sett-border rounded-input overflow-hidden">
             <div className="flex items-center gap-1 px-3 py-2 border-b border-sett-border bg-sett-fill">

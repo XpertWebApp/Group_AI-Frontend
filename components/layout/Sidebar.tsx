@@ -14,13 +14,7 @@ import { useAppSelector } from '@/hooks/useAppSelector';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
-
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/booking-requests', label: 'Group Requests', icon: Users },
-  { href: '/booking-requests/create', label: 'Create Request', icon: PlusCircle },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -32,6 +26,14 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const user = useAppSelector((s) => s.auth.user);
   const [searchQuery, setSearchQuery] = useState('');
+  const { t } = useLanguage();
+
+  const navItems = [
+    { href: '/dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
+    { href: '/booking-requests', label: t.nav.groupRequests, icon: Users },
+    { href: '/booking-requests/create', label: t.nav.createRequest, icon: PlusCircle },
+    { href: '/settings', label: t.nav.settings, icon: Settings },
+  ];
 
   const displayName =
     user?.firstName || user?.lastName
@@ -58,7 +60,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
             <input
               type="search"
-              placeholder="Search anything"
+              placeholder={t.nav.searchAnything}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-sett-primary"
@@ -102,7 +104,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             </div>
           </div>
         </div>
-        <p className="px-4 pb-4 text-xs text-white/50">2026 S-E-T-T | All Rights Reserved</p>
+        <p className="px-4 pb-4 text-xs text-white/50">{t.common.footer}</p>
       </div>
     </>
   );

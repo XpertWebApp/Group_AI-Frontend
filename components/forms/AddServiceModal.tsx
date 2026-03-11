@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils/cn';
 import type { AddProposalServicePayload } from '@/types/proposals';
+import type { ProposalService } from '@/types';
 
 const SERVICE_OPTIONS = [
   'Airport shuttle',
@@ -28,9 +29,10 @@ interface AddServiceModalProps {
   onClose: () => void;
   onAdd: (payload: AddProposalServicePayload) => Promise<void>;
   isLoading?: boolean;
+  initialData?: ProposalService;
 }
 
-export function AddServiceModal({ open, onClose, onAdd, isLoading }: AddServiceModalProps) {
+export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }: AddServiceModalProps) {
   const [serviceName, setServiceName] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
@@ -44,7 +46,27 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading }: AddServiceM
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) {
+    if (open && initialData) {
+      setServiceName(initialData.serviceName ?? '');
+      const buy = Number(initialData.buyPrice ?? 0);
+      const sell = Number(initialData.sellPrice ?? 0);
+      setBuyPrice(buy ? buy.toString() : '');
+      setSellPrice(sell ? sell.toString() : '');
+      setQuantity(String(initialData.quantity ?? 1));
+      // Derive markup from buy/sell
+      if (buy > 0 && sell > 0) {
+        setMarkup((((sell - buy) / buy) * 100).toFixed(1));
+      } else {
+        setMarkup('');
+      }
+      // Parse notes for Day/Night
+      const notes = initialData.notes ?? '';
+      setIsDay(notes.includes('Day'));
+      setIsNight(notes.includes('Night'));
+      setDateFrom('');
+      setDateTo('');
+      setShowDropdown(false);
+    } else if (!open) {
       setServiceName('');
       setShowDropdown(false);
       setDateFrom('');
@@ -56,7 +78,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading }: AddServiceM
       setIsDay(true);
       setIsNight(false);
     }
-  }, [open]);
+  }, [open, initialData]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -103,8 +125,10 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading }: AddServiceM
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Add Service">
-      <p className="text-body text-sett-text-accent mb-4">Add a new service to your event.</p>
+    <Modal open={open} onClose={onClose} title={initialData ? 'Edit Service' : 'Add Service'}>
+      <p className="text-body text-sett-text-accent mb-4">
+        {initialData ? 'Update the service details.' : 'Add a new service to your event.'}
+      </p>
       <div className="space-y-4">
         {/* Service Name with dropdown */}
         <div className="relative" ref={dropdownRef}>
@@ -255,7 +279,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading }: AddServiceM
           isLoading={isLoading}
           disabled={!serviceName.trim()}
         >
-          Add Service
+          {initialData ? 'Update Service' : 'Add Service'}
         </Button>
       </div>
     </Modal>
