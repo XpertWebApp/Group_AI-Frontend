@@ -41,8 +41,8 @@ export function BookingRequestFilters({
   ];
 
   return (
-    <div className="flex items-center gap-3.5">
-      <div className="relative flex-1">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5">
+      <div className="relative flex-1 min-w-0">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sett-text-secondary" />
         <input
           type="search"
@@ -52,24 +52,26 @@ export function BookingRequestFilters({
           className="w-full pl-9 pr-3 py-3 rounded-[14px] border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-secondary focus:outline-none focus:ring-2 focus:ring-sett-primary"
         />
       </div>
-      <Select
-        options={dateOptions}
-        value={dateRange}
-        onChange={(e) => onDateRangeChange(e.target.value)}
-        className="w-[144px]"
-      />
-      <Select
-        options={statusOptions}
-        value={status}
-        onChange={(e) => onStatusChange(e.target.value)}
-        className="w-[144px]"
-      />
-      <Link href="/booking-requests/create">
-        <Button variant="primary" size="md" className="text-white">
-          <Plus className="w-4 h-4 mr-1" />
-          {t.nav.createRequest}
-        </Button>
-      </Link>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select
+          options={dateOptions}
+          value={dateRange}
+          onChange={(e) => onDateRangeChange(e.target.value)}
+          className="w-full xs:w-[144px]"
+        />
+        <Select
+          options={statusOptions}
+          value={status}
+          onChange={(e) => onStatusChange(e.target.value)}
+          className="w-full xs:w-[144px]"
+        />
+        <Link href="/booking-requests/create" className="w-full sm:w-auto">
+          <Button variant="primary" size="md" className="text-white w-full sm:w-auto">
+            <Plus className="w-4 h-4 mr-1" />
+            {t.nav.createRequest}
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

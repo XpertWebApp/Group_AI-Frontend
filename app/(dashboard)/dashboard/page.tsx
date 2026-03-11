@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/cn';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
+import { StatCardSkeleton, TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, Plus } from 'lucide-react';
@@ -54,48 +55,52 @@ export default function DashboardPage() {
       <Header title={t.dashboard.title} />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {STAT_CARDS.map((card) => {
-          const stat = stats?.[card.key];
-          const value = stat?.value ?? 0;
-          const change = stat?.vsLastMonth ?? 0;
-          const trend = change >= 0 ? 'up' : 'down';
+      {loading ? (
+        <StatCardSkeleton cards={4} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {STAT_CARDS.map((card) => {
+            const stat = stats?.[card.key];
+            const value = stat?.value ?? 0;
+            const change = stat?.vsLastMonth ?? 0;
+            const trend = change >= 0 ? 'up' : 'down';
 
-          return (
-            <div
-              key={card.key}
-              className="bg-sett-card rounded-card shadow-card p-4 border border-sett-border relative"
-            >
-              <div className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-sett-light-green-bg flex items-center justify-center">
-                <Image src={card.icon} alt="" width={16} height={16} />
+            return (
+              <div
+                key={card.key}
+                className="bg-sett-card rounded-card shadow-card p-4 border border-sett-border relative"
+              >
+                <div className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-sett-light-green-bg flex items-center justify-center">
+                  <Image src={card.icon} alt="" width={16} height={16} />
+                </div>
+                <p className="text-label text-sett-text-secondary uppercase tracking-wide">
+                  {card.label}
+                </p>
+                <p className="text-2xl font-bold text-sett-text-primary mt-1">
+                  {value}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Image
+                    src={trend === 'up' ? '/icons/Icon (5).svg' : '/icons/Icon.svg'}
+                    alt={trend === 'up' ? 'Trending up' : 'Trending down'}
+                    width={14}
+                    height={14}
+                  />
+                  <span
+                    className={cn(
+                      'text-caption font-medium',
+                      trend === 'up' ? 'text-sett-trend-up' : 'text-sett-trend-down'
+                    )}
+                  >
+                    {change >= 0 ? '+' : ''}{change.toFixed(1)}%
+                  </span>
+                  <span className="text-caption text-sett-text-muted">{t.dashboard.vsLastMonth}</span>
+                </div>
               </div>
-              <p className="text-label text-sett-text-secondary uppercase tracking-wide">
-                {card.label}
-              </p>
-              <p className="text-2xl font-bold text-sett-text-primary mt-1">
-                {loading ? '—' : value}
-              </p>
-              <div className="flex items-center gap-1 mt-1">
-                <Image
-                  src={trend === 'up' ? '/icons/Icon (5).svg' : '/icons/Icon.svg'}
-                  alt={trend === 'up' ? 'Trending up' : 'Trending down'}
-                  width={14}
-                  height={14}
-                />
-                <span
-                  className={cn(
-                    'text-caption font-medium',
-                    trend === 'up' ? 'text-sett-trend-up' : 'text-sett-trend-down'
-                  )}
-                >
-                  {change >= 0 ? '+' : ''}{change.toFixed(1)}%
-                </span>
-                <span className="text-caption text-sett-text-muted">{t.dashboard.vsLastMonth}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Recent Offers Section */}
       <section>
@@ -127,76 +132,132 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-sett-card rounded-card shadow-card border border-sett-border overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[900px]">
-            <thead>
-              <tr className="border-b border-sett-border bg-sett-background">
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.offerId}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.customer}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.destination}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.checkIn}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.rooms}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.totalSell}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.margin}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.status}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-body text-sett-text-accent">
-                    {t.common.loading}
-                  </td>
-                </tr>
-              )}
-              {!loading && offers.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-body text-sett-text-accent">
-                    {t.dashboard.noRecentOffers}
-                  </td>
-                </tr>
-              )}
+        <div className="bg-sett-card rounded-card shadow-card border border-sett-border overflow-hidden">
+          {/* Loading skeleton */}
+          {loading && (
+            <>
+              <div className="hidden md:block">
+                <TableSkeleton rows={5} columns={8} />
+              </div>
+              <div className="md:hidden">
+                <CardSkeleton cards={4} />
+              </div>
+            </>
+          )}
+
+          {/* Empty state */}
+          {!loading && offers.length === 0 && (
+            <div className="px-4 py-8 text-center text-body text-sett-text-accent">
+              {t.dashboard.noRecentOffers}
+            </div>
+          )}
+
+          {/* Desktop table */}
+          {!loading && offers.length > 0 && (
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-sett-border bg-sett-background">
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.offerId}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.customer}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.destination}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.checkIn}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.rooms}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.totalSell}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.margin}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.status}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {offers.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="border-b border-sett-border last:border-0 hover:bg-sett-background/50 cursor-pointer"
+                    >
+                      <td className="px-4 py-3 text-body text-sett-text-primary font-medium">
+                        <Link href={`/booking-requests/${row.id}`} className="hover:text-sett-primary">
+                          #{row.offerId ?? row.referenceNumber}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-primary">
+                        {row.customer}
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-primary">
+                        {row.destination}
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-secondary">
+                        {formatDate(row.checkinDate)}
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-primary">
+                        {row.totalRooms ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-primary">
+                        {row.totalSell != null && row.totalSell > 0
+                          ? `\u20AC${row.totalSell.toLocaleString()}`
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-body font-medium text-sett-olive">
+                        {row.margin != null && row.margin > 0
+                          ? `\u20AC${row.margin.toLocaleString()}`
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={getStatusBadgeVariant(row.status)}>
+                          {row.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Mobile card view */}
+          {!loading && offers.length > 0 && (
+            <div className="md:hidden divide-y divide-sett-border">
               {offers.map((row) => (
-                <tr
+                <Link
                   key={row.id}
-                  className="border-b border-sett-border last:border-0 hover:bg-sett-background/50 cursor-pointer"
+                  href={`/booking-requests/${row.id}`}
+                  className="block p-4 hover:bg-sett-background/50 transition-colors"
                 >
-                  <td className="px-4 py-3 text-body text-sett-text-primary font-medium">
-                    <Link href={`/booking-requests/${row.id}`} className="hover:text-sett-primary">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-body font-semibold text-sett-text-primary">
                       #{row.offerId ?? row.referenceNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-body text-sett-text-primary">
-                    {row.customer}
-                  </td>
-                  <td className="px-4 py-3 text-body text-sett-text-primary">
-                    {row.destination}
-                  </td>
-                  <td className="px-4 py-3 text-body text-sett-text-secondary">
-                    {formatDate(row.checkinDate)}
-                  </td>
-                  <td className="px-4 py-3 text-body text-sett-text-primary">
-                    {row.totalRooms ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 text-body text-sett-text-primary">
-                    {row.totalSell != null && row.totalSell > 0
-                      ? `\u20AC${row.totalSell.toLocaleString()}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-body font-medium text-sett-olive">
-                    {row.margin != null && row.margin > 0
-                      ? `\u20AC${row.margin.toLocaleString()}`
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3">
+                    </span>
                     <Badge variant={getStatusBadgeVariant(row.status)}>
                       {row.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                     </Badge>
-                  </td>
-                </tr>
+                  </div>
+                  <p className="text-body font-medium text-sett-text-primary truncate">{row.customer}</p>
+                  <p className="text-sm text-sett-text-secondary truncate mt-0.5">{row.destination}</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 text-sm">
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.checkIn}</span>
+                      <p className="text-sett-text-secondary mt-0.5">{formatDate(row.checkinDate)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.rooms}</span>
+                      <p className="text-sett-text-primary mt-0.5">{row.totalRooms ?? '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.totalSell}</span>
+                      <p className="text-sett-text-primary font-medium mt-0.5">
+                        {row.totalSell != null && row.totalSell > 0 ? `\u20AC${row.totalSell.toLocaleString()}` : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.margin}</span>
+                      <p className="text-sett-olive font-medium mt-0.5">
+                        {row.margin != null && row.margin > 0 ? `\u20AC${row.margin.toLocaleString()}` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       </section>
     </div>

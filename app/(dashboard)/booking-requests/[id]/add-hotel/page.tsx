@@ -6,6 +6,7 @@ import { ArrowLeft, MapPin, Star, Check, AlertTriangle, X } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
+import { PageLoader, Spinner } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { cn } from '@/lib/utils/cn';
@@ -200,10 +201,15 @@ export default function AddHotelPage() {
         )}
       </div>
 
+      {/* Loading request data */}
+      {phase === 'idle' && !request && (
+        <PageLoader message="Loading request details..." />
+      )}
+
       {/* Searching phase */}
       {phase === 'searching' && (
         <div className="bg-sett-card rounded-card border border-sett-border p-12 text-center">
-          <div className="w-12 h-12 border-[3px] border-sett-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <Spinner size="lg" className="mx-auto mb-4" />
           <h3 className="text-heading-sm font-bold text-sett-text-primary mb-2">
             Searching Hotels...
           </h3>

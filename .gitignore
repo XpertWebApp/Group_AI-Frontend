@@ -48,5 +48,10 @@ public/Figma/
 public/Backend_Implementationdone.docx
 public/# SETT Backend — Frontend Integration Reference.docx
 
+# Documents — block all except README.md
+*.pdf
+*.docx
+*.doc
+
 # Misc
 *.pem

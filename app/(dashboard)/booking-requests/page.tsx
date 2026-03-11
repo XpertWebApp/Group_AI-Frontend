@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
+import { TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -174,7 +175,7 @@ export default function BookingRequestsPage() {
       {/* Card with filters + table */}
       <div className="bg-white rounded-[14px] border border-sett-border overflow-hidden">
         {/* Filter bar */}
-        <div className="p-5">
+        <div className="p-3 sm:p-5">
           <BookingRequestFilters
             search={search}
             onSearchChange={setSearch}
@@ -185,51 +186,45 @@ export default function BookingRequestsPage() {
           />
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px]">
-            <thead>
-              <tr className="border-y border-sett-border">
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.offerId}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.customer}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.destination}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.checkInOut}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.rooms}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.totalSell}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.margin}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.status}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.createdOn}</th>
-                <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.lastUpdated}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Loading state */}
-              {loading && (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="px-5 py-12 text-center text-body text-sett-text-secondary"
-                  >
-                    {t.requests.loadingRequests}
-                  </td>
-                </tr>
-              )}
+        {/* Loading skeleton */}
+        {loading && (
+          <>
+            <div className="hidden lg:block border-t border-sett-border">
+              <TableSkeleton rows={PAGE_SIZE} columns={10} />
+            </div>
+            <div className="lg:hidden border-t border-sett-border">
+              <CardSkeleton cards={PAGE_SIZE} />
+            </div>
+          </>
+        )}
 
-              {/* Empty state */}
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="px-5 py-12 text-center text-body text-sett-text-secondary"
-                  >
-                    {t.requests.noRequests}
-                  </td>
-                </tr>
-              )}
+        {/* Empty state */}
+        {!loading && filtered.length === 0 && (
+          <div className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border">
+            {t.requests.noRequests}
+          </div>
+        )}
 
-              {/* Data rows */}
-              {!loading &&
-                rows.map((row) => {
+        {/* ── Desktop Table (lg and up) ── */}
+        {!loading && rows.length > 0 && (
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full min-w-[1100px]">
+              <thead>
+                <tr className="border-y border-sett-border">
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.offerId}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.customer}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.destination}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.checkInOut}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.rooms}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.totalSell}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.margin}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.status}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.createdOn}</th>
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.lastUpdated}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
                   const rooms = totalRooms(row.rooms);
                   const { totalSell, margin } = getProposalTotals(row);
 
@@ -238,86 +233,135 @@ export default function BookingRequestsPage() {
                       key={row.id}
                       className="border-b border-sett-border last:border-0 hover:bg-sett-fill/50 cursor-pointer transition-colors"
                     >
-                      {/* Offer ID */}
                       <td className="px-5 py-5 text-body font-medium text-sett-text-primary">
-                        <Link
-                          href={`/booking-requests/${row.id}`}
-                          className="hover:text-sett-primary"
-                        >
+                        <Link href={`/booking-requests/${row.id}`} className="hover:text-sett-primary">
                           #{row.referenceNumber ?? row.id.slice(0, 4)}
                         </Link>
                       </td>
-
-                      {/* Customer */}
                       <td className="px-5 py-5 text-body font-medium text-sett-text-primary">
                         {customerName(row)}
                       </td>
-
-                      {/* Destination */}
                       <td className="px-5 py-5 text-body text-sett-text-primary">
                         {row.destinationName ?? '—'}
                       </td>
-
-                      {/* Check In / Out (stacked) */}
                       <td className="px-5 py-5 text-body text-sett-text-primary">
                         <span className="block">{formatDate(row.checkinDate)}</span>
                         <span className="block text-sett-text-secondary mt-0.5">
                           {formatDate(row.checkoutDate)}
                         </span>
                       </td>
-
-                      {/* Rooms */}
                       <td className="px-5 py-5 text-body text-sett-text-primary">
                         {rooms ?? '—'}
                       </td>
-
-                      {/* Total Sell */}
                       <td className="px-5 py-5 text-body font-medium text-sett-text-primary">
                         {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                       </td>
-
-                      {/* Margin */}
                       <td className="px-5 py-5 text-body font-medium text-sett-olive">
                         {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                       </td>
-
-                      {/* Status */}
                       <td className="px-5 py-5">
                         <Badge variant={getStatusBadgeVariant(row.status)}>
                           {formatStatus(row.status)}
                         </Badge>
                       </td>
-
-                      {/* Created On */}
                       <td className="px-5 py-5 text-body text-sett-text-secondary">
                         {formatDate(row.createdAt)}
                       </td>
-
-                      {/* Last Updated */}
                       <td className="px-5 py-5 text-body text-sett-text-secondary">
                         {getLastUpdated(row)}
                       </td>
                     </tr>
                   );
                 })}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ── Mobile/Tablet Card View (below lg) ── */}
+        {!loading && rows.length > 0 && (
+          <div className="lg:hidden divide-y divide-sett-border border-t border-sett-border">
+            {rows.map((row) => {
+              const rooms = totalRooms(row.rooms);
+              const { totalSell, margin } = getProposalTotals(row);
+
+              return (
+                <Link
+                  key={row.id}
+                  href={`/booking-requests/${row.id}`}
+                  className="block p-4 hover:bg-sett-fill/50 transition-colors"
+                >
+                  {/* Top row: ID + Status */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-body font-semibold text-sett-text-primary">
+                      #{row.referenceNumber ?? row.id.slice(0, 4)}
+                    </span>
+                    <Badge variant={getStatusBadgeVariant(row.status)}>
+                      {formatStatus(row.status)}
+                    </Badge>
+                  </div>
+
+                  {/* Customer & Destination */}
+                  <p className="text-body font-medium text-sett-text-primary truncate">
+                    {customerName(row)}
+                  </p>
+                  <p className="text-sm text-sett-text-secondary truncate mt-0.5">
+                    {row.destinationName ?? '—'}
+                  </p>
+
+                  {/* Details grid */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 text-sm">
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.checkInOut}</span>
+                      <p className="text-sett-text-primary mt-0.5">
+                        {formatDate(row.checkinDate)} — {formatDate(row.checkoutDate)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.rooms}</span>
+                      <p className="text-sett-text-primary mt-0.5">{rooms ?? '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.totalSell}</span>
+                      <p className="text-sett-text-primary font-medium mt-0.5">
+                        {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.margin}</span>
+                      <p className="text-sett-olive font-medium mt-0.5">
+                        {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.createdOn}</span>
+                      <p className="text-sett-text-secondary mt-0.5">{formatDate(row.createdAt)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.lastUpdated}</span>
+                      <p className="text-sett-text-secondary mt-0.5">{getLastUpdated(row)}</p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
       {!loading && filtered.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <p className="text-body text-sett-text-muted">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
             {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, filtered.length)} {t.requests.of}{' '}
             {filtered.length} {t.requests.requestsLabel}
           </p>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safeCurrentPage <= 1}
-              className="px-2.5 h-8 rounded-lg text-body font-medium text-sett-text-accent disabled:opacity-40"
+              className="px-2 sm:px-2.5 h-8 rounded-lg text-sm sm:text-body font-medium text-sett-text-accent disabled:opacity-40"
             >
               {t.requests.prev}
             </button>
@@ -325,7 +369,7 @@ export default function BookingRequestsPage() {
               p === '...' ? (
                 <span
                   key={`ellipsis-${i}`}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-secondary"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary"
                 >
                   ...
                 </span>
@@ -334,7 +378,7 @@ export default function BookingRequestsPage() {
                   key={p}
                   type="button"
                   onClick={() => setPage(p as number)}
-                  className={`w-8 h-8 rounded-lg text-body ${
+                  className={`w-8 h-8 rounded-lg text-sm sm:text-body ${
                     p === safeCurrentPage
                       ? 'bg-sett-primary text-white font-bold'
                       : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-background'
@@ -348,7 +392,7 @@ export default function BookingRequestsPage() {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safeCurrentPage >= totalPages}
-              className="px-2.5 h-8 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-secondary disabled:opacity-40 hover:bg-sett-background"
+              className="px-2 sm:px-2.5 h-8 rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary disabled:opacity-40 hover:bg-sett-background"
             >
               {t.requests.next}
             </button>

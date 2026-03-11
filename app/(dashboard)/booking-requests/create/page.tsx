@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/Select';
 import { StepperNav } from '@/components/ui/StepperNav';
 import { RoomCounter } from '@/components/ui/RoomCounter';
 import { PhoneInput } from '@/components/ui/PhoneInput';
+import { Spinner } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils/cn';
 import { destinationsApi } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
@@ -459,7 +460,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </ul>
           )}
           {destLoading && (
-            <p className="mt-1 text-caption text-sett-text-muted">{t.createForm.searching}</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <Spinner size="sm" />
+              <span className="text-caption text-sett-text-muted">{t.createForm.searching}</span>
+            </div>
           )}
           <FieldError message={errors.destination} />
         </div>

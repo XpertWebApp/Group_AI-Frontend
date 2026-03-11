@@ -29,6 +29,7 @@ import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
+import { PageLoader } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
@@ -252,11 +253,7 @@ export default function RequestDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="w-8 h-8 border-2 border-sett-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <PageLoader message="Loading offer details..." />;
   }
 
   if (!request) {
@@ -1050,7 +1047,7 @@ function HotelCard({
       <div className="flex items-center justify-between px-4 py-3 bg-[#1B2B44] rounded-t-card">
         <div className="flex items-center gap-2">
           <h4 className="text-body font-bold text-white">
-            {hotel.hotelName ?? hotel.hotelCode}
+            {hotel.hotelName || hotel.hotelCode}
           </h4>
           <div className="flex gap-0.5">
             {Array.from({ length: 5 }).map((_, i) => (
