@@ -667,15 +667,34 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
               {t.createForm.nameList}
             </label>
-            <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-input border border-dashed border-sett-border bg-white text-body text-sett-text-muted cursor-pointer hover:border-sett-primary transition-colors">
-              <span className="text-sett-text-primary font-medium">+</span>
-              {t.createForm.uploadFile}
-              <input
-                type="file"
-                className="hidden"
-                onChange={(e) => updateField('nameListFile', e.target.files?.[0] || null)}
-              />
-            </label>
+            {formData.nameListFile ? (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-input border border-sett-primary bg-sett-primary/5 text-body">
+                <svg className="w-4 h-4 text-sett-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-sett-text-primary truncate flex-1">{formData.nameListFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => updateField('nameListFile', null)}
+                  className="text-sett-text-accent hover:text-sett-destructive transition-colors shrink-0"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-input border border-dashed border-sett-border bg-white text-body text-sett-text-muted cursor-pointer hover:border-sett-primary transition-colors">
+                <span className="text-sett-text-primary font-medium">+</span>
+                {t.createForm.uploadFile}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
+                  onChange={(e) => updateField('nameListFile', e.target.files?.[0] || null)}
+                />
+              </label>
+            )}
           </div>
         </div>
 
