@@ -133,6 +133,8 @@ export default function AddHotelPage() {
       await proposalsApi.addHotel(proposalId, {
         hotelCode: hotel.hotelCode,
         hotelName: hotel.hotelName,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
         tid: hotel.bestOption.tid,
         currency: hotel.bestOption.currency || hotel.currency || 'EUR',
         totalPrice,

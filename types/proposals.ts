@@ -23,6 +23,8 @@ export interface AddProposalHotelPayload {
   cancelDeadline?: string | null;
   supplierCode?: string;
   optionDetailsId?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface AdjustHotelPricingPayload {

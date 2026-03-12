@@ -30,6 +30,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
 import { PageLoader } from '@/components/ui/Loader';
+import { HotelMap } from '@/components/ui/HotelMap';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
@@ -675,8 +676,8 @@ export default function RequestDetailPage() {
               <h4 className="text-body font-bold text-sett-text-primary px-5 pt-4 pb-2">
                 View on map
               </h4>
-              <div className="h-44 bg-sett-fill flex items-center justify-center mx-4 mb-4 rounded-lg overflow-hidden">
-                <MapPin className="w-8 h-8 text-sett-text-accent" />
+              <div className="mx-4 mb-4">
+                <HotelMap hotels={hotels} className="h-44" />
               </div>
             </div>
 

@@ -139,6 +139,8 @@ export interface ProposalHotel {
   cancelDeadline?: string | null;
   supplierCode?: string | null;
   rooms?: Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
+  latitude?: number | null;
+  longitude?: number | null;
   createdAt: string;
 }
 
@@ -185,6 +187,8 @@ export interface HotelSearchResult {
   usableOptions?: unknown[];
   selectedOptions?: unknown[];
   note?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   // Legacy compat
   name?: string;
 }
