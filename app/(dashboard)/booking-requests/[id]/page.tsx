@@ -19,22 +19,9 @@ import {
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { PageLoader } from '@/components/ui/Loader';
-import { requestsApi } from '@/lib/api/requests';
 import type { BookingRequest } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 
-/* M3/M4/M5 — disabled imports for milestone1_2
-import { useMemo, useRef } from 'react';
-import { Eye, Save, Trash2, SquarePen, Send, XCircle } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { AddServiceModal } from '@/components/forms/AddServiceModal';
-import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { SuccessModal } from '@/components/ui/SuccessModal';
-import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
-import { HotelMap } from '@/components/ui/HotelMap';
-import { proposalsApi } from '@/lib/api/proposals';
-import type { Proposal, ProposalHotel, ProposalService } from '@/types';
-*/
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
@@ -64,16 +51,95 @@ export default function RequestDetailPage() {
   const [loading, setLoading] = useState(true);
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
-
   const loadData = useCallback(async () => {
-    try {
-      const req = await requestsApi.get(id);
-      if (req) setRequest(req);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+    const dummyRequests: Record<string, BookingRequest> = {
+      'demo-001': {
+        id: 'demo-001',
+        referenceNumber: 1001,
+        destinationId: 1,
+        destinationName: 'Barcelona, Spain',
+        checkinDate: '2026-04-15',
+        checkoutDate: '2026-04-20',
+        nights: 5,
+        starRating: 4,
+        rooms: { single: 5, double: 10, triple: 2, quadruple: 0 } as RoomsConfig,
+        companyName: 'Acme Corp',
+        firstName: 'John',
+        lastName: 'Smith',
+        contactEmail: 'john@acme.com',
+        contactPhone: '+49 170 1234567',
+        groupType: 'business',
+        groupSize: 30,
+        budgetRange: 'standard',
+        breakfastPreference: 'BB',
+        hotelLocation: 'central',
+        specialRequirements: 'Early check-in preferred',
+        status: 'pending',
+        createdAt: '2026-03-01T10:00:00Z',
+        updatedAt: '2026-03-01T10:00:00Z',
+        proposals: [],
+        termsAndConditions: '1. All prices are per person unless otherwise stated\n2. Prices are subject to availability at time of booking\n3. Full payment required 30 days before arrival',
+        cancellationConditions: 'Cancellations made 14 days or more in advance will receive a 100% refund.',
+      } as BookingRequest,
+      'demo-002': {
+        id: 'demo-002',
+        referenceNumber: 1002,
+        destinationId: 2,
+        destinationName: 'Rome, Italy',
+        checkinDate: '2026-05-10',
+        checkoutDate: '2026-05-14',
+        nights: 4,
+        starRating: 5,
+        rooms: { single: 2, double: 8, triple: 0, quadruple: 0 } as RoomsConfig,
+        companyName: 'TravelGroup GmbH',
+        firstName: 'Maria',
+        lastName: 'Mueller',
+        contactEmail: 'maria@travelgroup.de',
+        contactPhone: '+49 160 9876543',
+        groupType: 'leisure',
+        groupSize: 20,
+        budgetRange: 'premium',
+        breakfastPreference: 'BB',
+        hotelLocation: 'central',
+        status: 'draft',
+        createdAt: '2026-02-20T14:30:00Z',
+        updatedAt: '2026-02-25T09:15:00Z',
+        proposals: [],
+        termsAndConditions: '1. All prices are per person unless otherwise stated\n2. Prices are subject to availability at time of booking',
+        cancellationConditions: 'Cancellations made 7 days or more in advance will receive a full refund.',
+      } as BookingRequest,
+      'demo-003': {
+        id: 'demo-003',
+        referenceNumber: 1003,
+        destinationId: 3,
+        destinationName: 'Prague, Czech Republic',
+        checkinDate: '2026-06-01',
+        checkoutDate: '2026-06-05',
+        nights: 4,
+        starRating: 3,
+        rooms: { single: 10, double: 5, triple: 3, quadruple: 1 } as RoomsConfig,
+        companyName: 'SportTeam e.V.',
+        firstName: 'Klaus',
+        lastName: 'Weber',
+        contactEmail: 'klaus@sportteam.de',
+        contactPhone: '+49 151 5551234',
+        groupType: 'sports',
+        groupSize: 35,
+        budgetRange: 'economy',
+        breakfastPreference: 'RO',
+        hotelLocation: 'outside_city_center',
+        customerNotes: 'Need ground-floor rooms for accessibility',
+        status: 'processing',
+        createdAt: '2026-01-15T08:00:00Z',
+        updatedAt: '2026-03-05T16:45:00Z',
+        proposals: [],
+        termsAndConditions: '1. Group rates valid for minimum 10 participants\n2. Final room list required 14 days before arrival',
+        cancellationConditions: 'Cancellations within 7 days will incur a 50% fee.',
+      } as BookingRequest,
+    };
+    const req = dummyRequests[id] ?? null;
+    if (req) setRequest(req);
+    setLoading(false);
   }, [id]);
 
   useEffect(() => {
@@ -395,11 +461,6 @@ export default function RequestDetailPage() {
           </button>
         </div>
       </div>
-
-      {/* M3/M4/M5 — Hotels, Services, Sidebar, and Modals sections disabled for milestone1_2 */}
     </div>
   );
 }
-
-// M3/M4/M5 — MarkupDropdown, HotelCard, ServiceRow, ServiceCard sub-components
-// removed for milestone1_2. Preserved in git history (milestone_4v2 branch).

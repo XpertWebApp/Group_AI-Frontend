@@ -1,28 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
-import { proposalsApi } from '@/lib/api/proposals';
 import type { Proposal } from '@/types';
-
 export default function ProposalsListPage() {
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    proposalsApi.list().then((list) => {
-      if (!cancelled) {
-        setProposals(list);
-        setLoading(false);
-      }
-    }).catch(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, []);
+  const [proposals] = useState<Proposal[]>([]);
+  const loading = false;
 
   if (loading) {
     return (

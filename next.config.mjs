@@ -14,7 +14,7 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    const apiUrl = process.env.BACKEND_URL || 'https://89bc-223-178-215-86.ngrok-free.app';
+    const apiUrl = process.env.BACKEND_URL || '';
     return [
       {
         source: '/api/v1/:path*',
