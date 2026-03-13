@@ -1,9 +1,10 @@
 'use client';
 
-import { Bell, LogOut } from 'lucide-react';
-import { useState } from 'react';
-import { NotificationsModal } from '@/components/ui/NotificationsModal';
-import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { LogOut } from 'lucide-react';
+// import { Bell } from 'lucide-react'; // M4 — disabled for milestone1_2
+// import { useState } from 'react'; // M4 — disabled for milestone1_2
+// import { NotificationsModal } from '@/components/ui/NotificationsModal'; // M4 — disabled for milestone1_2
+// import { LanguageToggle } from '@/components/ui/LanguageToggle'; // M5 — disabled for milestone1_2
 import { useAppLayout } from '@/app/(dashboard)/AppLayoutContext';
 
 interface HeaderProps {
@@ -14,7 +15,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // const [notificationsOpen, setNotificationsOpen] = useState(false); // M4 — disabled for milestone1_2
   const { onLogoutClick } = useAppLayout();
 
   return (
@@ -26,7 +27,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <LanguageToggle />
+        {/* <LanguageToggle /> */}{/* M5 — disabled for milestone1_2 */}
         {onRefresh && (
           <button
             type="button"
@@ -35,6 +36,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
             aria-label="Refresh"
           />
         )}
+        {/* M4 — notification bell disabled for milestone1_2
         <button
           type="button"
           onClick={() => setNotificationsOpen(true)}
@@ -43,6 +45,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         >
           <Bell className="w-5 h-5 text-sett-text-secondary" />
         </button>
+        */}
         {onLogoutClick && (
           <button
             type="button"
@@ -55,10 +58,12 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
         {actions}
       </div>
+      {/* M4 — notifications modal disabled for milestone1_2
       <NotificationsModal
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
       />
+      */}
     </header>
   );
 }

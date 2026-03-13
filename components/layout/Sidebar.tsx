@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Users,
   PlusCircle,
-  Settings,
+  // Settings, // M5 — disabled for milestone1_2
   Search,
 } from 'lucide-react';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -32,7 +32,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
     { href: '/dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
     { href: '/booking-requests', label: t.nav.groupRequests, icon: Users },
     { href: '/booking-requests/create', label: t.nav.createRequest, icon: PlusCircle },
-    { href: '/settings', label: t.nav.settings, icon: Settings },
+    // { href: '/settings', label: t.nav.settings, icon: Settings }, // M5 — disabled for milestone1_2
   ];
 
   const displayName =

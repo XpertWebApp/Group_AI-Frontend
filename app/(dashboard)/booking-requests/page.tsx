@@ -6,7 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
 import { TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
-import { requestsApi } from '@/lib/api/requests';
+// import { requestsApi } from '@/lib/api/requests'; // M4 — disabled for milestone1_2
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
@@ -103,16 +103,87 @@ export default function BookingRequestsPage() {
   const [dateRange, setDateRange] = useState('');
   const [page, setPage] = useState(1);
 
+  // M4 — requestsApi.list() disabled for milestone1_2, using dummy data
   const loadRequests = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await requestsApi.list({ limit: 100, sortBy: 'createdAt', sortOrder: 'desc' });
-      setRequests(data);
-    } catch {
-      // keep empty
-    } finally {
-      setLoading(false);
-    }
+    const dummyRequests: BookingRequest[] = [
+      {
+        id: 'demo-001',
+        referenceNumber: 1001,
+        destinationId: 1,
+        destinationName: 'Barcelona, Spain',
+        checkinDate: '2026-04-15',
+        checkoutDate: '2026-04-20',
+        nights: 5,
+        starRating: 4,
+        rooms: { single: 5, double: 10, triple: 2, quadruple: 0 } as RoomsConfig,
+        companyName: 'Acme Corp',
+        firstName: 'John',
+        lastName: 'Smith',
+        contactEmail: 'john@acme.com',
+        contactPhone: '+49 170 1234567',
+        groupType: 'business',
+        groupSize: 30,
+        budgetRange: 'standard',
+        breakfastPreference: 'BB',
+        hotelLocation: 'central',
+        status: 'pending',
+        createdAt: '2026-03-01T10:00:00Z',
+        updatedAt: '2026-03-01T10:00:00Z',
+        proposals: [],
+      } as BookingRequest,
+      {
+        id: 'demo-002',
+        referenceNumber: 1002,
+        destinationId: 2,
+        destinationName: 'Rome, Italy',
+        checkinDate: '2026-05-10',
+        checkoutDate: '2026-05-14',
+        nights: 4,
+        starRating: 5,
+        rooms: { single: 2, double: 8, triple: 0, quadruple: 0 } as RoomsConfig,
+        companyName: 'TravelGroup GmbH',
+        firstName: 'Maria',
+        lastName: 'Mueller',
+        contactEmail: 'maria@travelgroup.de',
+        contactPhone: '+49 160 9876543',
+        groupType: 'leisure',
+        groupSize: 20,
+        budgetRange: 'premium',
+        breakfastPreference: 'BB',
+        hotelLocation: 'central',
+        status: 'draft',
+        createdAt: '2026-02-20T14:30:00Z',
+        updatedAt: '2026-02-25T09:15:00Z',
+        proposals: [],
+      } as BookingRequest,
+      {
+        id: 'demo-003',
+        referenceNumber: 1003,
+        destinationId: 3,
+        destinationName: 'Prague, Czech Republic',
+        checkinDate: '2026-06-01',
+        checkoutDate: '2026-06-05',
+        nights: 4,
+        starRating: 3,
+        rooms: { single: 10, double: 5, triple: 3, quadruple: 1 } as RoomsConfig,
+        companyName: 'SportTeam e.V.',
+        firstName: 'Klaus',
+        lastName: 'Weber',
+        contactEmail: 'klaus@sportteam.de',
+        contactPhone: '+49 151 5551234',
+        groupType: 'sports',
+        groupSize: 35,
+        budgetRange: 'economy',
+        breakfastPreference: 'RO',
+        hotelLocation: 'outside_city_center',
+        status: 'processing',
+        createdAt: '2026-01-15T08:00:00Z',
+        updatedAt: '2026-03-05T16:45:00Z',
+        proposals: [],
+      } as BookingRequest,
+    ];
+    setRequests(dummyRequests);
+    setLoading(false);
   }, []);
 
   useEffect(() => {

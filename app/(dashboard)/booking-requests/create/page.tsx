@@ -219,13 +219,14 @@ export default function CreateBookingRequestPage() {
     }
   };
 
+  // M4 — requestsApi.create() disabled for milestone1_2, using fake success
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
+      /* M4 — original API call disabled for milestone1_2
       const { requestsApi } = await import('@/lib/api/requests');
       const created = await requestsApi.create({
-        // Step 1: Trip Details
         destinationId: formData.destinationId,
         destinationName: formData.destination,
         checkinDate: formData.checkInDate,
@@ -235,7 +236,6 @@ export default function CreateBookingRequestPage() {
         groupType: formData.groupType || undefined,
         groupSize: formData.groupSize ? Number(formData.groupSize) : undefined,
         currencyCode: 'EUR',
-        // Step 2: Room & Accommodations
         rooms: {
           single: formData.singleRooms,
           double: formData.doubleRooms,
@@ -246,19 +246,21 @@ export default function CreateBookingRequestPage() {
         breakfastPreference: formData.breakfastPreference === 'with' ? 'BB' : 'RO',
         hotelLocation: formData.hotelLocation === 'central' ? 'central' : 'outside_city_center',
         specialRequirements: formData.specialRequestsRooms || undefined,
-        // Step 3: Customer Details
         companyName: formData.companyName,
         firstName: formData.firstName,
         lastName: formData.lastName,
         contactEmail: formData.email,
         contactPhone: formData.phone,
         customerNotes: formData.specialRequestsCustomer || undefined,
-        // Step 4: Policies
         termsAndConditions: formData.termsAndConditions || undefined,
         cancellationConditions: formData.cancellationConditions || undefined,
         status: 'pending',
       });
       router.push(`/booking-requests/${created.id}`);
+      */
+      // Fake success: simulate a short delay then redirect to the requests list
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      router.push('/booking-requests');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
       setSubmitError(message);

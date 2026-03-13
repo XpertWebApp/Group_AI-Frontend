@@ -9,7 +9,7 @@ import { StatCardSkeleton, TableSkeleton, CardSkeleton } from '@/components/ui/L
 import Link from 'next/link';
 import Image from 'next/image';
 import { Eye, Plus } from 'lucide-react';
-import { dashboardApi } from '@/lib/api/dashboard';
+// import { dashboardApi } from '@/lib/api/dashboard'; // M4 — disabled for milestone1_2
 import type { DashboardStatsResponse, RecentOffer } from '@/lib/api/dashboard';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
@@ -32,22 +32,17 @@ export default function DashboardPage() {
     { key: 'declined' as const, label: t.dashboard.declined, icon: '/icons/Icon (1).svg' },
   ];
 
+  // M4 — dashboard API disabled for milestone1_2, using dummy data
   useEffect(() => {
-    async function load() {
-      try {
-        const [statsData, offersData] = await Promise.all([
-          dashboardApi.getStats(),
-          dashboardApi.getRecentOffers(10),
-        ]);
-        if (statsData) setStats(statsData);
-        setOffers(offersData);
-      } catch {
-        // fallback to empty
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    const dummyStats: DashboardStatsResponse = {
+      totalRequests: { value: 0, vsLastMonth: 0 },
+      pendingRequests: { value: 0, vsLastMonth: 0 },
+      sentOffers: { value: 0, vsLastMonth: 0 },
+      declined: { value: 0, vsLastMonth: 0 },
+    };
+    setStats(dummyStats);
+    setOffers([]);
+    setLoading(false);
   }, []);
 
   return (
