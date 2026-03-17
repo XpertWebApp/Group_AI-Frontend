@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-geist-sans' });
 export const metadata: Metadata = {
   title: 'SETT - Sport & Events Tours & Travel',
   description: 'GroupHub - Booking and proposal management',
+  icons: {
+    icon: '/icons/sett_logo.svg',
+  },
 };
 
 export default function RootLayout({
