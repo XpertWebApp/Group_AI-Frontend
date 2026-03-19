@@ -1,0 +1,28 @@
+image: atlassian/default-image:3
+
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Sync correct branch → GitHub
+          script:
+            # Set correct identity (Vercel user)
+            - git config --global user.email "developer@eminencetechnology.com"
+            - git config --global user.name "developer-6272"
+
+            # Fetch all branches
+            - git fetch origin "+refs/heads/*:refs/remotes/origin/*"
+
+            # Checkout correct branch
+            - git checkout -b milestone1_2 origin/milestone1_2
+
+            # 🔥 IMPORTANT: rewrite commit author
+            - git commit --amend --no-edit --author="developer-6272 <developer@eminencetechnology.com>"
+
+            # Add GitHub remote
+            - git remote remove github || true
+            - git remote add github https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com/SETT-AI-Group-Offer-Agent-Oliver/NestJS-Frontend
+
+
+            # Push
+            - git push github milestone1_2:main --force
