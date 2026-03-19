@@ -40,6 +40,7 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'monospace'],
+        montserrat: ['var(--font-montserrat)', 'sans-serif'],
       },
       fontSize: {
         'heading-lg': ['28px', { lineHeight: '1.3' }],

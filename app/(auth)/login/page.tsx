@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import Image from 'next/image';
 
 const loginSchema = z.object({
-  email: z.string().email('Enter a valid email'),
+  email: z.string().min(1, 'Email is Required').email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
   rememberMe: z.boolean().optional(),
 });
@@ -38,8 +38,8 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    setSubmitError(null);
     try {
+      setSubmitError(null);
       const result = await authApi.login(data.email, data.password, data.rememberMe);
       if (typeof window !== 'undefined') {
         localStorage.setItem('accessToken', result.tokens.accessToken);
@@ -49,7 +49,9 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err) {
       const apiErr = getApiError(err);
-      setSubmitError(apiErr.message || 'Invalid credentials');
+      const message = apiErr.message || 'Invalid credentials';
+      setSubmitError(message);
+      // Keep error visible — clear only on next successful submit
     }
   };
 
@@ -64,18 +66,20 @@ export default function LoginPage() {
           className="mx-auto h-auto w-auto"
         />
       </div>
-      <h2 className="text-heading-lg font-bold text-sett-text-primary text-center mb-1">
+      <h2 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] text-center leading-normal mb-1">
         Welcome back
       </h2>
-      <p className="text-body text-sett-text-secondary text-center mb-6">
+      <p className="text-body text-[#4A4A4A] text-center mb-6">
         Sign in to access GroupHub
       </p>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <Input
           label="EMAIL"
           placeholder="Enter email"
-          type="email"
+          type="text"
           error={errors.email?.message}
+          className="placeholder:!text-[#A3A3A3] placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
+          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-[#1D1D1D] uppercase"
           {...register('email')}
         />
         <Input
@@ -83,13 +87,15 @@ export default function LoginPage() {
           placeholder="Enter password"
           isPassword
           error={errors.password?.message}
+          className="placeholder:!text-[#A3A3A3] placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
+          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-[#1D1D1D] uppercase"
           {...register('password')}
         />
         <div className="flex items-center justify-between">
-          <Checkbox label="Remember me" {...register('rememberMe')} />
+          <Checkbox label="Remember me" labelClassName="font-montserrat !text-[14px] font-medium leading-normal text-[#4A4A4A]" {...register('rememberMe')} />
           <Link
             href="/forgot-password"
-            className="text-body text-sett-primary font-medium hover:underline"
+            className="font-montserrat text-[14px] font-medium leading-normal text-[#667F00] hover:underline"
           >
             Forgot password?
           </Link>
@@ -102,16 +108,16 @@ export default function LoginPage() {
           variant="primary"
           fullWidth
           isLoading={isSubmitting}
-          className="mt-4"
+          className="mt-4 !text-[#FFF] font-montserrat !text-[14px] !font-normal leading-normal"
         >
           Sign In
         </Button>
       </form>
-      <p className="text-center text-body text-sett-text-secondary mt-6">
+      <p className="text-center font-montserrat text-[12px] font-normal leading-[14px] text-[#4A4A4A] mt-6">
         Need help? Contact{' '}
         <a
           href="mailto:support@sett.ai"
-          className="text-sett-primary font-medium hover:underline"
+          className="font-montserrat text-[12px] font-medium leading-[14px] text-[#667F00] hover:underline"
         >
           support@sett.ai
         </a>

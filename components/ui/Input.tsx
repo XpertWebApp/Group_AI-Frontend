@@ -8,17 +8,18 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   isPassword?: boolean;
+  labelClassName?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, isPassword, type, ...props }, ref) => {
+  ({ className, label, error, isPassword, labelClassName, type, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className={cn("block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5", labelClassName)}>
             {label.endsWith('*') ? (
               <>
                 {label.slice(0, -1).trimEnd()}{' '}
@@ -50,7 +51,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               className="absolute right-3 top-1/2 -translate-y-1/2 text-sett-text-muted hover:text-sett-primary transition-colors"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </button>
           )}
         </div>

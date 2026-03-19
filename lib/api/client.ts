@@ -27,7 +27,8 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<{ error?: ApiError }>) => {
     const originalRequest = error.config as typeof error.config & { _retry?: boolean };
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login';
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoginPage) {
       originalRequest._retry = true;
       const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
       if (refreshToken) {
