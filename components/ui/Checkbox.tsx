@@ -5,10 +5,11 @@ import { cn } from '@/lib/utils/cn';
 
 interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label?: string;
+  labelClassName?: string;
 }
 
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, id: idProp, ...props }, ref) => {
+  ({ className, label, labelClassName, id: idProp, ...props }, ref) => {
     const generatedId = useId();
     const inputId = idProp ?? `checkbox-${generatedId.replace(/:/g, '')}`;
     return (
@@ -18,13 +19,13 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           type="checkbox"
           id={inputId}
           className={cn(
-            'w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary',
+            'w-4 h-4 rounded border-sett-border text-sett-primary accent-sett-primary focus:ring-sett-primary',
             className
           )}
           {...props}
         />
         {label && (
-          <label htmlFor={inputId} className="text-body text-sett-text-primary cursor-pointer">
+          <label htmlFor={inputId} className={cn("text-body text-sett-text-primary cursor-pointer", labelClassName)}>
             {label}
           </label>
         )}
