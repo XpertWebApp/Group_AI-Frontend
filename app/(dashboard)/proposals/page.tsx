@@ -33,8 +33,9 @@ export default function ProposalsListPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
       <Header title="Proposals" subtitle="View and manage your proposals" />
+      <div className="p-4 md:p-6 space-y-6">
       <div className="bg-sett-card rounded-card shadow-card border border-sett-border overflow-x-auto">
         <table className="w-full min-w-[600px]">
           <thead>
@@ -99,6 +100,7 @@ export default function ProposalsListPage() {
           </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

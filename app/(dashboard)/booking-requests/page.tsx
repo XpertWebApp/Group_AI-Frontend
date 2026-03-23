@@ -169,9 +169,10 @@ export default function BookingRequestsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
       <Header title={t.requests.title} />
 
+      <div className="p-4 md:p-6 space-y-6">
       {/* Card with filters + table */}
       <div className="bg-white rounded-[14px] border border-sett-border overflow-hidden">
         {/* Filter bar */}
@@ -399,6 +400,7 @@ export default function BookingRequestsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

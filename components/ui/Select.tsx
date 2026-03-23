@@ -17,15 +17,16 @@ interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, placeholder, ...props }, ref) => {
+  ({ className, label, error, options, placeholder, value, ...props }, ref) => {
+    const isPlaceholder = !value || value === '';
     return (
       <div>
         {label && (
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
             {label.endsWith('*') ? (
               <>
                 {label.slice(0, -1).trimEnd()}{' '}
-                <span className="text-red-500">*</span>
+                <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
               </>
             ) : (
               label
@@ -35,17 +36,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <div className="relative">
           <select
             ref={ref}
+            value={value}
             className={cn(
-              'w-full px-3 py-2.5 rounded-[14px] border bg-white text-sett-text-secondary text-body appearance-none pr-9',
+              'w-full p-3 rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal appearance-none pr-9',
+              isPlaceholder ? 'text-[#A3A3A3]' : 'text-sett-text-primary',
               'focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent',
               'disabled:opacity-50 disabled:cursor-not-allowed',
-              error ? 'border-red-500' : 'border-sett-border',
+              error ? 'border-red-500' : 'border-[#E6EAF0]',
               className
             )}
             {...props}
           >
             {placeholder && (
-              <option value="" disabled>
+              <option value="" disabled className="text-[#A3A3A3]">
                 {placeholder}
               </option>
             )}

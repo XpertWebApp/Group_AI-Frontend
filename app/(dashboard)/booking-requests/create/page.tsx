@@ -10,6 +10,7 @@ import { StepperNav } from '@/components/ui/StepperNav';
 import { RoomCounter } from '@/components/ui/RoomCounter';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Spinner } from '@/components/ui/Loader';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { cn } from '@/lib/utils/cn';
 import { destinationsApi } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
@@ -28,6 +29,8 @@ interface FormData {
   // Step 2: Room & Accommodations
   singleRooms: number;
   doubleRooms: number;
+  standardDoubleBeds: number;
+  twinBeds: number;
   tripleRooms: number;
   quadrupleRooms: number;
   extraRooms: string;
@@ -58,6 +61,8 @@ const defaultFormData: FormData = {
   groupSize: '',
   singleRooms: 0,
   doubleRooms: 0,
+  standardDoubleBeds: 0,
+  twinBeds: 0,
   tripleRooms: 0,
   quadrupleRooms: 0,
   extraRooms: '',
@@ -103,20 +108,19 @@ function RadioOption({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 px-4 py-3 rounded-input border text-body font-medium transition-colors flex-1',
+        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal transition-colors flex-1',
         selected
-          ? 'bg-sett-primary text-white border-sett-primary'
-          : 'bg-white text-sett-text-primary border-sett-border hover:border-sett-primary'
+          ? 'border-[#D5E39B] bg-[#F7FAEB] text-[#1D1D1D]'
+          : 'border-[#E6EAF0] bg-white text-[#1D1D1D] hover:border-[#D5E39B]'
       )}
     >
-      <span
-        className={cn(
-          'w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center',
-          selected ? 'border-white' : 'border-sett-text-accent'
-        )}
-      >
-        {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-      </span>
+      {selected ? (
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" className="w-[14px] h-[14px] shrink-0">
+          <path fillRule="evenodd" clipRule="evenodd" d="M7.00008 1.1665C3.77833 1.1665 1.16675 3.77809 1.16675 6.99984C1.16675 10.2216 3.77833 12.8332 7.00008 12.8332C10.2218 12.8332 12.8334 10.2216 12.8334 6.99984C12.8334 3.77809 10.2218 1.1665 7.00008 1.1665ZM7.00008 4.6665C6.38124 4.6665 5.78775 4.91234 5.35017 5.34992C4.91258 5.78751 4.66675 6.381 4.66675 6.99984C4.66675 7.61868 4.91258 8.21217 5.35017 8.64975C5.78775 9.08734 6.38124 9.33317 7.00008 9.33317C7.61892 9.33317 8.21241 9.08734 8.65 8.64975C9.08758 8.21217 9.33341 7.61868 9.33341 6.99984C9.33341 6.381 9.08758 5.78751 8.65 5.34992C8.21241 4.91234 7.61892 4.6665 7.00008 4.6665Z" fill="#AAC737"/>
+        </svg>
+      ) : (
+        <span className="w-[14px] h-[14px] shrink-0 rounded-full border-2 border-[#A3A3A3]" />
+      )}
       {label}
     </button>
   );
@@ -131,10 +135,31 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     if (!data.destination.trim()) {
       errors.destination = t.createForm.destinationRequired;
     }
-    if (!data.checkInDate) errors.checkInDate = t.createForm.checkInRequired;
-    if (!data.checkOutDate) errors.checkOutDate = t.createForm.checkOutRequired;
+    const today = new Date().toISOString().split('T')[0];
+    const maxDate = new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0];
+    if (!data.checkInDate) {
+      errors.checkInDate = t.createForm.checkInRequired;
+    } else if (data.checkInDate < today) {
+      errors.checkInDate = t.createForm.checkInPastDate;
+    } else if (data.checkInDate > maxDate) {
+      errors.checkInDate = t.createForm.dateTooFarInFuture;
+    }
+    if (!data.checkOutDate) {
+      errors.checkOutDate = t.createForm.checkOutRequired;
+    } else if (data.checkOutDate < today) {
+      errors.checkOutDate = t.createForm.checkOutPastDate;
+    } else if (data.checkOutDate > maxDate) {
+      errors.checkOutDate = t.createForm.dateTooFarInFuture;
+    }
     if (data.checkInDate && data.checkOutDate && data.checkOutDate <= data.checkInDate) {
       errors.checkOutDate = t.createForm.checkOutAfterCheckIn;
+    }
+    if (!data.hotelCategory) errors.hotelCategory = t.createForm.hotelCategoryRequired;
+    if (!data.groupType) errors.groupType = t.createForm.groupTypeRequired;
+    if (!data.groupSize.trim()) {
+      errors.groupSize = t.createForm.groupSizeRequired;
+    } else if (Number(data.groupSize) <= 0) {
+      errors.groupSize = t.createForm.groupSizePositive;
     }
   }
 
@@ -168,10 +193,10 @@ export default function CreateBookingRequestPage() {
   const [currentStep, setCurrentStep] = useState(0);
 
   const STEPS = [
-    { label: t.createForm.stepTripDetails, icon: '/icons/Icon (4).svg' },
-    { label: t.createForm.stepRoomAccommodations, icon: '/icons/Icon (3).svg' },
-    { label: t.createForm.stepCustomerDetails, icon: '/icons/Icon (9).svg' },
-    { label: t.createForm.stepPolicies, icon: '/icons/Icon (7).svg' },
+    { label: t.createForm.stepTripDetails, icon: '/icons/streamline-ultimate_trip-road.svg' },
+    { label: t.createForm.stepRoomAccommodations, icon: '/icons/uil_bed.svg' },
+    { label: t.createForm.stepCustomerDetails, icon: '/icons/boxicons_user.svg' },
+    { label: t.createForm.stepPolicies, icon: '/icons/material-symbols_policy-outline-rounded.svg' },
   ];
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -208,6 +233,7 @@ export default function CreateBookingRequestPage() {
     setErrors({});
     if (currentStep < STEPS.length - 1) {
       setCurrentStep((s) => s + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -216,6 +242,7 @@ export default function CreateBookingRequestPage() {
     setErrors({});
     if (currentStep > 0) {
       setCurrentStep((s) => s - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -268,12 +295,13 @@ export default function CreateBookingRequestPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <>
       <Header title={t.createForm.title} />
 
+      <div className="p-4 md:p-6 space-y-6">
       <StepperNav steps={STEPS} currentStep={currentStep} />
 
-      <div className="bg-sett-card rounded-card border border-sett-border p-6">
+      <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-6">
         {currentStep === 0 && (
           <TripDetailsStep formData={formData} updateField={updateField} errors={errors} />
         )}
@@ -286,49 +314,67 @@ export default function CreateBookingRequestPage() {
         {currentStep === 3 && (
           <PoliciesStep formData={formData} updateField={updateField} />
         )}
-      </div>
 
-      {submitError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-card text-body">
-          {submitError}
-        </div>
-      )}
+        {submitError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-[14px] text-body mt-4">
+            {submitError}
+          </div>
+        )}
 
-      {/* Bottom Actions */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="secondary"
-          onClick={() => router.push('/booking-requests')}
-        >
-          {t.common.cancel}
-        </Button>
-        <div className="flex items-center gap-2">
-          {currentStep > 0 && (
-            <Button variant="secondary" onClick={handleBack}>
-              {t.common.back}
-            </Button>
-          )}
-          {currentStep < STEPS.length - 1 ? (
-            <Button variant="primary" onClick={handleNext} className="text-white">
-              {t.common.next}
-            </Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => {}}>
-                {t.createForm.addHotels}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSubmit}
-                isLoading={isSubmitting}
+        {/* Horizontal Line */}
+        <div className="w-full h-px bg-[#E6EAF0] mt-6" />
+
+        {/* Bottom Actions */}
+        <div className="flex items-center justify-between pt-6">
+          <button
+            type="button"
+            onClick={() => router.push('/booking-requests')}
+            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-[#E6EAF0] bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-[#4A4A4A]"
+          >
+            {t.common.cancel}
+          </button>
+          <div className="flex items-center gap-2">
+            {currentStep > 0 && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-[#E6EAF0] bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-[#4A4A4A]"
               >
-                {t.createForm.createRequestBtn}
-              </Button>
-            </>
-          )}
+                {t.common.back}
+              </button>
+            )}
+            {currentStep < STEPS.length - 1 ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-[#AAC737] shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white"
+              >
+                {t.common.next}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {}}
+                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-[#AAC737] bg-white font-montserrat text-[16px] font-semibold leading-normal text-[#AAC737]"
+                >
+                  {t.createForm.addHotels}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-[#AAC737] shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50"
+                >
+                  {isSubmitting ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t.createForm.createRequestBtn}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -342,8 +388,8 @@ interface StepProps {
 
 const inputClass = (hasError: boolean) =>
   cn(
-    'w-full px-3 py-2.5 rounded-input border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary',
-    hasError ? 'border-red-500' : 'border-sett-border'
+    'w-full p-3 rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-[#A3A3A3] placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal focus:outline-none focus:ring-2 focus:ring-sett-primary',
+    hasError ? 'border-red-500' : 'border-[#E6EAF0]'
   );
 
 function FieldError({ message }: { message?: string }) {
@@ -360,20 +406,17 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const destWrapperRef = useRef<HTMLDivElement>(null);
 
   const hotelCategoryOptions = [
-    { value: '', label: t.createForm.selectHotelCategory },
     { value: '3', label: t.createForm.star3 },
     { value: '4', label: t.createForm.star4 },
     { value: '5', label: t.createForm.star5 },
   ];
   const budgetRangeOptions = [
-    { value: '', label: t.createForm.selectBudgetRange },
     { value: 'economy', label: t.createForm.economy },
     { value: 'standard', label: t.createForm.standard },
     { value: 'premium', label: t.createForm.premium },
     { value: 'luxury', label: t.createForm.luxury },
   ];
   const groupTypeOptions = [
-    { value: '', label: t.createForm.selectGroupType },
     { value: 'business', label: t.createForm.businessGroup },
     { value: 'leisure', label: t.createForm.leisureGroup },
     { value: 'sports', label: t.createForm.sportsTeam },
@@ -435,8 +478,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
       />
       <div className="space-y-4">
         <div ref={destWrapperRef} className="relative">
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            {t.createForm.destination} <span className="text-red-500">*</span>
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
+            {t.createForm.destination} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
           </label>
           <input
             type="text"
@@ -470,26 +513,30 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              {t.createForm.checkInDate} <span className="text-red-500">*</span>
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
+              {t.createForm.checkInDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
             </label>
             <input
               type="date"
+              min={new Date().toISOString().split('T')[0]}
+              max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
               value={formData.checkInDate}
               onChange={(e) => updateField('checkInDate', e.target.value)}
-              className={inputClass(!!errors.checkInDate)}
+              className={cn(inputClass(!!errors.checkInDate), !formData.checkInDate && 'text-[#A3A3A3]')}
             />
             <FieldError message={errors.checkInDate} />
           </div>
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              {t.createForm.checkOutDate} <span className="text-red-500">*</span>
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
+              {t.createForm.checkOutDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
             </label>
             <input
               type="date"
+              min={formData.checkInDate || new Date().toISOString().split('T')[0]}
+              max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
               value={formData.checkOutDate}
               onChange={(e) => updateField('checkOutDate', e.target.value)}
-              className={inputClass(!!errors.checkOutDate)}
+              className={cn(inputClass(!!errors.checkOutDate), !formData.checkOutDate && 'text-[#A3A3A3]')}
             />
             <FieldError message={errors.checkOutDate} />
           </div>
@@ -525,9 +572,14 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           <Input
             label={`${t.createForm.groupSize} *`}
             type="number"
+            min="1"
             placeholder={t.createForm.groupSizePlaceholder}
             value={formData.groupSize}
-            onChange={(e) => updateField('groupSize', e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '' || Number(val) >= 0) updateField('groupSize', val);
+            }}
+            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
             error={errors.groupSize}
           />
         </div>
@@ -570,11 +622,32 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
         />
       </div>
       <FieldError message={errors.rooms} />
+
+      {/* Bed Configuration for Double Room */}
+      {formData.doubleRooms > 0 && (
+        <div className="mt-4 rounded-[14px] border border-[#E6EAF0] bg-[#F7F7F7] p-5">
+          <h3 className="font-montserrat text-[16px] font-semibold leading-normal text-[#1D1D1D] mb-4">
+            Select Bed Configuration for Double Room
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <RoomCounter
+              label="Standard Double Bed"
+              value={formData.standardDoubleBeds}
+              onChange={(v) => updateField('standardDoubleBeds', v)}
+            />
+            <RoomCounter
+              label="Twin Bed"
+              value={formData.twinBeds}
+              onChange={(v) => updateField('twinBeds', v)}
+            />
+          </div>
+        </div>
+      )}
       <div className="mb-4" />
 
       <div className="space-y-4">
         <div>
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
             {t.createForm.extraRooms} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
@@ -587,7 +660,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.breakfastPreference} <span className="text-sett-destructive">*</span>
             </label>
             <div className="flex gap-2">
@@ -604,7 +677,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
             </div>
           </div>
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.hotelLocation} <span className="text-sett-destructive">*</span>
             </label>
             <div className="flex gap-2">
@@ -623,7 +696,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
         </div>
 
         <div>
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
             {t.createForm.specialRequests} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
@@ -642,6 +715,15 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
 
 function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
   const { t } = useLanguage();
+  const [emailTouched, setEmailTouched] = useState(false);
+
+  const getEmailError = () => {
+    if (!emailTouched) return errors.email;
+    if (!formData.email.trim()) return t.createForm.emailRequired;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return t.createForm.invalidEmail;
+    return errors.email;
+  };
+  const emailError = getEmailError();
   return (
     <>
       <SectionHeader
@@ -651,7 +733,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.companyName} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -664,7 +746,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             <FieldError message={errors.companyName} />
           </div>
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.nameList}
             </label>
             {formData.nameListFile ? (
@@ -700,7 +782,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.firstName} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -713,7 +795,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             <FieldError message={errors.firstName} />
           </div>
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.lastName} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -729,17 +811,18 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+            <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
               {t.createForm.emailAddress} <span className="text-sett-destructive">*</span>
             </label>
             <input
-              type="email"
+              type="text"
               placeholder={t.createForm.emailPlaceholder}
               value={formData.email}
-              onChange={(e) => updateField('email', e.target.value)}
-              className={inputClass(!!errors.email)}
+              onChange={(e) => { updateField('email', e.target.value); if (!emailTouched) setEmailTouched(true); }}
+              onBlur={() => setEmailTouched(true)}
+              className={inputClass(!!emailError)}
             />
-            <FieldError message={errors.email} />
+            <FieldError message={emailError} />
           </div>
           <PhoneInput
             value={formData.phone}
@@ -749,7 +832,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
         </div>
 
         <div>
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
             {t.createForm.specialRequests} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
@@ -782,71 +865,25 @@ function PoliciesStep({
       />
       <div className="space-y-6">
         <div>
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
             {t.createForm.termsAndConditions}
           </label>
-          <div className="border border-sett-border rounded-input overflow-hidden">
-            <div className="flex items-center gap-1 px-3 py-2 border-b border-sett-border bg-sett-fill">
-              {['B', 'I', 'U', 'S'].map((btn) => (
-                <button
-                  key={btn}
-                  type="button"
-                  className="w-7 h-7 flex items-center justify-center rounded text-sett-text-secondary hover:bg-sett-border/50 text-sm font-semibold"
-                >
-                  {btn}
-                </button>
-              ))}
-              <span className="w-px h-4 bg-sett-border mx-1" />
-              {['≡', '≡', '≡'].map((btn, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="w-7 h-7 flex items-center justify-center rounded text-sett-text-secondary hover:bg-sett-border/50 text-sm"
-                >
-                  {btn}
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={formData.termsAndConditions}
-              onChange={(e) => updateField('termsAndConditions', e.target.value)}
-              className="w-full px-4 py-3 text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none min-h-[160px] resize-y"
-            />
-          </div>
+          <RichTextEditor
+            value={formData.termsAndConditions}
+            onChange={(val) => updateField('termsAndConditions', val)}
+            minHeight="160px"
+          />
         </div>
 
         <div>
-          <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
             {t.createForm.cancellationConditions}
           </label>
-          <div className="border border-sett-border rounded-input overflow-hidden">
-            <div className="flex items-center gap-1 px-3 py-2 border-b border-sett-border bg-sett-fill">
-              {['B', 'I', 'U', 'S'].map((btn) => (
-                <button
-                  key={btn}
-                  type="button"
-                  className="w-7 h-7 flex items-center justify-center rounded text-sett-text-secondary hover:bg-sett-border/50 text-sm font-semibold"
-                >
-                  {btn}
-                </button>
-              ))}
-              <span className="w-px h-4 bg-sett-border mx-1" />
-              {['≡', '≡', '≡'].map((btn, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="w-7 h-7 flex items-center justify-center rounded text-sett-text-secondary hover:bg-sett-border/50 text-sm"
-                >
-                  {btn}
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={formData.cancellationConditions}
-              onChange={(e) => updateField('cancellationConditions', e.target.value)}
-              className="w-full px-4 py-3 text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none min-h-[120px] resize-y"
-            />
-          </div>
+          <RichTextEditor
+            value={formData.cancellationConditions}
+            onChange={(val) => updateField('cancellationConditions', val)}
+            minHeight="120px"
+          />
         </div>
       </div>
     </>

@@ -18,7 +18,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
   const { onLogoutClick } = useAppLayout();
 
   return (
-    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-sett-border">
+    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 md:px-6 pt-[2.3rem] pb-4 bg-white border-b border-sett-border shadow-[0_1px_3px_0_rgba(7,28,66,0.06),0_1px_2px_0_rgba(7,28,66,0.04)]">
       <div>
         <h1 className="text-heading-sm font-bold text-sett-text-primary tracking-tight">{title}</h1>
         {subtitle && (
