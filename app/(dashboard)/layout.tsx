@@ -13,21 +13,18 @@ export default function DashboardLayout({
 }) {
   const user = useAppSelector((s) => s.auth.user);
   const router = useRouter();
-  const [checked, setChecked] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     const token = localStorage.getItem('accessToken');
     if (!token) {
       router.replace('/login');
+    } else {
+      setAuthorized(true);
     }
-    setChecked(true);
   }, [router]);
 
-  if (!checked && typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken');
-    if (!token) return null;
-  }
+  if (!authorized) return null;
 
   return (
     <LanguageProvider>
