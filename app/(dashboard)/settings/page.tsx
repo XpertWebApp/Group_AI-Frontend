@@ -15,8 +15,9 @@ export default function SettingsPage() {
     : '';
 
   return (
-    <div className="space-y-8 max-w-2xl">
+    <>
       <Header title="Settings" subtitle="Manage your account and preferences" />
+      <div className="p-4 md:p-6 space-y-8 max-w-2xl">
       <section className="bg-sett-card rounded-card shadow-card border border-sett-border p-6">
         <h2 className="text-heading-sm font-bold text-sett-text-primary mb-4">
           General
@@ -55,6 +56,7 @@ export default function SettingsPage() {
           {saved ? 'Saved' : 'Save Changes'}
         </Button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -30,6 +30,7 @@ export interface RecentOffer {
   status: string;
   proposalId: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export const dashboardApi = {

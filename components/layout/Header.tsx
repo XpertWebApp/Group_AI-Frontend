@@ -1,10 +1,9 @@
 'use client';
 
-import { LogOut } from 'lucide-react';
-// import { Bell } from 'lucide-react'; // M4 — disabled for milestone1_2
-// import { useState } from 'react'; // M4 — disabled for milestone1_2
-// import { NotificationsModal } from '@/components/ui/NotificationsModal'; // M4 — disabled for milestone1_2
-// import { LanguageToggle } from '@/components/ui/LanguageToggle'; // M5 — disabled for milestone1_2
+import { Bell, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { NotificationsModal } from '@/components/ui/NotificationsModal';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
 import { useAppLayout } from '@/app/(dashboard)/AppLayoutContext';
 
 interface HeaderProps {
@@ -15,11 +14,11 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
-  // const [notificationsOpen, setNotificationsOpen] = useState(false); // M4 — disabled for milestone1_2
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { onLogoutClick } = useAppLayout();
 
   return (
-    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-sett-border">
+    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 md:px-6 pt-[2.3rem] pb-4 bg-white border-b border-sett-border shadow-[0_1px_3px_0_rgba(7,28,66,0.06),0_1px_2px_0_rgba(7,28,66,0.04)]">
       <div>
         <h1 className="text-heading-sm font-bold text-sett-text-primary tracking-tight">{title}</h1>
         {subtitle && (
@@ -27,7 +26,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
-        {/* <LanguageToggle /> */}{/* M5 — disabled for milestone1_2 */}
+        <LanguageToggle />
         {onRefresh && (
           <button
             type="button"
@@ -36,7 +35,6 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
             aria-label="Refresh"
           />
         )}
-        {/* M4 — notification bell disabled for milestone1_2
         <button
           type="button"
           onClick={() => setNotificationsOpen(true)}
@@ -45,7 +43,6 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         >
           <Bell className="w-5 h-5 text-sett-text-secondary" />
         </button>
-        */}
         {onLogoutClick && (
           <button
             type="button"
@@ -58,12 +55,10 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
         {actions}
       </div>
-      {/* M4 — notifications modal disabled for milestone1_2
       <NotificationsModal
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
       />
-      */}
     </header>
   );
 }

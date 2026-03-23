@@ -52,9 +52,14 @@ export function AppLayout({ children }: AppLayoutProps) {
             <Menu className="w-6 h-6" />
           </button>
         </div>
-        <main className="flex-1 p-4 md:p-6 bg-sett-background overflow-auto min-h-0">
+        <main className="flex-1 bg-sett-background overflow-auto min-h-0">
           {children}
         </main>
+        <footer className="w-full py-3 px-4 border-t border-[#E6EAF0] bg-[#F7F7F7]">
+          <span className="font-montserrat text-[12px] font-medium leading-normal text-[#A3A3A3]">
+            2026 S-E-T-T &nbsp;|&nbsp; All Rights Reserved
+          </span>
+        </footer>
       </div>
     </div>
       <LogoutModal

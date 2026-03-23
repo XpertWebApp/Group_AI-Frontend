@@ -15,30 +15,31 @@ interface StepperNavProps {
 
 export function StepperNav({ steps, currentStep }: StepperNavProps) {
   return (
-    <div className="bg-sett-card rounded-card border border-sett-border p-6">
-      <div className="grid" style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}>
+    <div className="w-full flex justify-center items-center py-5 pl-5 pr-[22px] rounded-[14px] border border-[#E6EAF0] bg-white">
+      <div className="flex items-center gap-5 w-full">
         {steps.map((step, i) => {
           const isCompleted = i < currentStep;
           const isActive = i === currentStep;
           const isReached = isCompleted || isActive;
           return (
-            <div key={step.label} className="flex flex-col items-start gap-3">
+            <div key={step.label} className="flex flex-1 flex-col items-start gap-[14px]">
               {/* Step icon circle */}
               <div
                 className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center',
-                  isReached ? 'bg-sett-light-green-bg' : 'bg-[#f5f5f5]'
+                  'w-[40px] h-[40px] p-3 rounded-xl flex justify-center items-center aspect-square overflow-hidden',
+                  isReached ? 'bg-sett-light-green-bg' : 'bg-[#f5f5f5] border border-[#C8C8C8]'
                 )}
               >
                 <Image
                   src={step.icon}
                   alt=""
-                  width={18}
-                  height={18}
+                  width={16}
+                  height={16}
                   className={cn(
+                    'w-4 h-4 shrink-0 aspect-square object-contain',
                     isReached
                       ? 'brightness-0 invert-[45%] sepia-[90%] saturate-[400%] hue-rotate-[30deg]'
-                      : 'opacity-40'
+                      : ''
                   )}
                 />
               </div>
@@ -46,8 +47,8 @@ export function StepperNav({ steps, currentStep }: StepperNavProps) {
               {/* Progress bar — thicker to match Figma */}
               <div
                 className={cn(
-                  'w-full h-[12px] rounded-full',
-                  isReached ? 'bg-sett-primary' : 'bg-[#f0f0f0]'
+                  'w-full h-[10px] rounded-[4px]',
+                  isReached ? 'bg-[#AAC737]' : 'bg-[#f0f0f0]'
                 )}
               />
 

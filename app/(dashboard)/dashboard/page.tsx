@@ -44,7 +44,7 @@ export default function DashboardPage() {
       {
         id: 'demo-001',
         referenceNumber: 1001,
-        offerId: 'OFF-1001',
+        offerId: '1001',
         customer: 'Acme Corp',
         destination: 'Barcelona, Spain',
         checkinDate: '2026-04-15',
@@ -58,11 +58,12 @@ export default function DashboardPage() {
         status: 'pending',
         proposalId: '',
         createdAt: '2026-03-01T10:00:00Z',
+        updatedAt: '2026-03-16T10:00:00Z',
       },
       {
         id: 'demo-002',
         referenceNumber: 1002,
-        offerId: 'OFF-1002',
+        offerId: '1002',
         customer: 'TravelGroup GmbH',
         destination: 'Rome, Italy',
         checkinDate: '2026-05-10',
@@ -76,11 +77,12 @@ export default function DashboardPage() {
         status: 'draft',
         proposalId: '',
         createdAt: '2026-02-20T14:30:00Z',
+        updatedAt: '2026-03-10T14:30:00Z',
       },
       {
         id: 'demo-003',
         referenceNumber: 1003,
-        offerId: 'OFF-1003',
+        offerId: '1003',
         customer: 'SportTeam e.V.',
         destination: 'Prague, Czech Republic',
         checkinDate: '2026-06-01',
@@ -94,11 +96,12 @@ export default function DashboardPage() {
         status: 'processing',
         proposalId: '',
         createdAt: '2026-01-15T08:00:00Z',
+        updatedAt: '2026-03-14T08:00:00Z',
       },
       {
         id: 'demo-004',
         referenceNumber: 1004,
-        offerId: 'OFF-1004',
+        offerId: '1004',
         customer: 'EventPro Solutions',
         destination: 'Vienna, Austria',
         checkinDate: '2026-04-28',
@@ -112,11 +115,12 @@ export default function DashboardPage() {
         status: 'completed',
         proposalId: '',
         createdAt: '2026-02-10T09:15:00Z',
+        updatedAt: '2026-03-12T09:15:00Z',
       },
       {
         id: 'demo-005',
         referenceNumber: 1005,
-        offerId: 'OFF-1005',
+        offerId: '1005',
         customer: 'Müller Conferences',
         destination: 'Budapest, Hungary',
         checkinDate: '2026-07-12',
@@ -130,6 +134,7 @@ export default function DashboardPage() {
         status: 'pending',
         proposalId: '',
         createdAt: '2026-03-05T16:45:00Z',
+        updatedAt: '2026-03-08T16:45:00Z',
       },
     ];
     setStats(dummyStats);
@@ -138,9 +143,10 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <>
       <Header title={t.dashboard.title} />
 
+      <div className="p-4 md:p-6 space-y-6">
       {/* Stats Cards */}
       {loading ? (
         <StatCardSkeleton cards={4} />
@@ -155,15 +161,15 @@ export default function DashboardPage() {
             return (
               <div
                 key={card.key}
-                className="bg-sett-card rounded-card shadow-card p-4 border border-sett-border relative"
+                className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] p-5 border border-[#D5E39B] relative"
               >
-                <div className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-sett-light-green-bg flex items-center justify-center">
+                <div className="absolute top-4 right-4 flex items-center gap-[10px] p-2 rounded-[10px] border border-[#D5E39B] bg-[#F7FAEB]">
                   <Image src={card.icon} alt="" width={16} height={16} />
                 </div>
-                <p className="text-label text-sett-text-secondary uppercase tracking-wide">
+                <p className="font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#4A4A4A]">
                   {card.label}
                 </p>
-                <p className="text-2xl font-bold text-sett-text-primary mt-1">
+                <p className="font-montserrat text-[32px] font-bold leading-normal text-[#1D1D1D] uppercase mt-1">
                   {value}
                 </p>
                 <div className="flex items-center gap-1 mt-1">
@@ -174,14 +180,11 @@ export default function DashboardPage() {
                     height={14}
                   />
                   <span
-                    className={cn(
-                      'text-caption font-medium',
-                      trend === 'up' ? 'text-sett-trend-up' : 'text-sett-trend-down'
-                    )}
+                    className="font-montserrat text-[12px] font-bold leading-normal text-[#377F00]"
                   >
                     {change >= 0 ? '+' : ''}{change.toFixed(1)}%
                   </span>
-                  <span className="text-caption text-sett-text-muted">{t.dashboard.vsLastMonth}</span>
+                  <span className="font-montserrat text-[12px] font-medium leading-normal text-[#A3A3A3]">{t.dashboard.vsLastMonth}</span>
                 </div>
               </div>
             );
@@ -191,35 +194,34 @@ export default function DashboardPage() {
 
       {/* Recent Offers Section */}
       <section>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <div className="flex items-start gap-3">
-            <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
-            <div>
-              <h2 className="text-heading-sm font-bold text-sett-text-primary">
-                {t.dashboard.recentOffers}
-              </h2>
-              <p className="text-body text-sett-text-secondary mt-0.5">
-                {t.dashboard.recentOffersSubtitle}
-              </p>
+        <div className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] border border-[#E6EAF0] overflow-hidden">
+          <div className="flex justify-between items-start p-5 border-b border-[#E6EAF0]">
+            <div className="flex items-start gap-3">
+              <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
+              <div>
+                <h2 className="font-montserrat text-[18px] font-semibold leading-normal text-[#1D1D1D]">
+                  {t.dashboard.recentOffers}
+                </h2>
+                <p className="font-montserrat text-[14px] font-normal leading-normal text-[#4A4A4A] mt-0.5">
+                  {t.dashboard.recentOffersSubtitle}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/booking-requests">
+                <Button variant="outline" size="sm" className="!rounded-[14px] !border-[#AAC737] !bg-white !text-[#AAC737] font-montserrat !text-[16px] !font-semibold leading-normal !px-4 !py-3 gap-1">
+                  <Eye className="w-4 h-4" />
+                  {t.dashboard.viewAll}
+                </Button>
+              </Link>
+              <Link href="/booking-requests/create">
+                <Button variant="primary" size="sm" className="!rounded-[14px] font-montserrat !text-[16px] !font-semibold leading-normal !text-white !px-4 !py-3 gap-1 !bg-[#AAC737] !shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)]">
+                  <Plus className="w-4 h-4" />
+                  {t.dashboard.createRequest}
+                </Button>
+              </Link>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/booking-requests">
-              <Button variant="outline" size="sm">
-                <Eye className="w-4 h-4 mr-1.5" />
-                {t.dashboard.viewAll}
-              </Button>
-            </Link>
-            <Link href="/booking-requests/create">
-              <Button variant="primary" size="sm">
-                <Plus className="w-4 h-4 mr-1.5" />
-                {t.dashboard.createRequest}
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        <div className="bg-sett-card rounded-card shadow-card border border-sett-border overflow-hidden">
           {/* Loading skeleton */}
           {loading && (
             <>
@@ -242,17 +244,19 @@ export default function DashboardPage() {
           {/* Desktop table */}
           {!loading && offers.length > 0 && (
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full min-w-[900px]">
+              <table className="w-full min-w-[1200px]">
                 <thead>
-                  <tr className="border-b border-sett-border bg-sett-background">
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.offerId}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.customer}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.destination}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.checkIn}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.rooms}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.totalSell}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.margin}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-3">{t.requests.status}</th>
+                  <tr className="h-[57px] border-t border-b border-[#E6EAF0]">
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.offerId}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.customer}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.destination}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.checkInOut}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.rooms}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.totalSell}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.margin}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.status}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.createdOn}</th>
+                    <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-[#A3A3A3] px-4 py-3">{t.requests.lastUpdated}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -292,6 +296,12 @@ export default function DashboardPage() {
                         <Badge variant={getStatusBadgeVariant(row.status)}>
                           {row.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                         </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-secondary whitespace-nowrap">
+                        {formatDate(row.createdAt)}
+                      </td>
+                      <td className="px-4 py-3 text-body text-sett-text-secondary whitespace-nowrap">
+                        {formatDate(row.updatedAt)}
                       </td>
                     </tr>
                   ))}
@@ -347,6 +357,7 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
-    </div>
+      </div>
+    </>
   );
 }

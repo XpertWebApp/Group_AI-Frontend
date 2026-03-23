@@ -154,8 +154,9 @@ export default function RequestDetailPage() {
 
   if (!request) {
     return (
-      <div className="space-y-6">
+      <>
         <Header title="Create Request" />
+        <div className="p-4 md:p-6 space-y-6">
         <p className="text-body text-sett-text-secondary">Request not found.</p>
         <button
           type="button"
@@ -164,7 +165,8 @@ export default function RequestDetailPage() {
         >
           Back
         </button>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -182,9 +184,10 @@ export default function RequestDetailPage() {
         : '—';
 
   return (
-    <div className="space-y-6 pb-8">
+    <>
       <Header title="Create Request" />
 
+      <div className="p-4 md:p-6 space-y-6 pb-8">
       {/* ── Breadcrumb ── */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
@@ -461,6 +464,7 @@ export default function RequestDetailPage() {
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
