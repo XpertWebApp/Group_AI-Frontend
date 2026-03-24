@@ -283,21 +283,22 @@ export default function RequestDetailPage() {
         : '—';
 
   return (
-    <div className="space-y-6 pb-8">
+    <>
       <Header title="Create Request" />
 
+      <div className="p-4 md:p-6 space-y-6 pb-8">
       {/* ── Breadcrumb ── */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={() => router.push('/booking-requests')}
-          className="flex items-center gap-1 text-body text-sett-text-secondary hover:text-sett-text-primary transition-colors"
+          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-[#4A4A4A] hover:text-[#1D1D1D] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
-        <span className="text-sett-border hidden sm:inline">|</span>
-        <span className="text-heading-sm font-bold text-sett-text-primary">
+        <span className="text-[#E6EAF0] hidden sm:inline">|</span>
+        <span className="font-montserrat text-[18px] font-bold text-[#1D1D1D]">
           Offer #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
         <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
@@ -307,24 +308,36 @@ export default function RequestDetailPage() {
         </Badge>
       </div>
 
-      {/* ════════════════════ REQUEST SUMMARY CARD ════════════════════ */}
-      <div className="bg-sett-card rounded-card border border-sett-border p-4 sm:p-6">
-        {/* Section header */}
+      {/* ════════════════════ MAIN CONTENT CARD ════════════════════ */}
+      <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-5">
+
+      {/* ════════════════════ REQUEST SUMMARY ════════════════════ */}
+      <div className="mb-6">
+        {/* Section header with Add Hotels button */}
         <div className="flex items-center justify-between">
           <div className="flex items-start gap-3">
             <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-heading-sm font-bold text-sett-text-primary">
+                <h2 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D]">
                   Request Summary
                 </h2>
-                <Pencil className="w-4 h-4 text-sett-text-accent cursor-pointer hover:text-sett-text-primary" />
+                <Pencil className="w-4 h-4 text-[#A3A3A3] cursor-pointer hover:text-[#1D1D1D]" />
               </div>
-              <p className="text-body text-sett-text-accent mt-0.5">
+              <p className="font-montserrat text-[14px] font-normal text-[#4A4A4A] mt-0.5">
                 Booking details for this offer
               </p>
             </div>
           </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleAddHotelsClick}
+            isLoading={actionLoading}
+            className="!rounded-[14px] font-montserrat !text-[16px] !font-semibold !text-white !px-5 !py-3 !bg-[#AAC737] !shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)]"
+          >
+            Add Hotels
+          </Button>
         </div>
 
         {/* Collapsible content */}
@@ -332,7 +345,7 @@ export default function RequestDetailPage() {
           <>
         {/* ── Trip Details ── */}
         <div className="mb-6 mt-6">
-          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Trip Details</h3>
+          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">Trip Details</h3>
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
@@ -347,35 +360,35 @@ export default function RequestDetailPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="text-center">
-                <p className="text-label text-sett-text-accent uppercase tracking-wide">
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">
                   Hotel Category
                 </p>
                 <div className="flex items-center gap-1 mt-0.5 justify-center">
-                  <span className="text-body text-sett-text-secondary">
+                  <span className="font-montserrat text-[14px] font-medium text-[#4A4A4A]">
                     ({request.starRating}-Star)
                   </span>
                   {request.starRating && <StarRating rating={request.starRating} />}
                 </div>
               </div>
               <div className="text-center">
-                <p className="text-label text-sett-text-accent uppercase tracking-wide">
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">
                   Budget Range
                 </p>
-                <p className="text-body text-sett-text-secondary mt-0.5">
+                <p className="font-montserrat text-[14px] font-medium text-[#4A4A4A] mt-0.5">
                   {request.budgetRange || '—'}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-label text-sett-text-accent uppercase tracking-wide">
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">
                   Group Type
                 </p>
-                <p className="text-body text-sett-text-secondary mt-0.5 capitalize">
+                <p className="font-montserrat text-[14px] font-medium text-[#4A4A4A] mt-0.5 capitalize">
                   {request.groupType || '—'}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-label text-sett-text-accent uppercase tracking-wide">Guests</p>
-                <p className="text-body text-sett-text-secondary mt-0.5">
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">Guests</p>
+                <p className="font-montserrat text-[14px] font-medium text-[#4A4A4A] mt-0.5">
                   {request.groupSize ?? '—'}
                 </p>
               </div>
@@ -387,7 +400,7 @@ export default function RequestDetailPage() {
 
         {/* ── Room & Accommodations ── */}
         <div className="mb-6">
-          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">
+          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">
             Room & Accommodations
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
@@ -399,12 +412,12 @@ export default function RequestDetailPage() {
             ].map((room) => (
               <div
                 key={room.label}
-                className="border border-sett-border rounded-card p-4 text-center"
+                className="border border-[#E6EAF0] rounded-[14px] p-4 text-center"
               >
-                <p className="text-heading-sm font-bold text-sett-text-primary">
+                <p className="font-montserrat text-[18px] font-bold text-[#1D1D1D]">
                   {room.value || '—'}
                 </p>
-                <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
+                <p className="font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] mt-0.5">
                   {room.label}
                 </p>
               </div>
@@ -419,15 +432,15 @@ export default function RequestDetailPage() {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-            <div className="border border-sett-border rounded-card p-3 sm:p-4 text-center">
-              <p className="text-body font-semibold text-sett-text-primary">{breakfastLabel}</p>
-              <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
+            <div className="border border-[#E6EAF0] rounded-[14px] p-3 sm:p-4 text-center">
+              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">{breakfastLabel}</p>
+              <p className="font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] mt-0.5">
                 Breakfast Preference
               </p>
             </div>
-            <div className="border border-sett-border rounded-card p-3 sm:p-4 text-center">
-              <p className="text-body font-semibold text-sett-text-primary">{locationLabel}</p>
-              <p className="text-label text-sett-text-accent uppercase tracking-wide mt-0.5">
+            <div className="border border-[#E6EAF0] rounded-[14px] p-3 sm:p-4 text-center">
+              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">{locationLabel}</p>
+              <p className="font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] mt-0.5">
                 Hotel Location
               </p>
             </div>
@@ -449,7 +462,7 @@ export default function RequestDetailPage() {
 
         {/* ── Customer Details ── */}
         <div className="mb-6">
-          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">
+          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">
             Customer Details
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-3">
@@ -525,7 +538,7 @@ export default function RequestDetailPage() {
 
         {/* ── Policies ── */}
         <div>
-          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-3">Policies</h3>
+          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">Policies</h3>
           {request.termsAndConditions && (
             <div className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50">
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
@@ -555,7 +568,7 @@ export default function RequestDetailPage() {
           <button
             type="button"
             onClick={() => setSummaryCollapsed(!summaryCollapsed)}
-            className="p-1 rounded-full hover:bg-sett-fill transition-colors text-sett-text-accent hover:text-sett-text-primary"
+            className="p-1 rounded-full hover:bg-sett-fill transition-colors text-[#A3A3A3] hover:text-[#1D1D1D]"
             aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
           >
             {summaryCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
@@ -570,8 +583,8 @@ export default function RequestDetailPage() {
           {/* Hotels */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-heading-sm font-bold text-sett-text-primary">Hotels</h3>
-              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading}>
+              <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D]">Hotels</h3>
+              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading} className="!rounded-[14px] font-montserrat !text-[14px] !font-semibold !text-white !px-4 !py-2 !bg-[#AAC737]">
                 + Add Hotel
               </Button>
             </div>
@@ -840,7 +853,9 @@ export default function RequestDetailPage() {
           proposal={proposal}
         />
       )}
-    </div>
+      </div>
+      </div>
+    </>
   );
 }
 

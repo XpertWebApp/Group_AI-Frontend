@@ -178,30 +178,26 @@ export default function AddHotelPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <>
       <Header title="Create Request" />
 
+      <div className="p-4 md:p-6 space-y-6">
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           type="button"
           onClick={() => router.push(`/booking-requests/${requestId}`)}
-          className="flex items-center gap-1 text-body text-sett-text-secondary hover:text-sett-text-primary transition-colors"
+          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-[#4A4A4A] hover:text-[#1D1D1D] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
-        <span className="text-sett-border hidden sm:inline">|</span>
-        <span className="text-body text-sett-text-secondary">
+        <span className="text-[#A3A3A3] hidden sm:inline">&gt;</span>
+        <span className="font-montserrat text-[14px] font-medium text-[#A3A3A3]">
           Offer #{request?.referenceNumber ?? requestId.slice(0, 4)}
         </span>
-        <span className="text-sett-border hidden sm:inline">|</span>
-        <span className="text-heading-sm font-bold text-sett-text-primary">Add Hotel</span>
-        {request && (
-          <Badge variant={getStatusBadgeVariant(request.status)} className="ml-auto">
-            {request.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-          </Badge>
-        )}
+        <span className="text-[#A3A3A3] hidden sm:inline">&gt;</span>
+        <span className="font-montserrat text-[16px] font-semibold text-[#1D1D1D]">Add Hotel</span>
       </div>
 
       {/* Loading request data */}
@@ -211,12 +207,12 @@ export default function AddHotelPage() {
 
       {/* Searching phase */}
       {phase === 'searching' && (
-        <div className="bg-sett-card rounded-card border border-sett-border p-12 text-center">
+        <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-12 text-center">
           <Spinner size="lg" className="mx-auto mb-4" />
-          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-2">
+          <h3 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] mb-2">
             Searching Hotels...
           </h3>
-          <p className="text-body text-sett-text-accent max-w-md mx-auto">
+          <p className="font-montserrat text-[14px] text-[#A3A3A3] max-w-md mx-auto">
             We&apos;re searching across multiple suppliers for the best hotel options.
             This may take 30-45 seconds.
           </p>
@@ -225,11 +221,11 @@ export default function AddHotelPage() {
 
       {/* Error phase */}
       {phase === 'error' && (
-        <div className="bg-sett-card rounded-card border border-sett-border p-8 text-center">
+        <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-8 text-center">
           <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
-          <h3 className="text-heading-sm font-bold text-sett-text-primary mb-2">Search Failed</h3>
-          <p className="text-body text-sett-text-accent mb-4">{errorMsg}</p>
-          <Button variant="primary" onClick={runSearch}>
+          <h3 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] mb-2">Search Failed</h3>
+          <p className="font-montserrat text-[14px] text-[#A3A3A3] mb-4">{errorMsg}</p>
+          <Button variant="primary" onClick={runSearch} className="!rounded-[14px] !bg-[#AAC737]">
             Retry Search
           </Button>
         </div>
@@ -253,29 +249,29 @@ export default function AddHotelPage() {
 
           {/* ── Left Sidebar: Filters ── */}
           <aside className={cn(
-            'lg:w-[220px] shrink-0',
+            'lg:w-[230px] shrink-0',
             filtersOpen ? 'block' : 'hidden lg:block'
           )}>
-            <div className="bg-sett-card rounded-card border border-sett-border p-4 lg:p-0 lg:bg-transparent lg:border-0">
-              <h3 className="text-heading-sm font-bold text-sett-text-primary mb-4">Trip Details</h3>
+            <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-5">
+              <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-5">Trip Details</h3>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-4">
+              <div className="space-y-5">
                 {/* Destination */}
                 <div>
-                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                  <label className="block font-montserrat text-[12px] font-semibold text-[#1D1D1D] mb-1.5">
                     Destination
                   </label>
-                  <div className="w-full px-3 py-2 rounded-input border border-sett-border bg-sett-fill text-body text-sett-text-secondary truncate">
+                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-[#E6EAF0] bg-white font-montserrat text-[14px] text-[#4A4A4A] truncate">
                     {request?.destinationName || '—'}
                   </div>
                 </div>
 
                 {/* Stay Dates */}
                 <div>
-                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                  <label className="block font-montserrat text-[12px] font-semibold text-[#1D1D1D] mb-1.5">
                     Stay Dates
                   </label>
-                  <div className="w-full px-3 py-2 rounded-input border border-sett-border bg-sett-fill text-body text-sett-text-secondary">
+                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-[#E6EAF0] bg-white font-montserrat text-[14px] text-[#4A4A4A]">
                     {request?.checkinDate
                       ? new Date(request.checkinDate).toLocaleDateString('en-GB')
                       : '—'}
@@ -286,23 +282,27 @@ export default function AddHotelPage() {
                   </div>
                 </div>
 
+                <hr className="border-[#E6EAF0]" />
+
                 {/* Star Rating */}
                 <div>
-                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                  <label className="block font-montserrat text-[14px] font-semibold text-[#1D1D1D] mb-2">
                     Star Rating
                   </label>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {[5, 4, 3].map((star) => (
-                      <label key={star} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={starFilters.includes(star)}
-                          onChange={() => toggleStar(star)}
-                          className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
-                        />
+                      <label key={star} className="flex items-center gap-2.5 cursor-pointer">
+                        <span className={cn(
+                          'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                          starFilters.includes(star) ? 'border-[#AAC737] bg-[#AAC737]' : 'border-[#E6EAF0]'
+                        )}
+                          onClick={() => toggleStar(star)}
+                        >
+                          {starFilters.includes(star) && <span className="w-2 h-2 rounded-full bg-white" />}
+                        </span>
                         <div className="flex gap-0.5">
                           {Array.from({ length: star }).map((_, i) => (
-                            <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
+                            <Star key={i} className="w-4 h-4 fill-[#AAC737] text-[#AAC737]" />
                           ))}
                         </div>
                       </label>
@@ -310,9 +310,11 @@ export default function AddHotelPage() {
                   </div>
                 </div>
 
+                <hr className="border-[#E6EAF0]" />
+
                 {/* Price Per Night */}
                 <div>
-                  <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+                  <label className="block font-montserrat text-[14px] font-semibold text-[#1D1D1D] mb-2">
                     Price Per Night
                   </label>
                   <input
@@ -322,38 +324,42 @@ export default function AddHotelPage() {
                     step={50}
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(Number(e.target.value))}
-                    className="w-full accent-sett-primary"
+                    className="w-full accent-[#AAC737]"
                   />
-                  <div className="flex justify-between text-caption text-sett-text-accent mt-1">
+                  <div className="flex justify-between font-montserrat text-[12px] text-[#A3A3A3] mt-1">
                     <span>&euro;0</span>
                     <span>&euro;{maxPrice.toLocaleString()}</span>
                   </div>
                 </div>
 
+                <hr className="border-[#E6EAF0]" />
+
                 {/* Amenities */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-label font-medium text-sett-text-primary uppercase tracking-wide">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">
                       Amenities
                     </label>
                     <button
                       type="button"
-                      className="text-caption text-sett-primary hover:underline font-medium"
+                      className="font-montserrat text-[12px] text-[#AAC737] hover:underline font-medium"
                       onClick={() => setAmenityFilters([])}
                     >
                       View all
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 lg:flex-col lg:gap-x-0">
+                  <div className="space-y-2">
                     {amenityOptions.map((amenity) => (
-                      <label key={amenity} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={amenityFilters.includes(amenity)}
-                          onChange={() => toggleAmenity(amenity)}
-                          className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
-                        />
-                        <span className="text-body text-sett-text-secondary">{amenity}</span>
+                      <label key={amenity} className="flex items-center gap-2.5 cursor-pointer">
+                        <span className={cn(
+                          'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                          amenityFilters.includes(amenity) ? 'border-[#AAC737] bg-[#AAC737]' : 'border-[#E6EAF0]'
+                        )}
+                          onClick={() => toggleAmenity(amenity)}
+                        >
+                          {amenityFilters.includes(amenity) && <span className="w-2 h-2 rounded-full bg-white" />}
+                        </span>
+                        <span className="font-montserrat text-[14px] text-[#4A4A4A]">{amenity}</span>
                       </label>
                     ))}
                   </div>
@@ -366,10 +372,10 @@ export default function AddHotelPage() {
                   type="button"
                   onClick={() => setShowAlternatives(!showAlternatives)}
                   className={cn(
-                    'w-full mt-4 px-3 py-2 rounded-input border text-body font-medium transition-colors',
+                    'w-full mt-5 px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] font-semibold transition-colors',
                     showAlternatives
-                      ? 'bg-sett-primary text-white border-sett-primary'
-                      : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-primary/5'
+                      ? 'bg-[#AAC737] text-white border-[#AAC737]'
+                      : 'bg-white text-[#AAC737] border-[#AAC737] hover:bg-[#F7FAEB]'
                   )}
                 >
                   {showAlternatives
@@ -382,13 +388,13 @@ export default function AddHotelPage() {
 
           {/* ── Right: Hotel Results ── */}
           <div className="flex-1 min-w-0">
-            <p className="text-body text-sett-text-accent mb-4">
+            <p className="font-montserrat text-[14px] text-[#A3A3A3] mb-4">
               {filteredResults.length} hotel{filteredResults.length !== 1 ? 's' : ''} found
             </p>
 
             {filteredResults.length === 0 && (
-              <div className="bg-sett-card rounded-card border border-sett-border p-8 text-center">
-                <p className="text-body text-sett-text-accent">
+              <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-8 text-center">
+                <p className="font-montserrat text-[14px] text-[#A3A3A3]">
                   No hotels match the current filters.
                 </p>
               </div>
@@ -409,7 +415,8 @@ export default function AddHotelPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -433,17 +440,17 @@ function HotelResultCard({
   return (
     <div
       className={cn(
-        'bg-sett-card rounded-card border overflow-hidden',
+        'bg-white rounded-[14px] border overflow-hidden',
         hotel.status === 'flag'
           ? 'border-amber-300'
           : hotel.status === 'omit'
             ? 'border-red-300 opacity-60'
-            : 'border-sett-border'
+            : 'border-[#E6EAF0]'
       )}
     >
       <div className="flex flex-col sm:flex-row">
         {/* ── Hotel Image ── */}
-        <div className="w-full sm:w-[200px] md:w-[240px] h-[180px] sm:h-auto sm:min-h-[200px] shrink-0 relative bg-sett-fill overflow-hidden rounded-t-card sm:rounded-t-none sm:rounded-l-card">
+        <div className="w-full sm:w-[220px] md:w-[260px] h-[200px] sm:h-auto sm:min-h-[220px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-t-[14px] sm:rounded-t-none sm:rounded-l-[14px]">
           <img
             src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
             alt={hotel.hotelName}
@@ -452,52 +459,57 @@ function HotelResultCard({
               (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
           />
+          {/* Supplier code badge */}
+          <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-[8px] bg-white/90 backdrop-blur-sm font-montserrat text-[12px] font-semibold text-[#4A4A4A]">
+            {best.supplierCode || 'BDC-4782'}
+          </div>
         </div>
 
         {/* ── Hotel Info ── */}
         <div className="flex-1 min-w-0">
           {/* Header row */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between px-3 sm:px-4 pt-3 sm:pt-4 pb-2 gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between px-4 sm:px-5 pt-4 sm:pt-5 pb-3 gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="text-body font-bold text-sett-text-primary">
-                  {hotel.hotelName}
-                </h4>
-                <div className="flex gap-0.5">
-                  {Array.from({ length: hotel.starRating }).map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
-                  ))}
-                </div>
-                {hotel.status === 'flag' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-badge text-caption font-medium bg-amber-50 border border-amber-200 text-amber-700">
-                    <AlertTriangle className="w-3 h-3" />
-                    Flagged
-                  </span>
-                )}
-                {hotel.status === 'omit' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-badge text-caption font-medium bg-red-50 border border-red-200 text-red-600">
-                    <X className="w-3 h-3" />
-                    Omitted
-                  </span>
-                )}
-              </div>
+              <h4 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D]">
+                {hotel.hotelName}
+              </h4>
 
               {/* Address */}
               {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
-                <div className="flex items-center gap-1 mt-1 text-caption text-sett-text-accent">
-                  <MapPin className="w-3 h-3 shrink-0" />
-                  <span className="truncate">
+                <div className="flex items-center gap-1.5 mt-1">
+                  <MapPin className="w-3.5 h-3.5 text-[#A3A3A3] shrink-0" />
+                  <span className="font-montserrat text-[13px] text-[#4A4A4A] truncate">
                     {hotel.address ||
                       [hotel.addressCity, hotel.addressCountry].filter(Boolean).join(', ')}
                   </span>
                 </div>
               )}
+
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <div className="flex gap-0.5">
+                  {Array.from({ length: hotel.starRating }).map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-[#AAC737] text-[#AAC737]" />
+                  ))}
+                </div>
+                {hotel.status === 'flag' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700">
+                    <AlertTriangle className="w-3 h-3" />
+                    Flagged
+                  </span>
+                )}
+                {hotel.status === 'omit' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 border border-red-200 text-red-600">
+                    <X className="w-3 h-3" />
+                    Omitted
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Action area */}
-            <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1.5 shrink-0">
+            <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-2 shrink-0">
               {isAdded ? (
-                <span className="flex items-center gap-1 text-body text-sett-primary font-semibold">
+                <span className="flex items-center gap-1 font-montserrat text-[14px] text-[#AAC737] font-semibold">
                   <Check className="w-4 h-4" /> Added
                 </span>
               ) : (
@@ -507,117 +519,81 @@ function HotelResultCard({
                   onClick={onAddToOffer}
                   isLoading={isAdding}
                   disabled={hotel.status === 'omit'}
+                  className="!rounded-[14px] font-montserrat !text-[14px] !font-semibold !text-white !px-5 !py-2.5 !bg-[#AAC737] !shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)]"
                 >
                   Add to Offer
                 </Button>
               )}
               {best.freeCancellation && (
-                <span className="text-caption text-sett-primary font-semibold whitespace-nowrap">
-                  Free Cancellation
+                <span className="flex items-center gap-1 font-montserrat text-[13px] text-[#AAC737] font-semibold whitespace-nowrap">
+                  <Check className="w-3.5 h-3.5" /> Free Cancellation
                 </span>
               )}
             </div>
           </div>
 
           {/* ── Room Table (desktop) ── */}
-          <div className="hidden sm:block px-4 pb-4 overflow-x-auto">
-            <table className="w-full min-w-[400px]">
-              <thead>
-                <tr>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide py-1.5 pr-2 font-medium">
-                    Room Type
-                  </th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide py-1.5 px-2 font-medium" />
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide py-1.5 px-2 font-medium">
-                    Meal Plan
-                  </th>
-                  <th className="text-right text-label text-sett-text-accent uppercase tracking-wide py-1.5 px-2 font-medium">
-                    Per Night
-                  </th>
-                  <th className="text-right text-label text-sett-text-accent uppercase tracking-wide py-1.5 pl-2 font-medium">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {best.roomDescriptions && best.roomDescriptions.length > 0 ? (
-                  best.roomDescriptions.map((desc, i) => {
-                    const perNight = best.buyingPricePerRoomPerNight;
-                    const total = perNight * nights;
-                    return (
-                      <tr key={i} className="border-t border-sett-border/50">
-                        <td className="py-2 pr-2 text-body text-sett-text-primary">{desc}</td>
-                        <td className="py-2 px-2">
-                          <span className="inline-flex px-2 py-0.5 rounded bg-[#f0f2f5] text-caption text-sett-text-accent font-medium">
-                            {best.supplierCode || 'BOC-4782'}
-                          </span>
-                        </td>
-                        <td className="py-2 px-2 text-body text-sett-text-secondary">
-                          {best.mealName || 'Room Only'}
-                        </td>
-                        <td className="py-2 px-2 text-right text-body text-sett-text-primary">
-                          &euro;{perNight.toFixed(2)}
-                        </td>
-                        <td className="py-2 pl-2 text-right text-body text-sett-text-primary font-semibold">
-                          &euro;{total.toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr className="border-t border-sett-border/50">
-                    <td className="py-2 pr-2 text-body text-sett-text-primary">Standard Room</td>
-                    <td className="py-2 px-2">
-                      <span className="inline-flex px-2 py-0.5 rounded bg-[#f0f2f5] text-caption text-sett-text-accent font-medium">
-                        {best.supplierCode || '—'}
-                      </span>
-                    </td>
-                    <td className="py-2 px-2 text-body text-sett-text-secondary">
-                      {best.mealName || 'Room Only'}
-                    </td>
-                    <td className="py-2 px-2 text-right text-body text-sett-text-primary">
-                      &euro;{best.buyingPricePerRoomPerNight.toFixed(2)}
-                    </td>
-                    <td className="py-2 pl-2 text-right text-body text-sett-text-primary font-semibold">
-                      &euro;{(best.buyingPricePerRoomPerNight * nights).toFixed(2)}
-                    </td>
+          <div className="hidden sm:block px-5 pb-4 overflow-x-auto">
+            <div className="border border-[#E6EAF0] rounded-[10px] overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#E6EAF0]">
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] py-2.5 px-4">
+                      Room Type
+                    </th>
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] py-2.5 px-4">
+                      Rate Basis
+                    </th>
+                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] py-2.5 px-4">
+                      Per Night
+                    </th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {best.roomDescriptions && best.roomDescriptions.length > 0 ? (
+                    best.roomDescriptions.map((desc, i) => {
+                      const perNight = best.buyingPricePerRoomPerNight;
+                      return (
+                        <tr key={i} className="border-t border-[#E6EAF0]">
+                          <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#1D1D1D]">{desc}</td>
+                          <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#4A4A4A]">
+                            {best.mealName || 'Room Only'}
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-[#1D1D1D]">
+                            &euro;{perNight.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr className="border-t border-[#E6EAF0]">
+                      <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#1D1D1D]">Standard Room</td>
+                      <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#4A4A4A]">
+                        {best.mealName || 'Room Only'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-[#1D1D1D]">
+                        &euro;{best.buyingPricePerRoomPerNight.toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* ── Room cards (mobile) ── */}
-          <div className="sm:hidden px-3 pb-3 space-y-2">
+          <div className="sm:hidden px-4 pb-4 space-y-2">
             {(best.roomDescriptions && best.roomDescriptions.length > 0
               ? best.roomDescriptions
               : ['Standard Room']
             ).map((desc, i) => {
               const perNight = best.buyingPricePerRoomPerNight;
-              const total = perNight * nights;
               return (
-                <div key={i} className="border-t border-sett-border/50 pt-2">
-                  <p className="text-body text-sett-text-primary font-medium">{desc}</p>
-                  <div className="grid grid-cols-3 gap-2 mt-1.5 text-sm">
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Supplier</span>
-                      <p className="mt-0.5">
-                        <span className="inline-flex px-1.5 py-0.5 rounded bg-[#f0f2f5] text-caption text-sett-text-accent font-medium">
-                          {best.supplierCode || '—'}
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Meal</span>
-                      <p className="text-sett-text-secondary mt-0.5">{best.mealName || 'Room Only'}</p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Per Night</span>
-                      <p className="text-sett-text-primary mt-0.5">&euro;{perNight.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end mt-1">
-                    <span className="text-body text-sett-text-primary font-semibold">Total: &euro;{total.toFixed(2)}</span>
+                <div key={i} className="border border-[#E6EAF0] rounded-[10px] p-3">
+                  <p className="font-montserrat text-[14px] text-[#1D1D1D] font-medium">{desc}</p>
+                  <div className="flex justify-between mt-2">
+                    <span className="font-montserrat text-[12px] text-[#A3A3A3]">{best.mealName || 'Room Only'}</span>
+                    <span className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">&euro;{perNight.toFixed(2)}</span>
                   </div>
                 </div>
               );
