@@ -608,7 +608,12 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
         <RoomCounter
           label={t.createForm.doubleRoom}
           value={formData.doubleRooms}
-          onChange={(v) => updateField('doubleRooms', v)}
+          onChange={(v) => {
+            updateField('doubleRooms', v);
+            // Reset bed configuration when double rooms change
+            updateField('standardDoubleBeds', 0);
+            updateField('twinBeds', 0);
+          }}
         />
         <RoomCounter
           label={t.createForm.tripleRoom}
@@ -634,11 +639,13 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
               label="Standard Double Bed"
               value={formData.standardDoubleBeds}
               onChange={(v) => updateField('standardDoubleBeds', v)}
+              max={formData.doubleRooms - Math.floor(formData.twinBeds / 2)}
             />
             <RoomCounter
               label="Twin Bed"
               value={formData.twinBeds}
               onChange={(v) => updateField('twinBeds', v)}
+              max={(formData.doubleRooms - formData.standardDoubleBeds) * 2}
             />
           </div>
         </div>
