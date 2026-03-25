@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -268,6 +269,8 @@ export default function CreateBookingRequestPage() {
           double: formData.doubleRooms,
           triple: formData.tripleRooms,
           quadruple: formData.quadrupleRooms,
+          standardDoubleBeds: formData.standardDoubleBeds || undefined,
+          twinBeds: formData.twinBeds || undefined,
           extraRoomsNote: formData.extraRooms || undefined,
         },
         breakfastPreference: formData.breakfastPreference === 'with' ? 'BB' : 'RO',
@@ -285,6 +288,7 @@ export default function CreateBookingRequestPage() {
         cancellationConditions: formData.cancellationConditions || undefined,
         status: 'pending',
       });
+      toast.success('Booking request created successfully!');
       router.push(`/booking-requests/${created.id}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
@@ -329,7 +333,7 @@ export default function CreateBookingRequestPage() {
           <button
             type="button"
             onClick={() => router.push('/booking-requests')}
-            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary"
+            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary transition-colors duration-200 hover:bg-[#EBEBEB] hover:text-sett-text-primary"
           >
             {t.common.cancel}
           </button>
@@ -338,7 +342,7 @@ export default function CreateBookingRequestPage() {
               <button
                 type="button"
                 onClick={handleBack}
-                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary"
+                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary transition-colors duration-200 hover:bg-[#EBEBEB] hover:text-sett-text-primary"
               >
                 {t.common.back}
               </button>
@@ -347,7 +351,7 @@ export default function CreateBookingRequestPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white"
+                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white transition-colors duration-200 hover:bg-sett-primary-hover"
               >
                 {t.common.next}
               </button>
@@ -356,7 +360,7 @@ export default function CreateBookingRequestPage() {
                 <button
                   type="button"
                   onClick={() => {}}
-                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-primary bg-white font-montserrat text-[16px] font-semibold leading-normal text-sett-primary"
+                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-primary bg-white font-montserrat text-[16px] font-semibold leading-normal text-sett-primary transition-colors duration-200 hover:bg-sett-primary hover:text-sett-navy"
                 >
                   {t.createForm.addHotels}
                 </button>
@@ -364,7 +368,7 @@ export default function CreateBookingRequestPage() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50"
+                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50 transition-colors duration-200 hover:bg-sett-primary-hover"
                 >
                   {isSubmitting ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t.createForm.createRequestBtn}
                 </button>

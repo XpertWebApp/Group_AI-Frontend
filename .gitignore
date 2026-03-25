@@ -52,6 +52,6 @@ public/# SETT Backend — Frontend Integration Reference.docx
 *.pdf
 *.docx
 *.doc
-
+*.txt
 # Misc
 *.pem

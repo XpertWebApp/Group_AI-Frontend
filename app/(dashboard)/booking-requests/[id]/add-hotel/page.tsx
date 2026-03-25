@@ -2,22 +2,24 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { PageLoader, Spinner } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
+import { hotelsApi } from '@/lib/api/hotels';
 import { cn } from '@/lib/utils/cn';
 import type {
   HotelSearchResult,
   BookingRequest,
+  Facility,
 } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 type SearchPhase = 'idle' | 'searching' | 'polling' | 'done' | 'error';
 
-const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
 const POLL_INTERVAL_MS = 3000;
 
 export default function AddHotelPage() {
@@ -41,18 +43,11 @@ export default function AddHotelPage() {
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState(3000);
-  const [amenityFilters, setAmenityFilters] = useState<string[]>([]);
+  const [amenityFilters, setAmenityFilters] = useState<number[]>([]);
   const [showAlternatives, setShowAlternatives] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const amenityOptions = [
-    'Free Cancellation',
-    'Pool',
-    'Spa',
-    'Gym',
-    'Restaurant',
-    'WiFi',
-  ];
+  const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
 
   // Load request data
   useEffect(() => {
@@ -60,6 +55,15 @@ export default function AddHotelPage() {
       if (r) setRequest(r);
     });
   }, [requestId]);
+
+  // Load dynamic facilities for the destination
+  useEffect(() => {
+    if (request?.destinationId) {
+      hotelsApi.getFacilitiesByDestination(request.destinationId).then((facilities) => {
+        setAvailableFacilities(facilities);
+      });
+    }
+  }, [request?.destinationId]);
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const checkedCountRef = useRef(0);
@@ -244,6 +248,7 @@ export default function AddHotelPage() {
         includeAlternativeStars: true,
         currencyCode: request?.currencyCode || 'EUR',
         nationalityCode: request?.nationalityCode || undefined,
+        facilityIds: amenityFilters.length > 0 ? amenityFilters : undefined,
       });
       if (!mountedRef.current) return;
       setPhase('polling');
@@ -254,7 +259,7 @@ export default function AddHotelPage() {
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback]);
+  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, amenityFilters, startPollingFallback]);
 
   // Check existing search status first, only start new search if needed
   const runSearch = useCallback(async () => {
@@ -356,6 +361,7 @@ export default function AddHotelPage() {
       });
 
       setAddedHotels((prev) => new Set(prev).add(hotel.hotelCode));
+      toast.success('Hotel added successfully!');
     } catch (err) {
       console.error('Failed to add hotel:', err);
     } finally {
@@ -369,9 +375,9 @@ export default function AddHotelPage() {
     );
   };
 
-  const toggleAmenity = (amenity: string) => {
+  const toggleAmenity = (facilityId: number) => {
     setAmenityFilters((prev) =>
-      prev.includes(amenity) ? prev.filter((a) => a !== amenity) : [...prev, amenity]
+      prev.includes(facilityId) ? prev.filter((a) => a !== facilityId) : [...prev, facilityId]
     );
   };
 
@@ -394,7 +400,13 @@ export default function AddHotelPage() {
   const filteredResults = displayResults.filter((h) => {
     if (starFilters.length > 0 && !starFilters.includes(h.starRating)) return false;
     if (h.sellingPricePerRoomPerNight > maxPrice) return false;
-    if (amenityFilters.includes('Free Cancellation') && !h.cxlDeadline) return false;
+    // AND logic: hotel must have ALL selected facilities
+    if (amenityFilters.length > 0 && h.facilities) {
+      const hotelFacilityIds = new Set(h.facilities.map((f) => f.id));
+      if (!amenityFilters.every((id) => hotelFacilityIds.has(id))) return false;
+    } else if (amenityFilters.length > 0 && !h.facilities) {
+      return false;
+    }
     return true;
   });
 
@@ -488,29 +500,32 @@ export default function AddHotelPage() {
 
           {/* ── Left Sidebar: Filters ── */}
           <aside className={cn(
-            'lg:w-[230px] shrink-0',
+            'lg:w-[320px] shrink-0',
             filtersOpen ? 'block' : 'hidden lg:block'
           )}>
             <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
               <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
+              <hr className="border-sett-border-light mb-5" />
 
               <div className="space-y-5">
                 {/* Destination */}
-                <div>
-                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary mb-1.5">
+                <div className="flex flex-col gap-[6px]">
+                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
                     {t.addHotel.destination}
                   </label>
-                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light bg-white font-montserrat text-[14px] text-sett-text-secondary truncate">
+                  <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
                     {request?.destinationName || '—'}
                   </div>
                 </div>
 
+                <hr className="border-sett-border-light" />
+
                 {/* Stay Dates */}
-                <div>
-                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary mb-1.5">
+                <div className="flex flex-col gap-[6px]">
+                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
                     {t.addHotel.stayDates}
                   </label>
-                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light bg-white font-montserrat text-[14px] text-sett-text-secondary">
+                  <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
                     {request?.checkinDate
                       ? new Date(request.checkinDate).toLocaleDateString('en-GB')
                       : '—'}
@@ -523,21 +538,75 @@ export default function AddHotelPage() {
 
                 <hr className="border-sett-border-light" />
 
+                {/* Rooms Required */}
+                {request?.rooms && (
+                  <div className="flex flex-col gap-[6px]">
+                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                      Rooms Required
+                    </label>
+                    <div className="space-y-2">
+                      {[
+                        { label: 'Single', value: request.rooms.single },
+                        { label: 'Double', value: request.rooms.double },
+                        { label: 'Triple', value: request.rooms.triple },
+                        { label: 'Quadruple', value: request.rooms.quadruple },
+                      ]
+                        .filter((r) => r.value && r.value > 0)
+                        .map((r) => (
+                          <div key={r.label}>
+                            <div className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                              <span>{r.label}</span>
+                              <span className="font-semibold text-sett-text-primary">{r.value}</span>
+                            </div>
+                            {/* Bed Configuration for Double rooms */}
+                            {r.label === 'Double' && (request.rooms?.standardDoubleBeds || request.rooms?.twinBeds) ? (
+                              <div className="mt-2 px-3 py-3 rounded-[10px] border border-sett-border-light bg-[#F7F7F7]">
+                                <hr className="border-sett-border-light mb-3" />
+                                <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary mb-2">Bed Configuration</p>
+                                <div className="space-y-1.5">
+                                  {request.rooms?.standardDoubleBeds ? (
+                                    <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
+                                      <span>Standard Double Bed</span>
+                                      <span className="font-semibold text-sett-text-primary">{request.rooms.standardDoubleBeds}</span>
+                                    </div>
+                                  ) : null}
+                                  {request.rooms?.twinBeds ? (
+                                    <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
+                                      <span>Twin Bed</span>
+                                      <span className="font-semibold text-sett-text-primary">{request.rooms.twinBeds}</span>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                <hr className="border-sett-border-light" />
+
                 {/* Star Rating */}
-                <div>
-                  <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary mb-2">
+                <div className="flex flex-col gap-3">
+                  <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
                     {t.addHotel.starRating}
                   </label>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-3">
                     {[5, 4, 3].map((star) => (
-                      <label key={star} className="flex items-center gap-2.5 cursor-pointer">
-                        <span className={cn(
-                          'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                          starFilters.includes(star) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                      <label
+                        key={star}
+                        className={cn(
+                          'flex items-center gap-3 cursor-pointer transition-opacity',
+                          starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
                         )}
-                          onClick={() => toggleStar(star)}
-                        >
-                          {starFilters.includes(star) && <span className="w-2 h-2 rounded-full bg-white" />}
+                        onClick={() => toggleStar(star)}
+                      >
+                        <span className={cn(
+                          'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                          starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                        )}>
+                          {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
                         </span>
                         <div className="flex gap-0.5">
                           {Array.from({ length: star }).map((_, i) => (
@@ -563,7 +632,9 @@ export default function AddHotelPage() {
                     step={50}
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(Number(e.target.value))}
-                    className="w-full accent-sett-primary"
+                    className="w-full h-[14px] rounded-full appearance-none cursor-pointer bg-sett-primary
+                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[14px] [&::-webkit-slider-thumb]:h-[14px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#F8F9FB] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-sett-border-light [&::-webkit-slider-thumb]:shadow-sm
+                      [&::-moz-range-thumb]:w-[14px] [&::-moz-range-thumb]:h-[14px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F8F9FB] [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-sett-border-light [&::-moz-range-thumb]:shadow-sm"
                   />
                   <div className="flex justify-between font-montserrat text-[12px] text-sett-text-accent mt-1">
                     <span>&euro;0</span>
@@ -579,26 +650,33 @@ export default function AddHotelPage() {
                     <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
                       {t.addHotel.amenities}
                     </label>
-                    <button
-                      type="button"
-                      className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
-                      onClick={() => setAmenityFilters([])}
-                    >
-                      {t.addHotel.viewAll}
-                    </button>
+                    {availableFacilities.length > 6 && (
+                      <button
+                        type="button"
+                        className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                        onClick={() => setShowAllAmenities((prev) => !prev)}
+                      >
+                        {showAllAmenities ? 'Show Less' : t.addHotel.viewAll}
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    {amenityOptions.map((amenity) => (
-                      <label key={amenity} className="flex items-center gap-2.5 cursor-pointer">
+                    {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => (
+                      <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
                         <span className={cn(
                           'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                          amenityFilters.includes(amenity) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                          amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
                         )}
-                          onClick={() => toggleAmenity(amenity)}
+                          onClick={() => toggleAmenity(facility.id)}
                         >
-                          {amenityFilters.includes(amenity) && <span className="w-2 h-2 rounded-full bg-white" />}
+                          {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
                         </span>
-                        <span className="font-montserrat text-[14px] text-sett-text-secondary">{amenity}</span>
+                        <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                          {facility.name}
+                          {facility.hotelCount !== undefined && (
+                            <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
+                          )}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -674,7 +752,6 @@ function HotelResultCard({
   const { t } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
   const hasCancellation = !!hotel.cxlDeadline;
-  const supplierCode = hotel.supplierSplit?.[0]?.supplierCode || '';
   const isLimited = hotel.capacityStatus === 'LIMITED';
 
   // Build room type list from perTypeAllocations
@@ -682,18 +759,21 @@ function HotelResultCard({
     ? hotel.perTypeAllocations
     : [{ roomType: 'Standard Room', roomsAllocated: hotel.roomsAllocated || 1 }];
 
+  const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
+
   return (
     <div
       className={cn(
-        'bg-white rounded-[14px] border overflow-hidden',
+        'bg-white rounded-[14px] border overflow-hidden p-5',
         isLimited
           ? 'border-amber-300'
           : 'border-sett-border-light'
       )}
     >
-      <div className="flex flex-col sm:flex-row">
+      {/* ── Top section: Image + Hotel Details + Action ── */}
+      <div className="flex flex-col sm:flex-row gap-5">
         {/* ── Hotel Image ── */}
-        <div className="w-full sm:w-[220px] md:w-[260px] h-[200px] sm:h-auto sm:min-h-[220px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-t-[14px] sm:rounded-t-none sm:rounded-l-[14px]">
+        <div className="w-full sm:w-[280px] h-[200px] sm:h-[256px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
           <img
             src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
             alt={hotel.hotelName}
@@ -702,35 +782,28 @@ function HotelResultCard({
               (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
           />
-          {/* Supplier code badge */}
-          {supplierCode && (
-            <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-[8px] bg-white/90 backdrop-blur-sm font-montserrat text-[12px] font-semibold text-sett-text-secondary">
-              {supplierCode}
-            </div>
-          )}
         </div>
 
-        {/* ── Hotel Info ── */}
-        <div className="flex-1 min-w-0">
-          {/* Header row */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between px-4 sm:px-5 pt-4 sm:pt-5 pb-3 gap-2">
-            <div className="flex-1 min-w-0">
+        {/* ── Hotel Details ── */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between">
+          {/* Top: Name, Address, Stars + Add to Offer */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-3">
               <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">
                 {hotel.hotelName}
               </h4>
 
-              {/* Address */}
               {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
-                <div className="flex items-center gap-1.5 mt-1">
+                <div className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-sett-text-accent shrink-0" />
-                  <span className="font-montserrat text-[13px] text-sett-text-secondary truncate">
+                  <span className="font-montserrat text-[13px] text-sett-text-secondary">
                     {hotel.address ||
                       [hotel.addressCity, hotel.addressCountry].filter(Boolean).join(', ')}
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex gap-0.5">
                   {Array.from({ length: hotel.starRating }).map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
@@ -746,7 +819,7 @@ function HotelResultCard({
             </div>
 
             {/* Action area */}
-            <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-2 shrink-0">
+            <div className="shrink-0 flex flex-col items-end gap-2">
               {isAdded ? (
                 <span className="flex items-center gap-1 font-montserrat text-[14px] text-sett-primary font-semibold">
                   <Check className="w-4 h-4" /> {t.addHotel.added}
@@ -757,83 +830,119 @@ function HotelResultCard({
                   size="sm"
                   onClick={onAddToOffer}
                   isLoading={isAdding}
-                  className=""
                 >
                   {t.addHotel.addToOffer}
                 </Button>
               )}
               {hasCancellation && (
-                <span className="flex items-center gap-1 font-montserrat text-[13px] text-sett-primary font-semibold whitespace-nowrap">
-                  <Check className="w-3.5 h-3.5" /> {t.addHotel.freeCancellation}
-                </span>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="flex items-center gap-1 font-montserrat text-[13px] text-sett-primary font-semibold whitespace-nowrap">
+                    <Check className="w-3.5 h-3.5" /> {t.addHotel.freeCancellation}
+                  </span>
+                  {hotel.cxlDeadline && (
+                    <span className="font-montserrat text-[11px] text-sett-text-accent whitespace-nowrap">
+                      {t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          {/* ── Room Table (desktop) ── */}
-          <div className="hidden sm:block px-5 pb-4 overflow-x-auto">
-            <div className="border border-sett-border-light rounded-[10px] overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-sett-border-light">
-                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                      {t.addHotel.roomType}
-                    </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                      {t.addHotel.rooms}
-                    </th>
-                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                      {t.addHotel.perNight}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roomTypes.map((rt, i) => (
-                    <tr key={i} className="border-t border-sett-border-light">
-                      <td className="py-2.5 px-4 font-montserrat text-[14px] text-sett-text-primary capitalize">
-                        {rt.roomType.replace(/_/g, ' ')}
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
-                        {rt.roomsAllocated}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                        &euro;{sellPrice.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Facility tags */}
+          {hotel.facilities && hotel.facilities.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {hotel.facilities.map((facility) => (
+                <span
+                  key={facility.id}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20"
+                >
+                  {facility.name}
+                </span>
+              ))}
             </div>
+          )}
+
+          {/* ── Room Table (desktop) ── */}
+          <div className="hidden sm:block mt-4 overflow-x-auto">
+            <div className="border border-sett-border-light rounded-[14px] overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-sett-border-light bg-[#FAFAFA]">
+                <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                  {t.addHotel.roomType}
+                </th>
+                <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                  {t.addHotel.rooms}
+                </th>
+                <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                  Rate Basis
+                </th>
+                <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                  {t.addHotel.perNight}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {roomTypes.map((rt, i) => (
+                <tr key={i} className="border-t border-sett-border-light">
+                  <td className="py-2.5 px-4">
+                    <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
+                      {rt.roomType.replace(/_/g, ' ')}
+                    </span>
+                    {rt.supplierCode && (
+                      <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
+                        {rt.supplierCode}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
+                    {rt.roomsAllocated}
+                  </td>
+                  <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
+                    {rt.mealName || rt.mealType || '—'}
+                  </td>
+                  <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                    &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+              </tbody>
+            </table>
+          </div>
           </div>
 
           {/* ── Room cards (mobile) ── */}
-          <div className="sm:hidden px-4 pb-4 space-y-2">
+          <div className="sm:hidden mt-4 space-y-2">
             {roomTypes.map((rt, i) => (
               <div key={i} className="border border-sett-border-light rounded-[10px] p-3">
-                <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize">
-                  {rt.roomType.replace(/_/g, ' ')}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize">
+                    {rt.roomType.replace(/_/g, ' ')}
+                  </p>
+                  {rt.supplierCode && (
+                    <span className="font-montserrat text-[11px] text-sett-text-accent">{rt.supplierCode}</span>
+                  )}
+                </div>
                 <div className="flex justify-between mt-2">
-                  <span className="font-montserrat text-[12px] text-sett-text-accent">{rt.roomsAllocated} room{rt.roomsAllocated !== 1 ? 's' : ''}</span>
-                  <span className="font-montserrat text-[14px] font-semibold text-sett-text-primary">&euro;{sellPrice.toFixed(2)}</span>
+                  <span className="font-montserrat text-[12px] text-sett-text-accent">
+                    {rt.roomsAllocated} room{rt.roomsAllocated !== 1 ? 's' : ''}
+                    {(rt.mealName || rt.mealType) && ` · ${rt.mealName || rt.mealType}`}
+                  </span>
+                  <span className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                    &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* Notes / cancel info */}
-          {(hotel.cxlDeadline || hotel.note) && (
-            <div className="px-3 sm:px-4 pb-3 space-y-1">
-              {hotel.cxlDeadline && (
-                <p className="text-caption text-sett-text-accent">
-                  {t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </p>
-              )}
-              {hotel.note && (
-                <p className="text-caption text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                  {hotel.note}
-                </p>
-              )}
+          {/* Notes */}
+          {hotel.note && (
+            <div className="mt-3">
+              <p className="font-montserrat text-[12px] text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                {hotel.note}
+              </p>
             </div>
           )}
         </div>

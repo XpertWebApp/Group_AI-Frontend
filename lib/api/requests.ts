@@ -118,6 +118,7 @@ export const requestsApi = {
       waitSeconds?: number;
       currencyCode?: string;
       nationalityCode?: string;
+      facilityIds?: number[];
     }
   ): Promise<HotelSearchInitResponse> {
     const { data } = await apiClient.post<ApiResponse<HotelSearchInitResponse>>(

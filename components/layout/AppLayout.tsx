@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { LogoutModal } from '@/components/ui/LogoutModal';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { authApi } from '@/lib/api/auth';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { logout as logoutAction } from '@/lib/store/slices/authSlice';
@@ -30,6 +31,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       }
       dispatch(logoutAction());
       setLogoutOpen(false);
+      toast.success('Logged out successfully!');
       router.push('/login');
     }
   };

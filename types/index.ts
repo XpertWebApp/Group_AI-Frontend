@@ -39,6 +39,8 @@ export interface RoomsConfig {
   triple?: number;
   quadruple?: number;
   suites?: number;
+  standardDoubleBeds?: number;
+  twinBeds?: number;
   extraRoomsNote?: string | null;
 }
 
@@ -155,6 +157,14 @@ export interface ProposalService {
   createdAt: string;
 }
 
+// ──── Facility Types ────
+
+export interface Facility {
+  id: number;
+  name: string;
+  hotelCount?: number;
+}
+
 // ──── Hotel Search Types ────
 
 export interface HotelBestOption {
@@ -173,6 +183,10 @@ export interface HotelBestOption {
 export interface PerTypeAllocation {
   roomType: string;
   roomsAllocated: number;
+  supplierCode?: string;
+  mealType?: string;
+  mealName?: string;
+  pricePerRoomPerNight?: number;
 }
 
 export interface SupplierSplitItem {
@@ -202,6 +216,7 @@ export interface HotelSearchResult {
   supplierSplit?: SupplierSplitItem[];
   perTypeAllocations?: PerTypeAllocation[];
   note?: string | null;
+  facilities?: Facility[];
   // Legacy / backward compat fields
   sessionId?: string;
   status?: 'include' | 'flag' | 'omit';

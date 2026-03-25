@@ -36,6 +36,7 @@ import { proposalsApi } from '@/lib/api/proposals';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
@@ -175,6 +176,7 @@ export default function RequestDetailPage() {
         p ? { ...p, hotels: (p.hotels ?? []).filter((h) => h.id !== hotelId) } : null
       );
       setRemoveHotelTarget(null);
+      toast.success('Hotel removed successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -196,6 +198,7 @@ export default function RequestDetailPage() {
           : null
       );
       setAddServiceOpen(false);
+      toast.success('Service added successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -221,6 +224,7 @@ export default function RequestDetailPage() {
           : null
       );
       setEditingService(null);
+      toast.success('Service updated successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -235,6 +239,7 @@ export default function RequestDetailPage() {
         p ? { ...p, services: (p.services ?? []).filter((s) => s.id !== serviceId) } : null
       );
       setRemoveServiceTarget(null);
+      toast.success('Service removed successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -247,6 +252,7 @@ export default function RequestDetailPage() {
       const updated = await proposalsApi.saveDraft(proposal.id);
       setProposal(updated);
       setSaveDraftOpen(false);
+      toast.success('Draft saved successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -292,6 +298,7 @@ export default function RequestDetailPage() {
       setSendEmail('');
       setSendNotes('');
       setSuccessOpen(true);
+      toast.success('Proposal sent successfully!');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to mark as sent';
       setSendError(`${t.offer.approvedButNotSent}: ${msg}. ${t.offer.tryAgain}`);
@@ -309,6 +316,7 @@ export default function RequestDetailPage() {
       });
       setProposal(updated);
       setDeclineOpen(false);
+      toast.success('Proposal declined.');
       router.push('/booking-requests');
     } finally {
       setActionLoading(false);

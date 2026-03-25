@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { authApi } from '@/lib/api/auth';
 import { getApiError } from '@/lib/api/auth';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
@@ -56,6 +57,7 @@ export default function LoginPage() {
         localStorage.setItem('refreshToken', result.tokens.refreshToken);
       }
       dispatch(setUser(result.user));
+      toast.success('Login successful!');
       router.push('/dashboard');
     } catch (err) {
       const apiErr = getApiError(err);

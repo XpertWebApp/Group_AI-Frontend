@@ -75,6 +75,7 @@ export default function ProposalPage() {
         p ? { ...p, hotels: [...(p.hotels ?? []), added] } : null
       );
       setAddHotelOpen(false);
+      toast.success('Hotel added successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -88,6 +89,7 @@ export default function ProposalPage() {
         p ? { ...p, services: [...(p.services ?? []), service] } : null
       );
       setAddServiceOpen(false);
+      toast.success('Service added successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -101,6 +103,7 @@ export default function ProposalPage() {
         p ? { ...p, hotels: (p.hotels ?? []).filter((h) => h.id !== hotelId) } : null
       );
       setRemoveTarget(null);
+      toast.success('Hotel removed successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -118,6 +121,7 @@ export default function ProposalPage() {
     try {
       const updated = await proposalsApi.saveDraft(id);
       setProposal(updated);
+      toast.success('Draft saved successfully!');
     } finally {
       setActionLoading(false);
     }
@@ -128,6 +132,7 @@ export default function ProposalPage() {
     try {
       const updated = await proposalsApi.lock(id);
       setProposal(updated);
+      toast.success('Proposal locked!');
     } catch (err: unknown) {
       const axios = await import('axios');
       if (axios.isAxiosError(err) && err.response?.status === 409) {
@@ -144,6 +149,7 @@ export default function ProposalPage() {
     try {
       const updated = await proposalsApi.send(id);
       setProposal(updated);
+      toast.success('Proposal sent successfully!');
     } finally {
       setActionLoading(false);
     }
