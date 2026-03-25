@@ -340,6 +340,26 @@ export const translations = {
       backToSignIn: 'Back to Sign In',
     },
 
+    // ── Toast Messages ──
+    toasts: {
+      loginSuccess: 'Login successful!',
+      logoutSuccess: 'Logged out successfully!',
+      hotelAdded: 'Hotel added successfully!',
+      hotelRemoved: 'Hotel removed successfully!',
+      serviceAdded: 'Service added successfully!',
+      serviceUpdated: 'Service updated successfully!',
+      serviceRemoved: 'Service removed successfully!',
+      draftSaved: 'Draft saved successfully!',
+      proposalLocked: 'Proposal locked!',
+      proposalLockedByAnother: 'Proposal is locked by another user.',
+      proposalLockedGeneric: 'Proposal is locked.',
+      proposalSent: 'Proposal sent successfully!',
+      proposalDeclined: 'Proposal declined.',
+      failedToApprove: 'Failed to approve proposal',
+      failedToMarkSent: 'Failed to mark as sent',
+      requestCreated: 'Booking request created successfully!',
+    },
+
     // ── Modals ──
     modals: {
       confirm: 'Confirm',
@@ -757,6 +777,26 @@ export const translations = {
       forgotPasswordTitle: 'Passwort vergessen?',
       forgotPasswordDesc: 'Kontaktieren Sie den Support, um Ihr Passwort zurückzusetzen.',
       backToSignIn: 'Zurück zur Anmeldung',
+    },
+
+    // ── Toast-Nachrichten ──
+    toasts: {
+      loginSuccess: 'Anmeldung erfolgreich!',
+      logoutSuccess: 'Erfolgreich abgemeldet!',
+      hotelAdded: 'Hotel erfolgreich hinzugefügt!',
+      hotelRemoved: 'Hotel erfolgreich entfernt!',
+      serviceAdded: 'Dienstleistung erfolgreich hinzugefügt!',
+      serviceUpdated: 'Dienstleistung erfolgreich aktualisiert!',
+      serviceRemoved: 'Dienstleistung erfolgreich entfernt!',
+      draftSaved: 'Entwurf erfolgreich gespeichert!',
+      proposalLocked: 'Angebot gesperrt!',
+      proposalLockedByAnother: 'Angebot ist von einem anderen Benutzer gesperrt.',
+      proposalLockedGeneric: 'Angebot ist gesperrt.',
+      proposalSent: 'Angebot erfolgreich gesendet!',
+      proposalDeclined: 'Angebot abgelehnt.',
+      failedToApprove: 'Genehmigung des Angebots fehlgeschlagen',
+      failedToMarkSent: 'Konnte nicht als gesendet markiert werden',
+      requestCreated: 'Buchungsanfrage erfolgreich erstellt!',
     },
 
     // ── Modals ──

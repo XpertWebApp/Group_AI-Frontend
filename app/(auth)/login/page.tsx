@@ -57,7 +57,7 @@ export default function LoginPage() {
         localStorage.setItem('refreshToken', result.tokens.refreshToken);
       }
       dispatch(setUser(result.user));
-      toast.success('Login successful!');
+      toast.success(t.toasts.loginSuccess);
       router.push('/dashboard');
     } catch (err) {
       const apiErr = getApiError(err);

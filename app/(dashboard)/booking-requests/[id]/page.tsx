@@ -176,7 +176,7 @@ export default function RequestDetailPage() {
         p ? { ...p, hotels: (p.hotels ?? []).filter((h) => h.id !== hotelId) } : null
       );
       setRemoveHotelTarget(null);
-      toast.success('Hotel removed successfully!');
+      toast.success(t.toasts.hotelRemoved);
     } finally {
       setActionLoading(false);
     }
@@ -198,7 +198,7 @@ export default function RequestDetailPage() {
           : null
       );
       setAddServiceOpen(false);
-      toast.success('Service added successfully!');
+      toast.success(t.toasts.serviceAdded);
     } finally {
       setActionLoading(false);
     }
@@ -224,7 +224,7 @@ export default function RequestDetailPage() {
           : null
       );
       setEditingService(null);
-      toast.success('Service updated successfully!');
+      toast.success(t.toasts.serviceUpdated);
     } finally {
       setActionLoading(false);
     }
@@ -239,7 +239,7 @@ export default function RequestDetailPage() {
         p ? { ...p, services: (p.services ?? []).filter((s) => s.id !== serviceId) } : null
       );
       setRemoveServiceTarget(null);
-      toast.success('Service removed successfully!');
+      toast.success(t.toasts.serviceRemoved);
     } finally {
       setActionLoading(false);
     }
@@ -252,7 +252,7 @@ export default function RequestDetailPage() {
       const updated = await proposalsApi.saveDraft(proposal.id);
       setProposal(updated);
       setSaveDraftOpen(false);
-      toast.success('Draft saved successfully!');
+      toast.success(t.toasts.draftSaved);
     } finally {
       setActionLoading(false);
     }
@@ -282,7 +282,7 @@ export default function RequestDetailPage() {
         adminNotes: sendNotes.trim() || undefined,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to approve proposal';
+      const msg = err instanceof Error ? err.message : t.toasts.failedToApprove;
       setSendError(msg);
       setActionLoading(false);
       return;
@@ -298,9 +298,9 @@ export default function RequestDetailPage() {
       setSendEmail('');
       setSendNotes('');
       setSuccessOpen(true);
-      toast.success('Proposal sent successfully!');
+      toast.success(t.toasts.proposalSent);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to mark as sent';
+      const msg = err instanceof Error ? err.message : t.toasts.failedToMarkSent;
       setSendError(`${t.offer.approvedButNotSent}: ${msg}. ${t.offer.tryAgain}`);
     } finally {
       setActionLoading(false);
@@ -316,7 +316,7 @@ export default function RequestDetailPage() {
       });
       setProposal(updated);
       setDeclineOpen(false);
-      toast.success('Proposal declined.');
+      toast.success(t.toasts.proposalDeclined);
       router.push('/booking-requests');
     } finally {
       setActionLoading(false);

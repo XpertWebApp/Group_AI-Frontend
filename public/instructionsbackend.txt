@@ -1,42 +1,170 @@
-The Bug
-Your SSE hotelProbeCompleted handler updates the progress counter (correctly showing "21 hotels found so far") but does not push the hotel's result object into the array that renders the hotel cards below.
+Frontend Integration Guide — Dynamic Amenities (Facilities)
+Overview
+The amenities/facilities filter on the "Add Hotel" page is now fully dynamic. The backend provides:
 
-The Fix
-In your SSE hotelProbeCompleted event handler, you likely have something like:
+A list of available amenities per destination (for the sidebar)
+Amenity-based hotel filtering during search
+Per-hotel amenity data in each search result
+1. Load Amenities for the Filter Sidebar
+When: As soon as the "Add Hotel" page opens (you already know the destinationId from the booking request).
+
+Endpoint:
 
 
-// ❌ Current — only updates counter
-eventSource.addEventListener('hotelProbeCompleted', (e) => {
-  const event = JSON.parse(e.data);
-  checkedCount++;
-  if (event.status === 'CONFIRMED' || event.status === 'LIMITED') {
-    foundCount++;  // ← updates "21 hotels found so far"
-    // BUT never adds the hotel to the display list!
+GET /api/v1/hotels/facilities/by-destination/{destinationId}
+Example:
+
+
+GET /api/v1/hotels/facilities/by-destination/4621
+Response:
+
+
+{
+  "success": true,
+  "message": "Facilities for destination retrieved",
+  "data": {
+    "facilities": [
+      { "id": 64, "name": "Swimming pool", "hotelCount": 312 },
+      { "id": 8388608, "name": "Spa", "hotelCount": 185 },
+      { "id": 32, "name": "Gym / fitness centre", "hotelCount": 274 },
+      { "id": 512, "name": "Restaurant", "hotelCount": 410 },
+      { "id": 2097152, "name": "Free WiFi", "hotelCount": 489 },
+      { "id": 16, "name": "Bar", "hotelCount": 298 }
+    ]
   }
-});
-It needs to also add the hotel to the results array:
+}
+What each field means:
+
+Field	Type	Description
+id	number	Unique facility ID — use this when sending filter requests
+name	string	Display label for the checkbox (e.g. "Swimming pool")
+hotelCount	number	How many hotels in this destination have this facility — useful for showing counts like "Pool (312)"
+Usage:
+
+Replace the current hardcoded amenity list (Free Cancellation, Pool, Spa, Gym, Restaurant, WiFi) with this dynamic list.
+Each item becomes a checkbox in the sidebar.
+The list is already sorted alphabetically by the backend.
+hotelCount is optional to display — but helpful to show users which filters are useful (e.g. grey out or hide amenities with 0 hotels).
+Note: If you ever need the full list of all amenities regardless of destination (e.g. for a global settings page), use GET /api/v1/hotels/facilities instead.
+
+2. Pass Selected Amenities to Hotel Search
+When: User clicks "Search" or triggers the hotel search (the existing POST call you already make).
+
+Endpoint (unchanged — just add one new field):
 
 
-// ✅ Fixed — also adds hotel to results list
-eventSource.addEventListener('hotelProbeCompleted', (e) => {
-  const event = JSON.parse(e.data);
-  checkedCount++;
-  if (event.status === 'CONFIRMED' || event.status === 'LIMITED') {
-    foundCount++;
-    // ADD the hotel to the results array that renders cards:
-    setHotels(prev => [...prev, event.result]);
+POST /api/v1/requests/{requestId}/hotel-search
+Updated Request Body:
+
+
+{
+  "mealType": "BB",
+  "includeAlternativeStars": true,
+  "facilityIds": [64, 8388608, 32]
+}
+The new field:
+
+Field	Type	Required	Description
+facilityIds	number[]	No	Array of facility IDs the user checked. Only hotels that have ALL selected facilities will be searched. Omit or send [] to skip filtering.
+How it works:
+
+This is AND logic — if the user selects Pool + Spa + WiFi, only hotels that have all three will be probed.
+If facilityIds is omitted or empty, all hotels are searched (same as before — fully backward compatible).
+The filtering happens before probe jobs are dispatched, so it also speeds up the search (fewer hotels to probe).
+Example — no amenities selected (same as before):
+
+
+{
+  "mealType": "BB"
+}
+Example — user selected Pool and Spa:
+
+
+{
+  "mealType": "BB",
+  "facilityIds": [64, 8388608]
+}
+3. Display Per-Hotel Amenities on Result Cards
+When: You receive an SSE hotelProbeCompleted event (the same events you already listen to).
+
+What changed: Each result object in the hotelProbeCompleted event now includes a facilities array.
+
+SSE Event Payload (updated):
+
+
+{
+  "hotelCode": "HPG_DXB_12345",
+  "status": "CONFIRMED",
+  "roomsFound": 8,
+  "capacityVerificationRequired": false,
+  "result": {
+    "hotelCode": "HPG_DXB_12345",
+    "hotelName": "La Suite Dubai Hotel & Apartments",
+    "starRating": 4,
+    "imageUrl": "/api/v1/hotels/image?key=abc123...",
+    "addressCity": "Dubai",
+    "addressCountry": "AE",
+    "roomsFound": 8,
+    "roomsAllocated": 8,
+    "highestMidRangePrice": 38.00,
+    "sellingPricePerRoomPerNight": 44,
+    "currency": "EUR",
+    "facilities": [
+      { "id": 64, "name": "Swimming pool" },
+      { "id": 8388608, "name": "Spa" },
+      { "id": 32, "name": "Gym / fitness centre" },
+      { "id": 512, "name": "Restaurant" },
+      { "id": 2097152, "name": "Free WiFi" },
+      { "id": 16, "name": "Bar" },
+      { "id": 4, "name": "Air conditioning" },
+      { "id": 256, "name": "Parking" }
+    ],
+    "supplierSplit": [ ... ],
+    "perTypeAllocations": [ ... ]
   }
-});
-The hotel object is in event.result — it contains hotelName, starRating, sellingPricePerRoomPerNight, imageUrl, roomsAllocated, etc. (the full shape I documented in the previous message).
+}
+The facilities array:
 
-Also
-The status endpoint response visible in the Network tab shows completed: 43 — that's from a previous finished run. Once the current search finishes (200/200), do a final status call and replace the hotel list with the authoritative data:
+Field	Type	Description
+id	number	Facility ID (same IDs used in filter)
+name	string	Display name
+Usage:
 
+Show amenity icons/tags on each hotel result card (e.g. small icons for Pool, WiFi, Spa below the hotel name).
+You can match facility.id to your icon map for rendering specific icons.
+If facilities is empty ([]), the hotel has no synced amenity data — show nothing or a placeholder.
+4. Suggested Icon Mapping
+Here are all 24 facility IDs currently in the system. Map these to your icon library:
 
-// When progress reaches 100%
-const res = await fetch(`/api/v1/requests/${requestId}/hotel-search/status`);
-const { data } = await res.json();
-const finalHotels = data.jobs
-  .filter(j => j.status === 'COMPLETED' && j.resultJson)
-  .map(j => j.resultJson);
-setHotels(finalHotels);  // replace with authoritative list
+ID	Name	Suggested Icon
+1	Lounge Area	sofa / lounge
+2	Disabled access	wheelchair / accessible
+4	Air conditioning	snowflake / ac
+8	Cots available	baby / crib
+16	Bar	wine-glass / bar
+32	Gym / fitness centre	dumbbell / gym
+64	Swimming pool	pool / water
+128	Pets Are Welcome	paw / pet
+256	Parking	car / parking
+512	Restaurant	utensils / restaurant
+1024	Telephone	phone
+2048	Mini Bar	glass / minibar
+4096	Iron/Ironing board	iron
+8192	TV Cable / Satellite	tv
+16384	Safe	lock / safe
+32768	Tea / Coffee Facilities	coffee
+65536	Bathroom with Bath	bath
+131072	Bathroom with Shower	shower
+262144	Non smoking rooms	no-smoking
+524288	Smoking rooms	smoking
+1048576	Internet	wifi / globe
+2097152	Free WiFi	wifi
+8388608	Spa	spa / hot-tub
+16777216	Business Center	briefcase / business
+5. Quick Checklist
+ Replace hardcoded amenity list with GET /api/v1/hotels/facilities/by-destination/{destinationId} call on page load
+ Store selected facility IDs in component state
+ Pass facilityIds array in the POST /api/v1/requests/:id/hotel-search body
+ Read result.facilities from each hotelProbeCompleted SSE event
+ Render amenity icons/tags on hotel result cards
+ (Optional) Show hotelCount next to each filter checkbox

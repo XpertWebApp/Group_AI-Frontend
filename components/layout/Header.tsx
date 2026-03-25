@@ -39,7 +39,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
   };
 
   return (
-    <header className="h-[68px] bg-white border-b-[0.8px] border-sett-border-light">
+    <header className="sticky top-0 z-30 h-[68px] bg-white border-b-[0.8px] border-sett-border-light">
       <div className="flex items-center justify-between h-full px-5">
       <div>
         <h1 className="font-montserrat text-[18px] font-semibold leading-normal text-sett-text-primary">{title}</h1>

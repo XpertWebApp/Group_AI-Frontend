@@ -10,6 +10,7 @@ import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { logout as logoutAction } from '@/lib/store/slices/authSlice';
 import { Menu } from 'lucide-react';
 import { AppLayoutProvider } from '@/app/(dashboard)/AppLayoutContext';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const dispatch = useAppDispatch();
   const router = useRouter();
+  const { t } = useLanguage();
 
   const handleLogoutConfirm = async () => {
     try {
@@ -31,7 +33,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       }
       dispatch(logoutAction());
       setLogoutOpen(false);
-      toast.success('Logged out successfully!');
+      toast.success(t.toasts.logoutSuccess);
       router.push('/login');
     }
   };
@@ -43,7 +45,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           isMobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
         />
-      <div className="flex-1 flex flex-col lg:ml-sidebar min-h-screen">
+      <div className="flex-1 flex flex-col lg:ml-sidebar h-screen">
         <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-3 bg-sett-card border-b border-sett-border lg:hidden">
           <button
             type="button"

@@ -361,7 +361,7 @@ export default function AddHotelPage() {
       });
 
       setAddedHotels((prev) => new Set(prev).add(hotel.hotelCode));
-      toast.success('Hotel added successfully!');
+      toast.success(t.toasts.hotelAdded);
     } catch (err) {
       console.error('Failed to add hotel:', err);
     } finally {

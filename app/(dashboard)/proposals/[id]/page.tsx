@@ -75,7 +75,7 @@ export default function ProposalPage() {
         p ? { ...p, hotels: [...(p.hotels ?? []), added] } : null
       );
       setAddHotelOpen(false);
-      toast.success('Hotel added successfully!');
+      toast.success(t.toasts.hotelAdded);
     } finally {
       setActionLoading(false);
     }
@@ -89,7 +89,7 @@ export default function ProposalPage() {
         p ? { ...p, services: [...(p.services ?? []), service] } : null
       );
       setAddServiceOpen(false);
-      toast.success('Service added successfully!');
+      toast.success(t.toasts.serviceAdded);
     } finally {
       setActionLoading(false);
     }
@@ -103,7 +103,7 @@ export default function ProposalPage() {
         p ? { ...p, hotels: (p.hotels ?? []).filter((h) => h.id !== hotelId) } : null
       );
       setRemoveTarget(null);
-      toast.success('Hotel removed successfully!');
+      toast.success(t.toasts.hotelRemoved);
     } finally {
       setActionLoading(false);
     }
@@ -121,7 +121,7 @@ export default function ProposalPage() {
     try {
       const updated = await proposalsApi.saveDraft(id);
       setProposal(updated);
-      toast.success('Draft saved successfully!');
+      toast.success(t.toasts.draftSaved);
     } finally {
       setActionLoading(false);
     }
@@ -132,12 +132,12 @@ export default function ProposalPage() {
     try {
       const updated = await proposalsApi.lock(id);
       setProposal(updated);
-      toast.success('Proposal locked!');
+      toast.success(t.toasts.proposalLocked);
     } catch (err: unknown) {
       const axios = await import('axios');
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         const owner = (err.response?.data as { error?: { owner?: string } })?.error?.owner;
-        toast.error(owner ? `Proposal is locked by another user.` : 'Proposal is locked.');
+        toast.error(owner ? t.toasts.proposalLockedByAnother : t.toasts.proposalLockedGeneric);
       }
     } finally {
       setActionLoading(false);
@@ -149,7 +149,7 @@ export default function ProposalPage() {
     try {
       const updated = await proposalsApi.send(id);
       setProposal(updated);
-      toast.success('Proposal sent successfully!');
+      toast.success(t.toasts.proposalSent);
     } finally {
       setActionLoading(false);
     }
@@ -227,7 +227,7 @@ export default function ProposalPage() {
               <thead>
                 <tr className="border-b border-sett-border">
                   <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Hotel</th>
-                  <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Total</th>
+                  <th className="text-right text-label text-sett-text-secondary uppercase px-4 py-3">Total</th>
                   <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Actions</th>
                 </tr>
               </thead>
@@ -235,7 +235,7 @@ export default function ProposalPage() {
                 {(proposal.hotels ?? []).map((h) => (
                   <tr key={h.id} className="border-b border-sett-border last:border-0">
                     <td className="px-4 py-3 text-body">{h.hotelName ?? h.hotelCode}</td>
-                    <td className="px-4 py-3 text-body">{h.currency} {Number(h.totalPrice).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-body text-right">{h.currency} {Number(h.totalPrice).toFixed(2)}</td>
                     <td className="px-4 py-3">
                       {!isLocked && (
                         <button
@@ -275,8 +275,8 @@ export default function ProposalPage() {
                 <tr className="border-b border-sett-border">
                   <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Service</th>
                   <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Qty</th>
-                  <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Buy</th>
-                  <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Sell</th>
+                  <th className="text-right text-label text-sett-text-secondary uppercase px-4 py-3">Buy</th>
+                  <th className="text-right text-label text-sett-text-secondary uppercase px-4 py-3">Sell</th>
                   <th className="text-left text-label text-sett-text-secondary uppercase px-4 py-3">Actions</th>
                 </tr>
               </thead>
@@ -285,8 +285,8 @@ export default function ProposalPage() {
                   <tr key={s.id} className="border-b border-sett-border last:border-0">
                     <td className="px-4 py-3 text-body">{s.serviceName ?? '—'}</td>
                     <td className="px-4 py-3 text-body">{s.quantity ?? 1}</td>
-                    <td className="px-4 py-3 text-body">{Number(s.buyPrice ?? 0).toFixed(2)}</td>
-                    <td className="px-4 py-3 text-body">{Number(s.sellPrice ?? 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-body text-right">{Number(s.buyPrice ?? 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-body text-right">{Number(s.sellPrice ?? 0).toFixed(2)}</td>
                     <td className="px-4 py-3">
                       {!isLocked && (
                         <button

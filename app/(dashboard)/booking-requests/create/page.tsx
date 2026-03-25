@@ -288,7 +288,7 @@ export default function CreateBookingRequestPage() {
         cancellationConditions: formData.cancellationConditions || undefined,
         status: 'pending',
       });
-      toast.success('Booking request created successfully!');
+      toast.success(t.toasts.requestCreated);
       router.push(`/booking-requests/${created.id}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
