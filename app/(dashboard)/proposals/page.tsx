@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { proposalsApi } from '@/lib/api/proposals';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 import type { Proposal } from '@/types';
 
 export default function ProposalsListPage() {
+  const { t } = useLanguage();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,29 +36,29 @@ export default function ProposalsListPage() {
 
   return (
     <>
-      <Header title="Proposals" subtitle="View and manage your proposals" />
+      <Header title={t.proposals.title} subtitle={t.proposals.subtitle} />
       <div className="p-4 md:p-6 space-y-6">
       <div className="bg-sett-card rounded-card shadow-card border border-sett-border overflow-x-auto">
         <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-sett-border bg-sett-background">
               <th className="text-left text-label text-sett-text-secondary uppercase tracking-wide px-4 py-3">
-                ID
+                {t.proposals.id}
               </th>
               <th className="text-left text-label text-sett-text-secondary uppercase tracking-wide px-4 py-3">
-                Request
+                {t.proposals.request}
               </th>
               <th className="text-left text-label text-sett-text-secondary uppercase tracking-wide px-4 py-3">
-                Status
+                {t.proposals.status}
               </th>
               <th className="text-left text-label text-sett-text-secondary uppercase tracking-wide px-4 py-3">
-                Total Sell
+                {t.proposals.totalSell}
               </th>
               <th className="text-left text-label text-sett-text-secondary uppercase tracking-wide px-4 py-3">
-                Created
+                {t.proposals.created}
               </th>
               <th className="text-left text-label text-sett-text-secondary uppercase tracking-wide px-4 py-3">
-                Action
+                {t.proposals.action}
               </th>
             </tr>
           </thead>
@@ -64,7 +66,7 @@ export default function ProposalsListPage() {
             {proposals.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-body text-sett-text-secondary">
-                  No proposals yet.
+                  {t.proposals.noProposals}
                 </td>
               </tr>
             ) : (
@@ -91,7 +93,7 @@ export default function ProposalsListPage() {
                       href={`/proposals/${p.id}`}
                       className="text-body text-sett-primary font-medium hover:underline"
                     >
-                      View
+                      {t.proposals.view}
                     </Link>
                   </td>
                 </tr>

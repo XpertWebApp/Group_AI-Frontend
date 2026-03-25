@@ -43,7 +43,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const content = (
     <>
       <div className="flex flex-col h-full">
-        <div className="p-6 border-b border-white/10">
+        <div className="h-[68px] flex items-center px-6 border-b border-sett-sidebar-border">
           <Link href="/dashboard" className="block" onClick={onMobileClose}>
             <Image
               src="/icons/sett_logo.svg"
@@ -52,10 +52,9 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
               height={40}
               className="h-auto w-auto"
             />
-
           </Link>
         </div>
-        <div className="p-3">
+        <div className="p-3 border-b border-sett-sidebar-border">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
             <input
@@ -93,18 +92,19 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-sett-primary flex items-center justify-center text-white font-semibold text-sm">
-              {displayName.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-white truncate">{displayName}</p>
-              <p className="text-xs text-white/70 truncate">{user?.email ?? '—'}</p>
+        <div className="px-5 pb-4 pt-4 border-t border-b border-sett-sidebar-border">
+          <div className="rounded-[17px] bg-sett-sidebar-border px-[14px] py-[12px]">
+            <div className="flex items-center gap-[10px]">
+              <div className="w-[30px] h-[30px] shrink-0 rounded-[10px] bg-[#667F00] flex items-center justify-center text-white font-semibold text-[12px] font-montserrat">
+                {displayName.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1 space-y-[2px]">
+                <p className="font-montserrat text-[12px] font-semibold leading-normal text-white truncate">{displayName}</p>
+                <p className="font-montserrat text-[10px] font-normal leading-normal text-white/60 truncate">{user?.role ?? 'Admin'}</p>
+              </div>
             </div>
           </div>
         </div>
-        <p className="px-4 pb-4 text-xs text-white/50">{t.common.footer}</p>
       </div>
     </>
   );

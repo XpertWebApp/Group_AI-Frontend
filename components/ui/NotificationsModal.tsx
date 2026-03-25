@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Modal } from './Modal';
 import { dashboardApi } from '@/lib/api/dashboard';
 import type { Notification } from '@/types';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface NotificationsModalProps {
   open: boolean;
@@ -11,6 +12,7 @@ interface NotificationsModalProps {
 }
 
 export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -18,7 +20,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
     setLoading(true);
     try {
       const data = await dashboardApi.getNotifications({ limit: 20 });
-      setNotifications(data);
+      setNotifications(data.notifications);
     } catch {
       // keep existing
     } finally {
@@ -55,12 +57,12 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <Modal open={open} onClose={onClose} title="Notifications">
+    <Modal open={open} onClose={onClose} title={t.notifications.title}>
       {loading && notifications.length === 0 ? (
-        <p className="text-body text-sett-text-accent py-4 text-center">Loading...</p>
+        <p className="text-body text-sett-text-accent py-4 text-center">{t.notifications.loading}</p>
       ) : notifications.length === 0 ? (
         <p className="text-body text-sett-text-accent py-4 text-center">
-          No notifications yet.
+          {t.notifications.empty}
         </p>
       ) : (
         <>
@@ -71,7 +73,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
                 onClick={handleMarkAllRead}
                 className="text-caption text-sett-primary font-medium hover:underline"
               >
-                Mark all as read
+                {t.notifications.markAllRead}
               </button>
             </div>
           )}
@@ -91,7 +93,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
                       {n.title}
                     </p>
                     <p className="text-caption text-sett-text-accent mt-0.5 line-clamp-2">
-                      {n.message}
+                      {n.body}
                     </p>
                     <p className="text-caption text-sett-text-muted mt-1">
                       {new Date(n.createdAt).toLocaleDateString('en-GB', {
@@ -108,7 +110,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
                       type="button"
                       onClick={() => handleMarkRead(n.id)}
                       className="shrink-0 w-2 h-2 rounded-full bg-sett-primary mt-2"
-                      title="Mark as read"
+                      title={t.notifications.markRead}
                     />
                   )}
                 </div>

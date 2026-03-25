@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { CheckCircle } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface SuccessModalProps {
   open: boolean;
@@ -19,9 +20,11 @@ export function SuccessModal({
   onClose,
   title,
   message,
-  buttonLabel = 'OK',
+  buttonLabel,
   autoRedirectSeconds,
 }: SuccessModalProps) {
+  const { t } = useLanguage();
+  const resolvedButtonLabel = buttonLabel ?? t.modals.ok;
   const [countdown, setCountdown] = useState(autoRedirectSeconds ?? 0);
 
   useEffect(() => {
@@ -49,11 +52,11 @@ export function SuccessModal({
         <h3 className="text-heading-sm font-bold text-sett-text-primary mb-2">{title}</h3>
         <p className="text-body text-sett-text-secondary mb-6">{message}</p>
         <Button variant="primary" fullWidth onClick={onClose}>
-          {buttonLabel}
+          {resolvedButtonLabel}
         </Button>
         {autoRedirectSeconds && countdown > 0 && (
           <p className="text-caption text-sett-text-accent mt-3">
-            Redirecting to group request in {countdown} seconds...
+            {t.modals.redirecting.replace('{seconds}', String(countdown))}
           </p>
         )}
       </div>

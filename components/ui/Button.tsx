@@ -13,23 +13,29 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
 }
 
+/*
+ * Button variants per SETT Brand Guidelines §5.1
+ * PRIMARY CTA: bg #AAC737, text #071c42, uppercase, letter-spacing 0.08em
+ * SECONDARY:   transparent bg, 2px solid #AAC737, text #AAC737
+ * HOVER:       bg #7a9420, transition 0.2s ease
+ */
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-sett-primary text-white shadow-[0px_8px_20px_0px_rgba(0,0,0,0.13)] hover:bg-sett-primary-hover active:bg-sett-primary-active disabled:opacity-50 disabled:pointer-events-none',
+    'bg-sett-primary text-sett-navy uppercase tracking-[0.08em] font-bold transition-colors duration-200 hover:bg-sett-primary-hover active:bg-sett-primary-hover disabled:opacity-50 disabled:pointer-events-none',
   secondary:
-    'bg-white border border-sett-border text-sett-text-primary hover:bg-sett-background active:bg-sett-border disabled:opacity-50 disabled:pointer-events-none',
+    'bg-transparent border-2 border-sett-primary text-sett-primary uppercase tracking-[0.08em] font-bold transition-colors duration-200 hover:bg-sett-primary hover:text-sett-navy disabled:opacity-50 disabled:pointer-events-none',
   outline:
-    'bg-transparent border border-sett-primary text-sett-primary hover:bg-sett-light-green-bg disabled:opacity-50 disabled:pointer-events-none',
+    'bg-transparent border-2 border-sett-primary text-sett-primary uppercase tracking-[0.08em] font-bold transition-colors duration-200 hover:bg-sett-light-green-bg disabled:opacity-50 disabled:pointer-events-none',
   destructive:
-    'bg-sett-destructive text-white hover:bg-sett-destructive-hover disabled:opacity-50 disabled:pointer-events-none',
+    'bg-sett-destructive text-white uppercase tracking-[0.08em] font-bold transition-colors duration-200 hover:bg-sett-destructive-hover disabled:opacity-50 disabled:pointer-events-none',
   ghost:
-    'bg-transparent text-sett-text-primary hover:bg-sett-border/50 disabled:opacity-50 disabled:pointer-events-none',
+    'bg-transparent text-sett-text-primary transition-colors duration-200 hover:bg-sett-border/50 disabled:opacity-50 disabled:pointer-events-none',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm rounded-input',
-  md: 'px-4 py-2.5 text-body rounded-button',
-  lg: 'px-6 py-3 text-body rounded-button',
+  sm: 'px-4 py-2 text-[13px] rounded-button',
+  md: 'px-8 py-3.5 text-[14px] rounded-button',
+  lg: 'px-10 py-4 text-[14px] rounded-button',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -53,7 +59,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={disabled || isLoading}
         className={cn(
-          'inline-flex items-center justify-center font-semibold transition-colors rounded-button focus:outline-none focus:ring-2 focus:ring-sett-primary focus:ring-offset-2',
+          'inline-flex items-center justify-center gap-2 rounded-button focus:outline-none focus:ring-2 focus:ring-sett-primary focus:ring-offset-2',
           variantClasses[variant],
           sizeClasses[size],
           fullWidth && 'w-full',

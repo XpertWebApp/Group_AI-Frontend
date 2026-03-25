@@ -1,36 +1,34 @@
 import { apiClient } from './client';
 import type { ApiResponse, Notification } from '@/types';
 
-export interface DashboardStatItem {
-  value: number;
-  vsLastMonth: number;
-}
+type StatValue = number | { value: number; vsLastMonth: number };
 
 export interface DashboardStatsResponse {
-  totalRequests: DashboardStatItem;
-  pendingRequests: DashboardStatItem;
-  sentOffers: DashboardStatItem;
-  declined: DashboardStatItem;
+  totalRequests: StatValue;
+  pending: StatValue;
+  pendingRequests?: StatValue;
+  sentOffers: StatValue;
+  declined: StatValue;
 }
 
 export interface RecentOffer {
   id: string;
+  requestId?: string;
   referenceNumber: number;
-  offerId: string;
-  customer: string;
-  destination: string;
+  destinationName?: string;
+  destination?: string;
+  companyName?: string;
+  customer?: string;
+  contactName?: string;
   checkinDate: string;
-  nights: number;
-  totalRooms: number;
-  groupSize: number;
-  totalSell: number;
-  totalBuy: number;
-  margin: number;
-  marginPct: number;
+  checkoutDate?: string;
   status: string;
-  proposalId: string;
   createdAt: string;
-  updatedAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unreadCount: number;
 }
 
 export const dashboardApi = {
@@ -49,12 +47,16 @@ export const dashboardApi = {
     return data.data;
   },
 
-  async getNotifications(params?: { unread?: boolean; limit?: number }): Promise<Notification[]> {
-    const { data } = await apiClient.get<ApiResponse<Notification[]>>(
+  async getNotifications(params?: { unread?: boolean; limit?: number }): Promise<NotificationsResponse> {
+    const { data } = await apiClient.get<ApiResponse<NotificationsResponse>>(
       '/dashboard/notifications',
       { params }
     );
-    if (!data.success || !Array.isArray(data.data)) return [];
+    if (!data.success || !data.data) return { notifications: [], unreadCount: 0 };
+    // Handle both array and object response shapes
+    if (Array.isArray(data.data)) {
+      return { notifications: data.data as unknown as Notification[], unreadCount: 0 };
+    }
     return data.data;
   },
 

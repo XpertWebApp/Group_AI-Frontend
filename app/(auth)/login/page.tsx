@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,19 +14,29 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
 import Image from 'next/image';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
-const loginSchema = z.object({
-  email: z.string().min(1, 'Email is Required').email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required'),
-  rememberMe: z.boolean().optional(),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginFormValues = {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+};
 
 export default function LoginPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { t } = useLanguage();
+
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().min(1, t.login.emailRequired).email(t.login.emailInvalid),
+        password: z.string().min(1, t.login.passwordRequired),
+        rememberMe: z.boolean().optional(),
+      }),
+    [t]
+  );
 
   const {
     register,
@@ -66,38 +76,38 @@ export default function LoginPage() {
           className="mx-auto h-auto w-auto"
         />
       </div>
-      <h2 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] text-center leading-normal mb-1">
-        Welcome back
+      <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary text-center leading-normal mb-1">
+        {t.login.welcomeBack}
       </h2>
-      <p className="text-body text-[#4A4A4A] text-center mb-6">
-        Sign in to access GroupHub
+      <p className="text-body text-sett-text-secondary text-center mb-6">
+        {t.login.signInSubtitle}
       </p>
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <Input
-          label="EMAIL"
-          placeholder="Enter email"
+          label={t.login.email}
+          placeholder={t.login.emailPlaceholder}
           type="text"
           error={errors.email?.message}
-          className="placeholder:!text-[#A3A3A3] placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
-          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-[#1D1D1D] uppercase"
+          className="placeholder:!text-sett-text-accent placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
+          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-sett-text-primary uppercase"
           {...register('email')}
         />
         <Input
-          label="PASSWORD"
-          placeholder="Enter password"
+          label={t.login.password}
+          placeholder={t.login.passwordPlaceholder}
           isPassword
           error={errors.password?.message}
-          className="placeholder:!text-[#A3A3A3] placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
-          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-[#1D1D1D] uppercase"
+          className="placeholder:!text-sett-text-accent placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
+          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-sett-text-primary uppercase"
           {...register('password')}
         />
         <div className="flex items-center justify-between">
-          <Checkbox label="Remember me" labelClassName="font-montserrat !text-[14px] font-medium leading-normal text-[#4A4A4A]" {...register('rememberMe')} />
+          <Checkbox label={t.login.rememberMe} labelClassName="font-montserrat !text-[14px] font-medium leading-normal text-sett-text-secondary" {...register('rememberMe')} />
           <Link
             href="/forgot-password"
             className="font-montserrat text-[14px] font-medium leading-normal text-[#667F00] hover:underline"
           >
-            Forgot password?
+            {t.login.forgotPassword}
           </Link>
         </div>
         {submitError && (
@@ -108,13 +118,13 @@ export default function LoginPage() {
           variant="primary"
           fullWidth
           isLoading={isSubmitting}
-          className="mt-4 !text-[#FFF] font-montserrat !text-[14px] !font-normal leading-normal"
+          className="mt-4"
         >
-          Sign In
+          {t.login.signIn}
         </Button>
       </form>
-      <p className="text-center font-montserrat text-[12px] font-normal leading-[14px] text-[#4A4A4A] mt-6">
-        Need help? Contact{' '}
+      <p className="text-center font-montserrat text-[12px] font-normal leading-[14px] text-sett-text-secondary mt-6">
+        {t.login.needHelp}{' '}
         <a
           href="mailto:support@sett.ai"
           className="font-montserrat text-[12px] font-medium leading-[14px] text-[#667F00] hover:underline"

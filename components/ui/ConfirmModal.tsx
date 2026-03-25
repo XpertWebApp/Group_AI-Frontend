@@ -2,6 +2,7 @@
 
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface ConfirmModalProps {
   open: boolean;
@@ -19,9 +20,11 @@ export function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Confirm',
+  confirmLabel,
   variant = 'danger',
 }: ConfirmModalProps) {
+  const { t } = useLanguage();
+  const resolvedConfirmLabel = confirmLabel ?? t.modals.confirm;
   const handleConfirm = () => {
     onConfirm();
     onClose();
@@ -32,13 +35,13 @@ export function ConfirmModal({
       <p className="text-body text-sett-text-secondary mb-6">{message}</p>
       <div className="flex gap-3 justify-end">
         <Button variant="secondary" onClick={onClose}>
-          Cancel
+          {t.modals.cancel}
         </Button>
         <Button
           variant={variant === 'danger' ? 'destructive' : 'primary'}
           onClick={handleConfirm}
         >
-          {confirmLabel}
+          {resolvedConfirmLabel}
         </Button>
       </div>
     </Modal>

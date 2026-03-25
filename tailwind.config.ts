@@ -1,5 +1,37 @@
 import type { Config } from 'tailwindcss';
 
+/*
+ * ═══════════════════════════════════════════════════════════
+ *  SETT Hub Brand Theme — based on Brand Guidelines v1.0
+ *  Source: SETT-Hub-Brand-Guidelines-v2.pdf (March 2026)
+ * ═══════════════════════════════════════════════════════════
+ *
+ *  Color Palette
+ *  ─────────────
+ *  SETT Green     #AAC737  — Primary accent: CTAs, highlights, headings, links, active states
+ *  SETT Navy      #071c42  — Primary dark bg, header bars, hero sections, text on light bg
+ *  SETT Grey      #686868  — Body text, secondary labels, borders, muted elements
+ *  White          #FFFFFF  — Text on dark bg, page backgrounds (light theme)
+ *  Green Dark     #7a9420  — Hover states, pressed states, depth accents
+ *  Green Light    #c8e050  — Gradient highlights, decorative lines, subtle accents
+ *  Black          #0a0a0a  — High-contrast banners, overlay text, footer backgrounds
+ *
+ *  Typography: Montserrat (Google Fonts)
+ *  Fallback: Arial, Helvetica, sans-serif
+ *
+ *  Color Rules
+ *  ─────────────
+ *  Dark pages:       Navy bg (#071c42) + white text + green accents
+ *  Light pages:      White bg + navy text + green accents
+ *  CTAs/Buttons:     Always #AAC737 green with dark text (#071c42) or white text
+ *  Forbidden colors: Never use purple, orange, or red (except error states)
+ *
+ *  CSS Variables:
+ *  --sett-green: #AAC737; --sett-navy: #071c42; --sett-grey: #686868;
+ *  --sett-white: #ffffff; --sett-black: #0a0a0a; --sett-green-dark: #7a9420;
+ *  --sett-green-light: #c8e050;
+ */
+
 const config: Config = {
   content: [
     './app/**/*.{js,ts,jsx,tsx,mdx}',
@@ -7,63 +39,116 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      /* ── Brand Colors ── */
       colors: {
         sett: {
-          primary: '#AAC737',
-          'primary-hover': '#99B530',
-          'primary-active': '#88A229',
-          'primary-dark': '#667F00',
-          sidebar: '#071C42',
-          'sidebar-active': '#667F00',
-          background: '#F8F9FB',
-          card: '#FFFFFF',
-          border: '#E6EAF0',
-          fill: '#F7F7F7',
-          'text-primary': '#1D1D1D',
-          'text-secondary': '#4A4A4A',
-          'text-accent': '#A3A3A3',
-          'text-muted': '#767676',
-          destructive: '#FB2C36',
-          'destructive-hover': '#E0242D',
-          success: '#22C55E',
+          // Core brand palette (from guidelines §2)
+          green: '#AAC737',
+          navy: '#071c42',
+          grey: '#686868',
+          black: '#0a0a0a',
+          'green-dark': '#7a9420',
+          'green-light': '#c8e050',
+
+          // Semantic aliases (mapped to brand palette)
+          primary: '#AAC737',           // SETT Green — CTAs, highlights, active states
+          'primary-hover': '#7a9420',   // Green Dark — hover/pressed states
+          'primary-active': '#7a9420',  // Green Dark — active/pressed
+          'primary-dark': '#667F00',    // Deep olive — sidebar active
+
+          sidebar: '#071c42',           // SETT Navy — sidebar bg
+          'sidebar-active': '#667F00',  // Deep olive — active nav item
+          'sidebar-border': '#14284C',  // Slightly lighter navy — sidebar dividers
+
+          background: '#F8F9FB',        // Light page background
+          card: '#FFFFFF',              // Card/panel background
+          border: '#E0E0E0',           // Card borders (guidelines §5.3)
+          'border-light': '#E6EAF0',    // Lighter border variant
+          fill: '#F8F9FA',             // Alternating table row bg (guidelines §5.2)
+
+          // Text hierarchy
+          'text-primary': '#071c42',    // SETT Navy — headings, primary text
+          'text-secondary': '#686868',  // SETT Grey — body text, secondary labels
+          'text-accent': '#A3A3A3',     // Light grey — muted/placeholder text
+          'text-muted': '#686868',      // SETT Grey — muted elements
+
+          // Status colors
+          destructive: '#CC3333',       // Error red (guidelines §5.5)
+          'destructive-hover': '#B02D2D',
+          success: '#AAC737',           // Use brand green for success
           warning: '#F59E0B',
+
+          // Status badge backgrounds
           pending: '#E5E7EB',
           draft: '#667F00',
           sent: '#F7FAEB',
           declined: '#FFEAEB',
-          'light-green-bg': '#F7FAEB',
+          'light-green-bg': '#F5F9E8',  // Selected/active row bg (guidelines §5.2)
+
           olive: '#667F00',
-          'trend-up': '#377F00',
-          'trend-down': '#FB2C36',
+          'trend-up': '#AAC737',        // Use brand green for positive trends
+          'trend-down': '#CC3333',      // Use error red for negative trends
+
+          // Table specific (guidelines §5.2)
+          'table-header': '#071c42',    // Navy header bg
+          'table-alt-row': '#F8F9FA',   // Alternating row bg
+          'table-border': '#E0E0E0',    // Table borders
+          'table-kpi': '#AAC737',       // KPIs and totals
         },
       },
+
+      /* ── Typography (guidelines §3) ── */
       fontFamily: {
-        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-montserrat)', 'Arial', 'Helvetica', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'monospace'],
-        montserrat: ['var(--font-montserrat)', 'sans-serif'],
+        montserrat: ['var(--font-montserrat)', 'Arial', 'Helvetica', 'sans-serif'],
       },
       fontSize: {
-        'heading-lg': ['28px', { lineHeight: '1.3' }],
-        'heading-md': ['24px', { lineHeight: '1.35' }],
-        'heading-sm': ['18px', { lineHeight: '1.4' }],
-        body: ['14px', { lineHeight: '1.5' }],
-        caption: ['12px', { lineHeight: '1.5' }],
-        label: ['12px', { lineHeight: '1.4', letterSpacing: '0.05em' }],
+        // Page Title (H1): weight 800, 28–36px
+        'heading-lg': ['32px', { lineHeight: '1.3', fontWeight: '800' }],
+        // Section Title (H2): weight 800, 22–28px
+        'heading-md': ['24px', { lineHeight: '1.35', fontWeight: '800' }],
+        // Subsection (H3): weight 700, 18–22px
+        'heading-sm': ['18px', { lineHeight: '1.4', fontWeight: '700' }],
+        // Body Text: weight 400, 14–16px
+        body: ['14px', { lineHeight: '1.5', fontWeight: '400' }],
+        // Subtitle / Light: weight 300, 14–18px
+        subtitle: ['16px', { lineHeight: '1.5', fontWeight: '300', letterSpacing: '0.05em' }],
+        // Caption / small text: 12px
+        caption: ['12px', { lineHeight: '1.5', fontWeight: '400' }],
+        // Labels / Tags: weight 600, 11–13px, UPPERCASE
+        label: ['12px', { lineHeight: '1.4', fontWeight: '600', letterSpacing: '0.1em' }],
+        // CTA Button: weight 700, 14px, UPPERCASE
+        'cta': ['14px', { lineHeight: '1.4', fontWeight: '700', letterSpacing: '0.08em' }],
+        // Table Header: weight 600–700, 12–14px
+        'table-head': ['13px', { lineHeight: '1.4', fontWeight: '600' }],
+        // Table Body: weight 400, 12–14px
+        'table-body': ['13px', { lineHeight: '1.4', fontWeight: '400' }],
+        // Footer / Legal: weight 400, 10–12px
+        footer: ['11px', { lineHeight: '1.5', fontWeight: '400' }],
       },
+
+      /* ── Border Radius (guidelines §5.3: cards 8px) ── */
       borderRadius: {
-        card: '16px',
-        button: '14px',
-        input: '8px',
+        card: '8px',
+        button: '4px',       // CTA buttons (guidelines §5.1)
+        input: '4px',        // Form inputs (guidelines §5.5)
         badge: '10px',
+        panel: '14px',       // Larger panels
       },
+
+      /* ── Shadows (guidelines §5.3: subtle shadow) ── */
       boxShadow: {
-        card: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        card: '0 2px 8px rgba(0, 0, 0, 0.08)',
         button: '0 2px 6px rgba(102, 127, 0, 0.25)',
         modal: '0 10px 40px rgba(0, 0, 0, 0.12)',
+        'input-focus': '0 0 0 3px rgba(170, 199, 55, 0.15)',  // Form input focus (guidelines §5.5)
       },
+
+      /* ── Spacing ── */
       spacing: {
-        'sidebar': '260px',
-        'header': '64px',
+        sidebar: '250px',     // Sidebar width (guidelines §5.4: 240–280px)
+        header: '68px',       // Header height
       },
     },
   },

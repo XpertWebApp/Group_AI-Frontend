@@ -6,6 +6,8 @@ import type {
   AdjustHotelPricingPayload,
   AddProposalServicePayload,
   SendProposalPayload,
+  ApproveProposalPayload,
+  DeclineProposalPayload,
 } from '@/types/proposals';
 
 export const proposalsApi = {
@@ -120,11 +122,38 @@ export const proposalsApi = {
     return data.data;
   },
 
-  async previewPdf(proposalId: string): Promise<{ previewUrl: string | null; note?: string }> {
-    const { data } = await apiClient.post<ApiResponse<{ previewUrl: string | null; note?: string }>>(
-      `/proposals/${proposalId}/actions/preview-pdf`
+  async previewPdf(proposalId: string): Promise<string> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+    const response = await fetch(`${baseURL}/proposals/${proposalId}/actions/preview-pdf`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        'ngrok-skip-browser-warning': 'true',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to generate PDF preview (${response.status})`);
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  },
+
+  async approve(proposalId: string, payload?: ApproveProposalPayload): Promise<Proposal> {
+    const { data } = await apiClient.post<ApiResponse<Proposal>>(
+      `/proposals/${proposalId}/actions/approve`,
+      payload ?? {}
     );
-    if (!data.success || !data.data) throw new Error(data.message || 'Failed to generate preview');
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to approve');
+    return data.data;
+  },
+
+  async decline(proposalId: string, payload: DeclineProposalPayload): Promise<Proposal> {
+    const { data } = await apiClient.post<ApiResponse<Proposal>>(
+      `/proposals/${proposalId}/actions/decline`,
+      payload
+    );
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to decline');
     return data.data;
   },
 };

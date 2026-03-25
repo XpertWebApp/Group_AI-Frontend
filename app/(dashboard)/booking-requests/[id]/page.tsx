@@ -35,6 +35,7 @@ import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
@@ -48,7 +49,7 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <Star
           key={i}
-          className={`w-4 h-4 ${i < rating ? 'fill-[#AAC737] text-[#AAC737]' : 'fill-none text-sett-text-accent'}`}
+          className={`w-4 h-4 ${i < rating ? 'fill-sett-primary text-sett-primary' : 'fill-none text-sett-text-accent'}`}
         />
       ))}
     </div>
@@ -59,6 +60,7 @@ export default function RequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { t } = useLanguage();
 
   const [request, setRequest] = useState<BookingRequest | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
@@ -74,6 +76,9 @@ export default function RequestDetailPage() {
   const [removeHotelTarget, setRemoveHotelTarget] = useState<string | null>(null);
   const [saveDraftOpen, setSaveDraftOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [sendEmail, setSendEmail] = useState('');
+  const [sendNotes, setSendNotes] = useState('');
+  const [sendError, setSendError] = useState('');
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -105,7 +110,27 @@ export default function RequestDetailPage() {
   const services = useMemo(() => proposal?.services ?? [], [proposal?.services]);
 
   const totals = useMemo(() => {
-    const hotelTotal = hotels.reduce((s, h) => s + Number(h.totalPrice ?? 0), 0);
+    // Calculate hotel buy (net) and sell totals separately from room breakdown
+    let hotelBuyTotal = 0;
+    let hotelSellTotal = 0;
+    hotels.forEach((h) => {
+      const roomData = h.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
+      if (roomData && Object.keys(roomData).length > 0) {
+        Object.values(roomData).forEach((detail) => {
+          const net = Number(detail.net ?? 0);
+          const sell = Number(detail.sell ?? 0);
+          const qty = detail.qty ?? 1;
+          const nights = detail.nights ?? 1;
+          hotelBuyTotal += net * qty * nights;
+          hotelSellTotal += sell * qty * nights;
+        });
+      } else {
+        // No room breakdown — use totalPrice for both
+        const tp = Number(h.totalPrice ?? 0);
+        hotelBuyTotal += tp;
+        hotelSellTotal += tp;
+      }
+    });
     const serviceBuyTotal = services.reduce(
       (s, sv) => s + Number(sv.buyPrice ?? 0) * (sv.quantity ?? 1),
       0
@@ -114,8 +139,8 @@ export default function RequestDetailPage() {
       (s, sv) => s + Number(sv.sellPrice ?? 0) * (sv.quantity ?? 1),
       0
     );
-    const totalPurchase = hotelTotal + serviceBuyTotal;
-    const totalSell = hotelTotal + serviceSellTotal;
+    const totalPurchase = hotelBuyTotal + serviceBuyTotal;
+    const totalSell = hotelSellTotal + serviceSellTotal;
     const markupEur = totalSell - totalPurchase;
     const margin = totalPurchase > 0 ? (markupEur / totalPurchase) * 100 : 0;
     return { totalPurchase, totalSell, markupEur, margin };
@@ -229,12 +254,47 @@ export default function RequestDetailPage() {
 
   const handleApproveAndSend = async () => {
     if (!proposal) return;
+    setSendError('');
+
+    // Validate at least 1 hotel
+    if (!proposal.hotels || proposal.hotels.length === 0) {
+      setSendError(t.offer.noHotelsError);
+      return;
+    }
+
+    // Validate email
+    if (!sendEmail.trim()) {
+      setSendError(t.offer.emailRequired);
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const updated = await proposalsApi.send(proposal.id);
+      // Step 1: Approve — generates PDF, emails agent
+      await proposalsApi.approve(proposal.id, {
+        agentEmail: sendEmail.trim(),
+        adminNotes: sendNotes.trim() || undefined,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to approve proposal';
+      setSendError(msg);
+      setActionLoading(false);
+      return;
+    }
+
+    try {
+      // Step 2: Send — marks proposal as sent
+      const updated = await proposalsApi.send(proposal.id, {
+        sendToEmail: sendEmail.trim(),
+      });
       setProposal(updated);
       setSendOpen(false);
+      setSendEmail('');
+      setSendNotes('');
       setSuccessOpen(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to mark as sent';
+      setSendError(`${t.offer.approvedButNotSent}: ${msg}. ${t.offer.tryAgain}`);
     } finally {
       setActionLoading(false);
     }
@@ -244,8 +304,10 @@ export default function RequestDetailPage() {
     if (!proposal) return;
     setActionLoading(true);
     try {
-      await proposalsApi.update(proposal.id, {} as never);
-      setProposal((p) => (p ? { ...p, status: 'declined' as never } : null));
+      const updated = await proposalsApi.decline(proposal.id, {
+        rejectionReason: 'Declined by agent',
+      });
+      setProposal(updated);
       setDeclineOpen(false);
       router.push('/booking-requests');
     } finally {
@@ -254,16 +316,16 @@ export default function RequestDetailPage() {
   };
 
   if (loading) {
-    return <PageLoader message="Loading offer details..." />;
+    return <PageLoader message={t.offer.loadingOffer} />;
   }
 
   if (!request) {
     return (
       <div className="space-y-6">
-        <Header title="Create Request" />
-        <p className="text-body text-sett-text-secondary">Request not found.</p>
+        <Header title={t.createForm.title} />
+        <p className="text-body text-sett-text-secondary">{t.offer.requestNotFound}</p>
         <Button variant="secondary" onClick={() => router.push('/booking-requests')}>
-          Back
+          {t.common.back}
         </Button>
       </div>
     );
@@ -271,20 +333,20 @@ export default function RequestDetailPage() {
 
   const breakfastLabel =
     request.breakfastPreference === 'BB'
-      ? 'With Breakfast'
+      ? t.offer.withBreakfast
       : request.breakfastPreference === 'RO'
-        ? 'Without Breakfast'
+        ? t.offer.withoutBreakfast
         : '—';
   const locationLabel =
     request.hotelLocation === 'central'
-      ? 'Central Location'
+      ? t.offer.centralLocation
       : request.hotelLocation === 'outside_city_center'
-        ? 'Outside City Center'
+        ? t.offer.outsideCityCenter
         : '—';
 
   return (
     <>
-      <Header title="Create Request" />
+      <Header title={t.createForm.title} />
 
       <div className="p-4 md:p-6 space-y-6 pb-8">
       {/* ── Breadcrumb ── */}
@@ -292,13 +354,13 @@ export default function RequestDetailPage() {
         <button
           type="button"
           onClick={() => router.push('/booking-requests')}
-          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-[#4A4A4A] hover:text-[#1D1D1D] transition-colors"
+          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t.common.back}
         </button>
         <span className="text-[#E6EAF0] hidden sm:inline">|</span>
-        <span className="font-montserrat text-[18px] font-bold text-[#1D1D1D]">
+        <span className="font-montserrat text-[18px] font-bold text-sett-text-primary">
           Offer #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
         <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
@@ -309,7 +371,7 @@ export default function RequestDetailPage() {
       </div>
 
       {/* ════════════════════ MAIN CONTENT CARD ════════════════════ */}
-      <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-5">
+      <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
 
       {/* ════════════════════ REQUEST SUMMARY ════════════════════ */}
       <div className="mb-6">
@@ -319,13 +381,13 @@ export default function RequestDetailPage() {
             <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D]">
-                  Request Summary
+                <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
+                  {t.offer.requestSummary}
                 </h2>
-                <Pencil className="w-4 h-4 text-[#A3A3A3] cursor-pointer hover:text-[#1D1D1D]" />
+                <Pencil className="w-4 h-4 text-sett-text-accent cursor-pointer hover:text-sett-text-primary" />
               </div>
-              <p className="font-montserrat text-[14px] font-normal text-[#4A4A4A] mt-0.5">
-                Booking details for this offer
+              <p className="font-montserrat text-[14px] font-normal text-sett-text-secondary mt-0.5">
+                {t.offer.bookingDetails}
               </p>
             </div>
           </div>
@@ -334,9 +396,8 @@ export default function RequestDetailPage() {
             size="sm"
             onClick={handleAddHotelsClick}
             isLoading={actionLoading}
-            className="!rounded-[14px] font-montserrat !text-[16px] !font-semibold !text-white !px-5 !py-3 !bg-[#AAC737] !shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)]"
           >
-            Add Hotels
+            {t.offer.addHotels}
           </Button>
         </div>
 
@@ -345,7 +406,7 @@ export default function RequestDetailPage() {
           <>
         {/* ── Trip Details ── */}
         <div className="mb-6 mt-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">Trip Details</h3>
+          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">{t.offer.tripDetails}</h3>
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
@@ -360,35 +421,35 @@ export default function RequestDetailPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">
-                  Hotel Category
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+                  {t.offer.hotelCategory}
                 </p>
                 <div className="flex items-center gap-1 mt-0.5 justify-center">
-                  <span className="font-montserrat text-[14px] font-medium text-[#4A4A4A]">
+                  <span className="font-montserrat text-[14px] font-medium text-sett-text-secondary">
                     ({request.starRating}-Star)
                   </span>
                   {request.starRating && <StarRating rating={request.starRating} />}
                 </div>
               </div>
               <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">
-                  Budget Range
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+                  {t.offer.budgetRange}
                 </p>
-                <p className="font-montserrat text-[14px] font-medium text-[#4A4A4A] mt-0.5">
+                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5">
                   {request.budgetRange || '—'}
                 </p>
               </div>
               <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">
-                  Group Type
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+                  {t.offer.groupType}
                 </p>
-                <p className="font-montserrat text-[14px] font-medium text-[#4A4A4A] mt-0.5 capitalize">
+                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5 capitalize">
                   {request.groupType || '—'}
                 </p>
               </div>
               <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-[#A3A3A3]">Guests</p>
-                <p className="font-montserrat text-[14px] font-medium text-[#4A4A4A] mt-0.5">
+                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">{t.offer.guests}</p>
+                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5">
                   {request.groupSize ?? '—'}
                 </p>
               </div>
@@ -400,24 +461,24 @@ export default function RequestDetailPage() {
 
         {/* ── Room & Accommodations ── */}
         <div className="mb-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">
-            Room & Accommodations
+          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">
+            {t.offer.roomAccommodations}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
             {[
-              { label: 'SINGLE', value: rooms?.single },
-              { label: 'DOUBLE', value: rooms?.double },
-              { label: 'TRIPLE', value: rooms?.triple },
-              { label: 'QUADRUPLE', value: rooms?.quadruple },
+              { label: t.offer.single, value: rooms?.single },
+              { label: t.offer.double, value: rooms?.double },
+              { label: t.offer.triple, value: rooms?.triple },
+              { label: t.offer.quadruple, value: rooms?.quadruple },
             ].map((room) => (
               <div
                 key={room.label}
-                className="border border-[#E6EAF0] rounded-[14px] p-4 text-center"
+                className="border border-sett-border-light rounded-[14px] p-4 text-center"
               >
-                <p className="font-montserrat text-[18px] font-bold text-[#1D1D1D]">
+                <p className="font-montserrat text-[18px] font-bold text-sett-text-primary">
                   {room.value || '—'}
                 </p>
-                <p className="font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] mt-0.5">
+                <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                   {room.label}
                 </p>
               </div>
@@ -426,22 +487,22 @@ export default function RequestDetailPage() {
 
           {rooms?.extraRoomsNote && (
             <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mb-4">
-              <span className="font-semibold text-body text-sett-text-primary">Extras: </span>
+              <span className="font-semibold text-body text-sett-text-primary">{t.offer.extras}: </span>
               <span className="text-body text-sett-text-secondary">{rooms.extraRoomsNote}</span>
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-            <div className="border border-[#E6EAF0] rounded-[14px] p-3 sm:p-4 text-center">
-              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">{breakfastLabel}</p>
-              <p className="font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] mt-0.5">
-                Breakfast Preference
+            <div className="border border-sett-border-light rounded-[14px] p-3 sm:p-4 text-center">
+              <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{breakfastLabel}</p>
+              <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
+                {t.offer.breakfastPreference}
               </p>
             </div>
-            <div className="border border-[#E6EAF0] rounded-[14px] p-3 sm:p-4 text-center">
-              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">{locationLabel}</p>
-              <p className="font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] mt-0.5">
-                Hotel Location
+            <div className="border border-sett-border-light rounded-[14px] p-3 sm:p-4 text-center">
+              <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{locationLabel}</p>
+              <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
+                {t.offer.hotelLocation}
               </p>
             </div>
           </div>
@@ -449,7 +510,7 @@ export default function RequestDetailPage() {
           {request.specialRequirements && (
             <div className="bg-[#EDF4FE] rounded-card px-4 py-3">
               <span className="font-semibold text-body text-sett-text-primary">
-                Special requirement:{' '}
+                {t.offer.specialRequirement}:{' '}
               </span>
               <span className="text-body text-sett-text-secondary">
                 {request.specialRequirements}
@@ -462,15 +523,15 @@ export default function RequestDetailPage() {
 
         {/* ── Customer Details ── */}
         <div className="mb-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">
-            Customer Details
+          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">
+            {t.offer.customerDetails}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-3">
             <div>
               <div className="flex items-center gap-1.5 mb-1">
                 <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
                 <span className="text-label text-sett-text-accent uppercase tracking-wide">
-                  Company Name
+                  {t.offer.companyName}
                 </span>
               </div>
               <p className="text-body text-sett-text-primary font-medium">
@@ -481,7 +542,7 @@ export default function RequestDetailPage() {
               <div className="flex items-center gap-1.5 mb-1">
                 <FileText className="w-3.5 h-3.5 text-sett-text-accent" />
                 <span className="text-label text-sett-text-accent uppercase tracking-wide">
-                  Guest List
+                  {t.offer.guestList}
                 </span>
               </div>
               {request.guestListFileKey ? (
@@ -496,7 +557,7 @@ export default function RequestDetailPage() {
               <div className="flex items-center gap-1.5 mb-1">
                 <Users className="w-3.5 h-3.5 text-sett-text-accent" />
                 <span className="text-label text-sett-text-accent uppercase tracking-wide">
-                  Contact Person
+                  {t.offer.contactPerson}
                 </span>
               </div>
               <p className="text-body text-sett-text-primary font-medium">
@@ -509,7 +570,7 @@ export default function RequestDetailPage() {
               <div className="flex items-center gap-1.5 mb-1">
                 <Mail className="w-3.5 h-3.5 text-sett-text-accent" />
                 <span className="text-label text-sett-text-accent uppercase tracking-wide">
-                  Email Address
+                  {t.offer.emailAddress}
                 </span>
               </div>
               <p className="text-body text-sett-text-primary">{request.contactEmail || '—'}</p>
@@ -518,7 +579,7 @@ export default function RequestDetailPage() {
               <div className="flex items-center gap-1.5 mb-1">
                 <Phone className="w-3.5 h-3.5 text-sett-text-accent" />
                 <span className="text-label text-sett-text-accent uppercase tracking-wide">
-                  Phone Number
+                  {t.offer.phoneNumber}
                 </span>
               </div>
               <p className="text-body text-sett-text-primary">{request.contactPhone || '—'}</p>
@@ -527,7 +588,7 @@ export default function RequestDetailPage() {
           {request.customerNotes && (
             <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mt-3">
               <span className="font-semibold text-body text-sett-text-primary">
-                Special requirement:{' '}
+                {t.offer.specialRequirement}:{' '}
               </span>
               <span className="text-body text-sett-text-secondary">{request.customerNotes}</span>
             </div>
@@ -538,11 +599,11 @@ export default function RequestDetailPage() {
 
         {/* ── Policies ── */}
         <div>
-          <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-3">Policies</h3>
+          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">{t.offer.policies}</h3>
           {request.termsAndConditions && (
             <div className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50">
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
-                Terms & Conditions
+                {t.offer.termsConditions}
               </p>
               <p className="text-body text-sett-text-secondary whitespace-pre-line">
                 {request.termsAndConditions}
@@ -552,7 +613,7 @@ export default function RequestDetailPage() {
           {request.cancellationConditions && (
             <div className="bg-sett-fill rounded-card px-4 py-3 border border-sett-border/50">
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
-                Cancellation Conditions
+                {t.offer.cancellationConditions}
               </p>
               <p className="text-body text-sett-text-secondary whitespace-pre-line">
                 {request.cancellationConditions}
@@ -568,7 +629,7 @@ export default function RequestDetailPage() {
           <button
             type="button"
             onClick={() => setSummaryCollapsed(!summaryCollapsed)}
-            className="p-1 rounded-full hover:bg-sett-fill transition-colors text-[#A3A3A3] hover:text-[#1D1D1D]"
+            className="p-1 rounded-full hover:bg-sett-fill transition-colors text-sett-text-accent hover:text-sett-text-primary"
             aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
           >
             {summaryCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
@@ -583,16 +644,16 @@ export default function RequestDetailPage() {
           {/* Hotels */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D]">Hotels</h3>
-              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading} className="!rounded-[14px] font-montserrat !text-[14px] !font-semibold !text-white !px-4 !py-2 !bg-[#AAC737]">
-                + Add Hotel
+              <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.offer.hotels}</h3>
+              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading}>
+                {t.offer.addHotel}
               </Button>
             </div>
 
             {hotels.length === 0 ? (
               <div className="bg-sett-card rounded-card border border-sett-border p-6 text-center">
                 <p className="text-body text-sett-text-accent">
-                  No hotels added yet. Click &quot;+ Add Hotel&quot; to search and add hotels.
+                  {t.offer.noHotels}
                 </p>
               </div>
             ) : (
@@ -614,14 +675,14 @@ export default function RequestDetailPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-heading-sm font-bold text-sett-text-primary">
-                Additional Services
+                {t.offer.additionalServices}
               </h3>
               <button
                 type="button"
                 onClick={() => setAddServiceOpen(true)}
-                className="px-4 py-1.5 border border-sett-primary rounded-full text-body text-sett-primary font-medium hover:bg-sett-primary/5 transition-colors"
+                className="px-4 py-1.5 border-2 border-sett-primary rounded-button text-body text-sett-primary font-bold uppercase tracking-[0.08em] hover:bg-sett-primary hover:text-sett-navy transition-colors duration-200"
               >
-                + Add Service
+                {t.offer.addService}
               </button>
             </div>
 
@@ -633,22 +694,22 @@ export default function RequestDetailPage() {
                     <thead>
                       <tr className="border-b border-sett-border bg-sett-fill">
                         <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                          Service
+                          {t.offer.service}
                         </th>
                         <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                          Net &euro;
+                          {t.offer.net} &euro;
                         </th>
                         <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                          Markup
+                          {t.offer.markup}
                         </th>
                         <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                          Sell &euro;
+                          {t.offer.sell} &euro;
                         </th>
                         <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                          Qty
+                          {t.offer.qty}
                         </th>
                         <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
-                          Total &euro;
+                          {t.offer.total} &euro;
                         </th>
                         <th className="w-20" />
                       </tr>
@@ -687,7 +748,7 @@ export default function RequestDetailPage() {
             {/* View on map */}
             <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
               <h4 className="text-body font-bold text-sett-text-primary px-5 pt-4 pb-2">
-                View on map
+                {t.offer.viewOnMap}
               </h4>
               <div className="mx-4 mb-4">
                 <HotelMap hotels={hotels} className="h-44" />
@@ -697,30 +758,30 @@ export default function RequestDetailPage() {
             {/* Room Breakdown */}
             <div className="bg-sett-card rounded-card border border-sett-border p-5">
               <h4 className="text-heading-sm font-bold text-sett-text-primary mb-4">
-                Room Breakdown
+                {t.offer.roomBreakdown}
               </h4>
               <dl className="space-y-3">
                 <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">Total Purchase</dt>
+                  <dt className="text-sett-text-secondary">{t.offer.totalPurchase}</dt>
                   <dd className="font-semibold text-sett-text-primary">
                     &euro;{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
                   </dd>
                 </div>
                 <hr className="border-sett-border" />
                 <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">Total Sell</dt>
+                  <dt className="text-sett-text-secondary">{t.offer.totalSell}</dt>
                   <dd className="font-semibold text-sett-text-primary">
                     &euro;{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
                   </dd>
                 </div>
                 <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">Margin EUR</dt>
+                  <dt className="text-sett-text-secondary">{t.offer.marginEur}</dt>
                   <dd className="font-semibold text-sett-primary">
                     &euro;{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
                   </dd>
                 </div>
                 <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">Margin %</dt>
+                  <dt className="text-sett-text-secondary">{t.offer.marginPct}</dt>
                   <dd className="font-semibold text-sett-primary">
                     {totals.margin.toFixed(1)}%
                   </dd>
@@ -730,38 +791,22 @@ export default function RequestDetailPage() {
 
             {/* Action Buttons */}
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
-              >
+              <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
                 <Eye className="w-4 h-4" />
-                Preview PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => setSaveDraftOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-border rounded-card text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-colors"
-              >
+                {t.offer.previewPdf}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setSaveDraftOpen(true)}>
                 <Save className="w-4 h-4" />
-                Save Draft
-              </button>
-              <button
-                type="button"
-                onClick={() => setSendOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-primary rounded-card text-body font-medium text-white hover:bg-sett-primary/90 transition-colors"
-              >
+                {t.offer.saveDraft}
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setSendOpen(true)}>
                 <Send className="w-4 h-4" />
-                Approve &amp; Send
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeclineOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-sett-destructive rounded-card text-body font-medium text-sett-destructive hover:bg-red-50 transition-colors"
-              >
+                {t.offer.approveAndSend}
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setDeclineOpen(true)}>
                 <XCircle className="w-4 h-4" />
-                Mark as Declined
-              </button>
+                {t.offer.markDeclined}
+              </Button>
             </div>
           </div>
         )}
@@ -787,9 +832,9 @@ export default function RequestDetailPage() {
         open={!!removeServiceTarget}
         onClose={() => setRemoveServiceTarget(null)}
         onConfirm={() => removeServiceTarget && handleRemoveService(removeServiceTarget)}
-        title="Are you sure you want to remove this service?"
-        message="This service will be removed from the offer."
-        confirmLabel="Remove"
+        title={t.offer.removeServiceTitle}
+        message={t.offer.removeServiceMsg}
+        confirmLabel={t.common.remove}
         variant="danger"
       />
 
@@ -797,9 +842,9 @@ export default function RequestDetailPage() {
         open={!!removeHotelTarget}
         onClose={() => setRemoveHotelTarget(null)}
         onConfirm={() => removeHotelTarget && handleRemoveHotel(removeHotelTarget)}
-        title="Are you sure you want to remove this hotel?"
-        message="This hotel will be removed from the offer. You can add it again from the hotel search."
-        confirmLabel="Remove"
+        title={t.offer.removeHotelTitle}
+        message={t.offer.removeHotelMsg}
+        confirmLabel={t.common.remove}
         variant="danger"
       />
 
@@ -807,29 +852,85 @@ export default function RequestDetailPage() {
         open={saveDraftOpen}
         onClose={() => setSaveDraftOpen(false)}
         onConfirm={handleSaveDraft}
-        title="Are you sure you want to save it as draft?"
-        message="The offer will be saved as a draft and won't be sent to the client. You can resume and submit it later."
-        confirmLabel="Save as Draft"
+        title={t.offer.saveDraftTitle}
+        message={t.offer.saveDraftMsg}
+        confirmLabel={t.offer.saveDraftConfirm}
         variant="primary"
       />
 
-      <ConfirmModal
-        open={sendOpen}
-        onClose={() => setSendOpen(false)}
-        onConfirm={handleApproveAndSend}
-        title="Approve & Send Offer?"
-        message="This will send the offer to the client. Make sure all details are correct."
-        confirmLabel="Approve & Send"
-        variant="primary"
-      />
+      {/* Approve & Send Modal */}
+      {sendOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-[14px] border border-sett-border-light w-full max-w-md mx-4 p-6">
+            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-1">
+              {t.offer.approveTitle}
+            </h3>
+            <p className="font-montserrat text-[14px] text-sett-text-secondary mb-5">
+              {t.offer.approveMsg}
+            </p>
+
+            {sendError && (
+              <div className="flex items-start gap-2 mb-4 p-3 rounded-[10px] bg-red-50 border border-red-200">
+                <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="font-montserrat text-[13px] text-red-700">{sendError}</p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
+                  {t.offer.agentEmail} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={sendEmail}
+                  onChange={(e) => setSendEmail(e.target.value)}
+                  placeholder={t.offer.emailPlaceholder}
+                  className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none focus:border-sett-primary"
+                />
+              </div>
+              <div>
+                <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
+                  {t.offer.adminNotes} <span className="font-normal text-sett-text-accent">{t.offer.adminNotesOptional}</span>
+                </label>
+                <textarea
+                  value={sendNotes}
+                  onChange={(e) => setSendNotes(e.target.value)}
+                  placeholder={t.offer.notesPlaceholder}
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none focus:border-sett-primary resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <Button
+                variant="secondary"
+                onClick={() => { setSendOpen(false); setSendError(''); setSendEmail(''); setSendNotes(''); }}
+                disabled={actionLoading}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleApproveAndSend}
+                isLoading={actionLoading}
+              >
+                <Send className="w-4 h-4" />
+                {t.offer.approveAndSend}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         open={declineOpen}
         onClose={() => setDeclineOpen(false)}
         onConfirm={handleDecline}
-        title="Mark Offer as Declined?"
-        message="This will mark the offer as declined. You can still access it later from the archive."
-        confirmLabel="Mark Declined"
+        title={t.offer.declineTitle}
+        message={t.offer.declineMsg}
+        confirmLabel={t.offer.declineConfirm}
         variant="danger"
       />
 
@@ -839,8 +940,8 @@ export default function RequestDetailPage() {
           setSuccessOpen(false);
           router.push('/booking-requests');
         }}
-        title="Offer Sent Successfully!"
-        message="The offer has been sent to the client at the specified email address."
+        title={t.offer.offerSentTitle}
+        message={t.offer.offerSentMsg}
         buttonLabel="Return to Group Request"
         autoRedirectSeconds={7}
       />
@@ -990,6 +1091,7 @@ function HotelCard({
   onPricingUpdate: (hotelId: string, updatedHotel: ProposalHotel) => void;
   onRemove: () => void;
 }) {
+  const { t } = useLanguage();
   const [localRooms, setLocalRooms] = useState<RoomData>(
     (hotel.rooms as RoomData) ?? {}
   );
@@ -1081,11 +1183,11 @@ function HotelCard({
           </h4>
           <div className="flex gap-0.5 shrink-0">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} className="w-3.5 h-3.5 fill-[#AAC737] text-[#AAC737]" />
+              <Star key={i} className="w-3.5 h-3.5 fill-sett-primary text-sett-primary" />
             ))}
           </div>
           {saving && (
-            <span className="text-caption text-white/70 ml-2 animate-pulse shrink-0">Saving...</span>
+            <span className="text-caption text-white/70 ml-2 animate-pulse shrink-0">{t.common.loading}</span>
           )}
         </div>
         <button
@@ -1094,18 +1196,9 @@ function HotelCard({
           className="flex items-center gap-1.5 text-body text-white/80 hover:text-white font-medium transition-colors shrink-0 ml-2"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Remove</span>
+          <span className="hidden sm:inline">{t.common.remove}</span>
         </button>
       </div>
-
-      {/* Address line */}
-      {hotel.hotelName && (
-        <div className="px-4 py-2 border-b border-sett-border">
-          <p className="text-caption text-sett-text-accent">
-            {hotel.hotelCode}
-          </p>
-        </div>
-      )}
 
       {/* Room table — desktop */}
       {roomEntries.length > 0 ? (
@@ -1115,25 +1208,25 @@ function HotelCard({
             <thead>
               <tr className="border-b border-sett-border">
                 <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Room Type
+                  {t.offer.roomType}
                 </th>
                 <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Net &euro;
+                  {t.offer.net} &euro;
                 </th>
                 <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Markup
+                  {t.offer.markup}
                 </th>
                 <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Sell &euro;
+                  {t.offer.sell} &euro;
                 </th>
                 <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Qty
+                  {t.offer.qty}
                 </th>
                 <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Nights
+                  {t.offer.nights}
                 </th>
                 <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                  Total &euro;
+                  {t.offer.total} &euro;
                 </th>
               </tr>
             </thead>
@@ -1196,17 +1289,17 @@ function HotelCard({
                 <p className="text-body font-medium text-sett-text-primary">{type}</p>
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div>
-                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>
                     <p className="text-sett-text-primary mt-0.5">{net.toFixed(2)}</p>
                   </div>
                   <div>
-                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Markup</span>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.markup}</span>
                     <div className="mt-0.5">
                       <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
                     </div>
                   </div>
                   <div>
-                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Sell</span>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.sell}</span>
                     <div className="mt-0.5">
                       <input
                         type="number"
@@ -1222,15 +1315,15 @@ function HotelCard({
                     </div>
                   </div>
                   <div>
-                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Qty</span>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.qty}</span>
                     <p className="text-sett-text-primary mt-0.5">{qty}</p>
                   </div>
                   <div>
-                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Nights</span>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.nights}</span>
                     <p className="text-sett-text-primary mt-0.5">{nights}</p>
                   </div>
                   <div>
-                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Total</span>
+                    <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.total}</span>
                     <p className="text-sett-primary font-semibold mt-0.5">{total.toLocaleString('en', { minimumFractionDigits: 2 })}</p>
                   </div>
                 </div>
@@ -1251,7 +1344,7 @@ function HotelCard({
       {hotel.freeCancellation && hotel.cancelDeadline && (
         <div className="px-4 py-2 border-t border-sett-border/50">
           <p className="text-caption text-sett-primary font-medium">
-            Free cancellation until{' '}
+            {t.offer.freeCancellation}{' '}
             {new Date(hotel.cancelDeadline).toLocaleDateString('en-GB', {
               day: '2-digit',
               month: 'short',

@@ -1,25 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, MapPin, Star, Check, AlertTriangle, X, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
-import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { PageLoader, Spinner } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { cn } from '@/lib/utils/cn';
 import type {
   HotelSearchResult,
-  HotelSearchResponse,
-  OptionDetailResult,
   BookingRequest,
 } from '@/types';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
-type SearchPhase = 'idle' | 'searching' | 'done' | 'error';
+type SearchPhase = 'idle' | 'searching' | 'polling' | 'done' | 'error';
 
 const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
+const POLL_INTERVAL_MS = 3000;
 
 export default function AddHotelPage() {
   const params = useParams();
@@ -27,13 +26,17 @@ export default function AddHotelPage() {
   const searchParams = useSearchParams();
   const requestId = params.id as string;
   const proposalId = searchParams.get('proposalId') ?? '';
+  const { t } = useLanguage();
 
   const [request, setRequest] = useState<BookingRequest | null>(null);
   const [phase, setPhase] = useState<SearchPhase>('idle');
-  const [searchResponse, setSearchResponse] = useState<HotelSearchResponse | null>(null);
+  const [completedResults, setCompletedResults] = useState<HotelSearchResult[]>([]);
+  const [searchSummary, setSearchSummary] = useState<{ total: number; completed: number; hotelsFound: number; queued: number; running: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [addedHotels, setAddedHotels] = useState<Set<string>>(new Set());
   const [addingHotel, setAddingHotel] = useState<string | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -58,25 +61,251 @@ export default function AddHotelPage() {
     });
   }, [requestId]);
 
-  // Auto-trigger hotel search
-  const runSearch = useCallback(async () => {
-    setPhase('searching');
-    setErrorMsg('');
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const checkedCountRef = useRef(0);
+  const totalCountRef = useRef(0);
+  const foundCountRef = useRef(0);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Final authoritative fetch when search completes
+  const fetchFinalResults = useCallback(async (reqId: string) => {
     try {
-      const response = await requestsApi.searchHotels(requestId, {
+      const status = await requestsApi.getHotelSearchStatus(reqId);
+      if (!mountedRef.current) return;
+      const finalHotels = status.jobs
+        .filter((j) => j.status === 'COMPLETED' && j.resultJson)
+        .map((j) => j.resultJson!);
+      setCompletedResults(finalHotels);
+      const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
+      setSearchSummary({
+        total: status.summary.total,
+        completed: checked,
+        hotelsFound: status.summary.completed,
+        queued: 0,
+        running: 0,
+      });
+      setPhase('done');
+    } catch {
+      // If final fetch fails, keep whatever we have from SSE
+      setPhase('done');
+    }
+  }, []);
+
+  // Start SSE + polling fallback
+  const startSearchStream = useCallback((reqId: string) => {
+    checkedCountRef.current = 0;
+    totalCountRef.current = 0;
+    foundCountRef.current = 0;
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const sseUrl = `${apiBase}/requests/${reqId}/hotel-search/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+
+    try {
+      const es = new EventSource(sseUrl);
+      eventSourceRef.current = es;
+
+      es.addEventListener('connected', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.totalCandidates) {
+            totalCountRef.current = data.totalCandidates;
+            setSearchSummary((prev) => ({
+              total: data.totalCandidates,
+              completed: prev?.completed ?? 0,
+              hotelsFound: prev?.hotelsFound ?? 0,
+              queued: data.totalCandidates,
+              running: 0,
+            }));
+          }
+        } catch { /* ignore parse errors */ }
+      });
+
+      es.addEventListener('hotelProbeProgress', (e) => {
+        if (!mountedRef.current) return;
+        try {
+          const event = JSON.parse(e.data);
+          checkedCountRef.current++;
+          const total = totalCountRef.current || 1;
+
+          // Update progress
+          setSearchSummary((prev) => ({
+            total: prev?.total ?? total,
+            completed: checkedCountRef.current,
+            hotelsFound: foundCountRef.current,
+            queued: Math.max(0, (prev?.total ?? total) - checkedCountRef.current),
+            running: 0,
+          }));
+
+          // If hotel result available, add to display
+          if ((event.status === 'CONFIRMED' || event.status === 'LIMITED') && event.result) {
+            foundCountRef.current++;
+            setCompletedResults((prev) => [...prev, event.result]);
+            setSearchSummary((s) => s ? { ...s, hotelsFound: foundCountRef.current } : s);
+          }
+        } catch { /* ignore */ }
+      });
+
+      es.addEventListener('hotelProbeCompleted', (e) => {
+        if (!mountedRef.current) return;
+        try {
+          const event = JSON.parse(e.data);
+          // If this is a per-hotel completion with result
+          if ((event.status === 'CONFIRMED' || event.status === 'LIMITED') && event.result) {
+            foundCountRef.current++;
+            setCompletedResults((prev) => {
+              // Avoid duplicates
+              if (prev.some((h) => h.hotelCode === event.result.hotelCode)) return prev;
+              return [...prev, event.result];
+            });
+            setSearchSummary((s) => s ? { ...s, hotelsFound: foundCountRef.current } : s);
+          }
+
+          // If this is the final "all done" event with summary
+          if (event.summary) {
+            es.close();
+            eventSourceRef.current = null;
+            fetchFinalResults(reqId);
+          }
+        } catch { /* ignore */ }
+      });
+
+      es.onerror = () => {
+        // SSE failed — fall back to polling
+        es.close();
+        eventSourceRef.current = null;
+        if (!mountedRef.current) return;
+        startPollingFallback(reqId);
+      };
+    } catch {
+      // EventSource not supported or failed — fall back to polling
+      startPollingFallback(reqId);
+    }
+  }, [fetchFinalResults]);
+
+  // Polling fallback (if SSE fails)
+  const startPollingFallback = useCallback((reqId: string) => {
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+
+    const poll = async () => {
+      try {
+        const status = await requestsApi.getHotelSearchStatus(reqId);
+        if (!mountedRef.current) return;
+
+        const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
+        setSearchSummary({
+          total: status.summary.total,
+          completed: checked,
+          hotelsFound: status.summary.completed,
+          queued: status.summary.queued,
+          running: status.summary.running,
+        });
+
+        const results = status.jobs
+          .filter((j) => j.status === 'COMPLETED' && j.resultJson)
+          .map((j) => j.resultJson!);
+        setCompletedResults(results);
+
+        if (status.summary.queued + status.summary.running === 0) {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          setPhase('done');
+        }
+      } catch (err) {
+        if (!mountedRef.current) return;
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        const msg = err instanceof Error ? err.message : 'Failed to get search status';
+        setErrorMsg(msg);
+        setPhase('error');
+      }
+    };
+
+    poll();
+    pollIntervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
+  }, []);
+
+  // Check existing search status first, only start new search if needed
+  // Start a brand-new hotel search
+  const startNewSearch = useCallback(async () => {
+    try {
+      await requestsApi.startHotelSearch(requestId, {
         mealType: request?.breakfastPreference || undefined,
         includeAlternativeStars: true,
         currencyCode: request?.currencyCode || 'EUR',
         nationalityCode: request?.nationalityCode || undefined,
       });
-      setSearchResponse(response);
-      setPhase('done');
+      if (!mountedRef.current) return;
+      setPhase('polling');
+      startPollingFallback(requestId);
     } catch (err: unknown) {
+      if (!mountedRef.current) return;
       const msg = err instanceof Error ? err.message : 'Hotel search failed';
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode]);
+  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback]);
+
+  // Check existing search status first, only start new search if needed
+  const runSearch = useCallback(async () => {
+    setPhase('searching');
+    setErrorMsg('');
+    setCompletedResults([]);
+    setSearchSummary(null);
+
+    // First try to load existing search results
+    try {
+      const status = await requestsApi.getHotelSearchStatus(requestId);
+      if (!mountedRef.current) return;
+
+      console.log('[AddHotel] Search status response:', JSON.stringify(status, null, 2));
+
+      const completedHotels = status.jobs
+        .filter((j: { status: string; resultJson?: unknown }) => j.status === 'COMPLETED' && j.resultJson)
+        .map((j: { resultJson?: HotelSearchResult | null }) => j.resultJson as HotelSearchResult);
+
+      console.log('[AddHotel] Completed hotels extracted:', completedHotels.length, completedHotels);
+
+      const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
+      const stillRunning = status.summary.queued + status.summary.running;
+
+      if (completedHotels.length > 0 || checked > 0) {
+        setCompletedResults(completedHotels);
+        setSearchSummary({
+          total: status.summary.total,
+          completed: checked,
+          hotelsFound: completedHotels.length,
+          queued: status.summary.queued,
+          running: status.summary.running,
+        });
+
+        if (stillRunning > 0) {
+          setPhase('polling');
+          startPollingFallback(requestId);
+        } else {
+          setPhase('done');
+        }
+        return;
+      }
+    } catch (err) {
+      // No existing search or status endpoint failed — that's OK, start a new one
+      console.log('[AddHotel] No existing search found, starting new one:', err);
+    }
+
+    if (!mountedRef.current) return;
+    // No existing results — start a new search
+    startNewSearch();
+  }, [requestId, startPollingFallback, startNewSearch]);
 
   useEffect(() => {
     if (request) {
@@ -90,57 +319,39 @@ export default function AddHotelPage() {
     setAddingHotel(hotel.hotelCode);
 
     try {
-      // Step 1: Get option details
-      const optionDetails = await requestsApi.getOptionDetails(requestId, [
-        {
-          sessionId: hotel.sessionId || hotel.bestOption.sessionId,
-          tid: hotel.bestOption.tid,
-          hotelCode: hotel.hotelCode,
-        },
-      ]);
+      const sellPrice = hotel.sellingPricePerRoomPerNight;
+      const roomsAllocated = hotel.roomsAllocated || 1;
+      const nights = request?.nights || 1;
+      const totalPrice = sellPrice * roomsAllocated * nights;
 
-      const detail: OptionDetailResult | undefined = optionDetails[0];
-
-      // Step 2: Calculate customer sell price (per room per night)
-      const buyingPricePerRoomPerNight = hotel.bestOption.buyingPricePerRoomPerNight;
-      const priceResult = await requestsApi.calculatePrice(requestId, buyingPricePerRoomPerNight);
-
-      const sellPerRoomPerNight = priceResult.sellPrice;
-      const totalRooms = searchResponse?.totalRoomsRequested ?? 1;
-      const nights = detail?.parsed.roomBreakdown?.[0]?.prices?.length
-        ?? (request?.nights || 1);
-
-      // Step 3: Build room data from option details
+      // Build room breakdown from perTypeAllocations if available
       const rooms: Record<string, { net: number; sell: number; qty: number; nights: number }> = {};
-      if (detail?.parsed.roomBreakdown) {
-        detail.parsed.roomBreakdown.forEach((rb) => {
-          const roomNights = rb.prices.length || 1;
-          const totalNet = rb.prices.reduce((s, p) => s + p.price, 0);
-          const netPerNight = totalNet / roomNights;
-          rooms[rb.description] = {
-            net: netPerNight,
-            sell: sellPerRoomPerNight,
-            qty: 1,
-            nights: roomNights,
+      if (hotel.perTypeAllocations && hotel.perTypeAllocations.length > 0) {
+        hotel.perTypeAllocations.forEach((alloc) => {
+          rooms[alloc.roomType] = {
+            net: hotel.highestMidRangePrice,
+            sell: sellPrice,
+            qty: alloc.roomsAllocated,
+            nights,
           };
         });
       }
 
-      // Total = sellPrice * totalRooms * nights
-      const totalPrice = sellPerRoomPerNight * totalRooms * nights;
+      // Get tid from supplierSplit if available
+      const tid = hotel.supplierSplit?.[0]?.tid || hotel.bestOption?.tid || '';
+      const supplierCode = hotel.supplierSplit?.[0]?.supplierCode || hotel.bestOption?.supplierCode || '';
 
-      // Step 4: Add hotel to proposal
       await proposalsApi.addHotel(proposalId, {
         hotelCode: hotel.hotelCode,
         hotelName: hotel.hotelName,
         latitude: hotel.latitude,
         longitude: hotel.longitude,
-        tid: hotel.bestOption.tid,
-        currency: hotel.bestOption.currency || hotel.currency || 'EUR',
+        tid,
+        currency: hotel.currency || 'EUR',
         totalPrice,
-        freeCancellation: hotel.bestOption.freeCancellation,
-        cancelDeadline: hotel.bestOption.cancelDeadline,
-        supplierCode: hotel.bestOption.supplierCode,
+        freeCancellation: !!hotel.cxlDeadline,
+        cancelDeadline: hotel.cxlDeadline || null,
+        supplierCode,
         rooms: Object.keys(rooms).length > 0 ? rooms : undefined,
       });
 
@@ -164,22 +375,32 @@ export default function AddHotelPage() {
     );
   };
 
-  // Client-side filter
-  const allResults = searchResponse?.results ?? [];
-  const altResults = searchResponse?.alternativeResults ?? [];
-  const displayResults = showAlternatives ? altResults : allResults;
+  // Client-side filter — separate main vs alternative by star rating match
+  const requestedStars = request?.starRating ?? 0;
+  const mainResults = completedResults.filter(
+    (h) => !requestedStars || h.starRating === requestedStars
+  );
+  const altResults = completedResults.filter(
+    (h) => requestedStars && h.starRating !== requestedStars
+  );
+  // If no main results match the requested star rating, show all hotels
+  const hasMainResults = mainResults.length > 0;
+  const displayResults = !hasMainResults
+    ? completedResults
+    : showAlternatives
+      ? altResults
+      : mainResults;
 
   const filteredResults = displayResults.filter((h) => {
     if (starFilters.length > 0 && !starFilters.includes(h.starRating)) return false;
-    if (h.bestOption.buyingPricePerRoomPerNight > maxPrice) return false;
-    if (amenityFilters.includes('Free Cancellation') && !h.bestOption.freeCancellation)
-      return false;
+    if (h.sellingPricePerRoomPerNight > maxPrice) return false;
+    if (amenityFilters.includes('Free Cancellation') && !h.cxlDeadline) return false;
     return true;
   });
 
   return (
     <>
-      <Header title="Create Request" />
+      <Header title={t.createForm.title} />
 
       <div className="p-4 md:p-6 space-y-6">
       {/* Breadcrumb */}
@@ -187,52 +408,70 @@ export default function AddHotelPage() {
         <button
           type="button"
           onClick={() => router.push(`/booking-requests/${requestId}`)}
-          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-[#4A4A4A] hover:text-[#1D1D1D] transition-colors"
+          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back
+          {t.common.back}
         </button>
-        <span className="text-[#A3A3A3] hidden sm:inline">&gt;</span>
-        <span className="font-montserrat text-[14px] font-medium text-[#A3A3A3]">
+        <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
+        <span className="font-montserrat text-[14px] font-medium text-sett-text-accent">
           Offer #{request?.referenceNumber ?? requestId.slice(0, 4)}
         </span>
-        <span className="text-[#A3A3A3] hidden sm:inline">&gt;</span>
-        <span className="font-montserrat text-[16px] font-semibold text-[#1D1D1D]">Add Hotel</span>
+        <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
+        <span className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.addHotel.title}</span>
       </div>
 
       {/* Loading request data */}
       {phase === 'idle' && !request && (
-        <PageLoader message="Loading request details..." />
+        <PageLoader message={t.addHotel.loadingRequest} />
       )}
 
-      {/* Searching phase */}
-      {phase === 'searching' && (
-        <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-12 text-center">
+      {/* Searching / Polling phase */}
+      {(phase === 'searching' || phase === 'polling') && (
+        <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
           <Spinner size="lg" className="mx-auto mb-4" />
-          <h3 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] mb-2">
-            Searching Hotels...
+          <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
+            {t.addHotel.searchingHotels}
           </h3>
-          <p className="font-montserrat text-[14px] text-[#A3A3A3] max-w-md mx-auto">
-            We&apos;re searching across multiple suppliers for the best hotel options.
-            This may take 30-45 seconds.
-          </p>
+          {searchSummary ? (
+            <>
+              <p className="font-montserrat text-[14px] text-sett-text-secondary mb-4">
+                {t.addHotel.hotelsChecked.replace('{completed}', String(searchSummary.completed)).replace('{total}', String(searchSummary.total))}
+              </p>
+              <div className="w-full max-w-md mx-auto bg-sett-border-light rounded-full h-2.5">
+                <div
+                  className="bg-sett-primary h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${searchSummary.total > 0 ? Math.round((searchSummary.completed / searchSummary.total) * 100) : 0}%` }}
+                />
+              </div>
+              {searchSummary.hotelsFound > 0 && (
+                <p className="font-montserrat text-[13px] text-sett-primary font-medium mt-3">
+                  {t.addHotel.hotelsFoundSoFar.replace('{count}', String(searchSummary.hotelsFound))}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="font-montserrat text-[14px] text-sett-text-accent max-w-md mx-auto">
+              {t.addHotel.startingSearch}
+            </p>
+          )}
         </div>
       )}
 
       {/* Error phase */}
       {phase === 'error' && (
-        <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-8 text-center">
+        <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
           <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
-          <h3 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] mb-2">Search Failed</h3>
-          <p className="font-montserrat text-[14px] text-[#A3A3A3] mb-4">{errorMsg}</p>
-          <Button variant="primary" onClick={runSearch} className="!rounded-[14px] !bg-[#AAC737]">
-            Retry Search
+          <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">{t.addHotel.searchFailed}</h3>
+          <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">{errorMsg}</p>
+          <Button variant="primary" onClick={runSearch}>
+            {t.addHotel.retrySearch}
           </Button>
         </div>
       )}
 
-      {/* Results */}
-      {phase === 'done' && searchResponse && (
+      {/* Results — show when done, or progressively during polling if results exist */}
+      {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && (
         <div className="flex flex-col lg:flex-row gap-6">
           {/* ── Mobile filter toggle ── */}
           <button
@@ -241,7 +480,7 @@ export default function AddHotelPage() {
             className="lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
           >
             <SlidersHorizontal className="w-4 h-4" />
-            {filtersOpen ? 'Hide Filters' : 'Show Filters'}
+            {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
             {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
               <span className="w-2 h-2 rounded-full bg-sett-primary" />
             )}
@@ -252,26 +491,26 @@ export default function AddHotelPage() {
             'lg:w-[230px] shrink-0',
             filtersOpen ? 'block' : 'hidden lg:block'
           )}>
-            <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-5">
-              <h3 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D] mb-5">Trip Details</h3>
+            <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+              <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
 
               <div className="space-y-5">
                 {/* Destination */}
                 <div>
-                  <label className="block font-montserrat text-[12px] font-semibold text-[#1D1D1D] mb-1.5">
-                    Destination
+                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary mb-1.5">
+                    {t.addHotel.destination}
                   </label>
-                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-[#E6EAF0] bg-white font-montserrat text-[14px] text-[#4A4A4A] truncate">
+                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light bg-white font-montserrat text-[14px] text-sett-text-secondary truncate">
                     {request?.destinationName || '—'}
                   </div>
                 </div>
 
                 {/* Stay Dates */}
                 <div>
-                  <label className="block font-montserrat text-[12px] font-semibold text-[#1D1D1D] mb-1.5">
-                    Stay Dates
+                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary mb-1.5">
+                    {t.addHotel.stayDates}
                   </label>
-                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-[#E6EAF0] bg-white font-montserrat text-[14px] text-[#4A4A4A]">
+                  <div className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light bg-white font-montserrat text-[14px] text-sett-text-secondary">
                     {request?.checkinDate
                       ? new Date(request.checkinDate).toLocaleDateString('en-GB')
                       : '—'}
@@ -282,19 +521,19 @@ export default function AddHotelPage() {
                   </div>
                 </div>
 
-                <hr className="border-[#E6EAF0]" />
+                <hr className="border-sett-border-light" />
 
                 {/* Star Rating */}
                 <div>
-                  <label className="block font-montserrat text-[14px] font-semibold text-[#1D1D1D] mb-2">
-                    Star Rating
+                  <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary mb-2">
+                    {t.addHotel.starRating}
                   </label>
                   <div className="space-y-2">
                     {[5, 4, 3].map((star) => (
                       <label key={star} className="flex items-center gap-2.5 cursor-pointer">
                         <span className={cn(
                           'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                          starFilters.includes(star) ? 'border-[#AAC737] bg-[#AAC737]' : 'border-[#E6EAF0]'
+                          starFilters.includes(star) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
                         )}
                           onClick={() => toggleStar(star)}
                         >
@@ -302,7 +541,7 @@ export default function AddHotelPage() {
                         </span>
                         <div className="flex gap-0.5">
                           {Array.from({ length: star }).map((_, i) => (
-                            <Star key={i} className="w-4 h-4 fill-[#AAC737] text-[#AAC737]" />
+                            <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
                           ))}
                         </div>
                       </label>
@@ -310,12 +549,12 @@ export default function AddHotelPage() {
                   </div>
                 </div>
 
-                <hr className="border-[#E6EAF0]" />
+                <hr className="border-sett-border-light" />
 
                 {/* Price Per Night */}
                 <div>
-                  <label className="block font-montserrat text-[14px] font-semibold text-[#1D1D1D] mb-2">
-                    Price Per Night
+                  <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary mb-2">
+                    {t.addHotel.pricePerNight}
                   </label>
                   <input
                     type="range"
@@ -324,28 +563,28 @@ export default function AddHotelPage() {
                     step={50}
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(Number(e.target.value))}
-                    className="w-full accent-[#AAC737]"
+                    className="w-full accent-sett-primary"
                   />
-                  <div className="flex justify-between font-montserrat text-[12px] text-[#A3A3A3] mt-1">
+                  <div className="flex justify-between font-montserrat text-[12px] text-sett-text-accent mt-1">
                     <span>&euro;0</span>
                     <span>&euro;{maxPrice.toLocaleString()}</span>
                   </div>
                 </div>
 
-                <hr className="border-[#E6EAF0]" />
+                <hr className="border-sett-border-light" />
 
                 {/* Amenities */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">
-                      Amenities
+                    <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                      {t.addHotel.amenities}
                     </label>
                     <button
                       type="button"
-                      className="font-montserrat text-[12px] text-[#AAC737] hover:underline font-medium"
+                      className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
                       onClick={() => setAmenityFilters([])}
                     >
-                      View all
+                      {t.addHotel.viewAll}
                     </button>
                   </div>
                   <div className="space-y-2">
@@ -353,13 +592,13 @@ export default function AddHotelPage() {
                       <label key={amenity} className="flex items-center gap-2.5 cursor-pointer">
                         <span className={cn(
                           'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                          amenityFilters.includes(amenity) ? 'border-[#AAC737] bg-[#AAC737]' : 'border-[#E6EAF0]'
+                          amenityFilters.includes(amenity) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
                         )}
                           onClick={() => toggleAmenity(amenity)}
                         >
                           {amenityFilters.includes(amenity) && <span className="w-2 h-2 rounded-full bg-white" />}
                         </span>
-                        <span className="font-montserrat text-[14px] text-[#4A4A4A]">{amenity}</span>
+                        <span className="font-montserrat text-[14px] text-sett-text-secondary">{amenity}</span>
                       </label>
                     ))}
                   </div>
@@ -374,13 +613,13 @@ export default function AddHotelPage() {
                   className={cn(
                     'w-full mt-5 px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] font-semibold transition-colors',
                     showAlternatives
-                      ? 'bg-[#AAC737] text-white border-[#AAC737]'
-                      : 'bg-white text-[#AAC737] border-[#AAC737] hover:bg-[#F7FAEB]'
+                      ? 'bg-sett-primary text-white border-sett-primary'
+                      : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-light-green-bg'
                   )}
                 >
                   {showAlternatives
-                    ? 'Show Main Results'
-                    : `Show Alternatives (${altResults.length})`}
+                    ? t.addHotel.showMainResults
+                    : `${t.addHotel.showAlternatives} (${altResults.length})`}
                 </button>
               )}
             </div>
@@ -388,14 +627,14 @@ export default function AddHotelPage() {
 
           {/* ── Right: Hotel Results ── */}
           <div className="flex-1 min-w-0">
-            <p className="font-montserrat text-[14px] text-[#A3A3A3] mb-4">
-              {filteredResults.length} hotel{filteredResults.length !== 1 ? 's' : ''} found
+            <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">
+              {t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))}
             </p>
 
             {filteredResults.length === 0 && (
-              <div className="bg-white rounded-[14px] border border-[#E6EAF0] p-8 text-center">
-                <p className="font-montserrat text-[14px] text-[#A3A3A3]">
-                  No hotels match the current filters.
+              <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+                <p className="font-montserrat text-[14px] text-sett-text-accent">
+                  {t.addHotel.noHotelsMatch}
                 </p>
               </div>
             )}
@@ -408,7 +647,6 @@ export default function AddHotelPage() {
                   isAdded={addedHotels.has(hotel.hotelCode)}
                   isAdding={addingHotel === hotel.hotelCode}
                   onAddToOffer={() => handleAddToOffer(hotel)}
-                  nights={request?.nights || 1}
                 />
               ))}
             </div>
@@ -427,25 +665,30 @@ function HotelResultCard({
   isAdded,
   isAdding,
   onAddToOffer,
-  nights,
 }: {
   hotel: HotelSearchResult;
   isAdded: boolean;
   isAdding: boolean;
   onAddToOffer: () => void;
-  nights: number;
 }) {
-  const best = hotel.bestOption;
+  const { t } = useLanguage();
+  const sellPrice = hotel.sellingPricePerRoomPerNight;
+  const hasCancellation = !!hotel.cxlDeadline;
+  const supplierCode = hotel.supplierSplit?.[0]?.supplierCode || '';
+  const isLimited = hotel.capacityStatus === 'LIMITED';
+
+  // Build room type list from perTypeAllocations
+  const roomTypes = hotel.perTypeAllocations && hotel.perTypeAllocations.length > 0
+    ? hotel.perTypeAllocations
+    : [{ roomType: 'Standard Room', roomsAllocated: hotel.roomsAllocated || 1 }];
 
   return (
     <div
       className={cn(
         'bg-white rounded-[14px] border overflow-hidden',
-        hotel.status === 'flag'
+        isLimited
           ? 'border-amber-300'
-          : hotel.status === 'omit'
-            ? 'border-red-300 opacity-60'
-            : 'border-[#E6EAF0]'
+          : 'border-sett-border-light'
       )}
     >
       <div className="flex flex-col sm:flex-row">
@@ -460,9 +703,11 @@ function HotelResultCard({
             }}
           />
           {/* Supplier code badge */}
-          <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-[8px] bg-white/90 backdrop-blur-sm font-montserrat text-[12px] font-semibold text-[#4A4A4A]">
-            {best.supplierCode || 'BDC-4782'}
-          </div>
+          {supplierCode && (
+            <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-[8px] bg-white/90 backdrop-blur-sm font-montserrat text-[12px] font-semibold text-sett-text-secondary">
+              {supplierCode}
+            </div>
+          )}
         </div>
 
         {/* ── Hotel Info ── */}
@@ -470,15 +715,15 @@ function HotelResultCard({
           {/* Header row */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between px-4 sm:px-5 pt-4 sm:pt-5 pb-3 gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className="font-montserrat text-[16px] font-semibold text-[#1D1D1D]">
+              <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">
                 {hotel.hotelName}
               </h4>
 
               {/* Address */}
               {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
                 <div className="flex items-center gap-1.5 mt-1">
-                  <MapPin className="w-3.5 h-3.5 text-[#A3A3A3] shrink-0" />
-                  <span className="font-montserrat text-[13px] text-[#4A4A4A] truncate">
+                  <MapPin className="w-3.5 h-3.5 text-sett-text-accent shrink-0" />
+                  <span className="font-montserrat text-[13px] text-sett-text-secondary truncate">
                     {hotel.address ||
                       [hotel.addressCity, hotel.addressCountry].filter(Boolean).join(', ')}
                   </span>
@@ -488,19 +733,13 @@ function HotelResultCard({
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <div className="flex gap-0.5">
                   {Array.from({ length: hotel.starRating }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-[#AAC737] text-[#AAC737]" />
+                    <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
                   ))}
                 </div>
-                {hotel.status === 'flag' && (
+                {isLimited && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700">
                     <AlertTriangle className="w-3 h-3" />
-                    Flagged
-                  </span>
-                )}
-                {hotel.status === 'omit' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-50 border border-red-200 text-red-600">
-                    <X className="w-3 h-3" />
-                    Omitted
+                    {t.addHotel.limitedCapacity}
                   </span>
                 )}
               </div>
@@ -509,8 +748,8 @@ function HotelResultCard({
             {/* Action area */}
             <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-2 shrink-0">
               {isAdded ? (
-                <span className="flex items-center gap-1 font-montserrat text-[14px] text-[#AAC737] font-semibold">
-                  <Check className="w-4 h-4" /> Added
+                <span className="flex items-center gap-1 font-montserrat text-[14px] text-sett-primary font-semibold">
+                  <Check className="w-4 h-4" /> {t.addHotel.added}
                 </span>
               ) : (
                 <Button
@@ -518,15 +757,14 @@ function HotelResultCard({
                   size="sm"
                   onClick={onAddToOffer}
                   isLoading={isAdding}
-                  disabled={hotel.status === 'omit'}
-                  className="!rounded-[14px] font-montserrat !text-[14px] !font-semibold !text-white !px-5 !py-2.5 !bg-[#AAC737] !shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)]"
+                  className=""
                 >
-                  Add to Offer
+                  {t.addHotel.addToOffer}
                 </Button>
               )}
-              {best.freeCancellation && (
-                <span className="flex items-center gap-1 font-montserrat text-[13px] text-[#AAC737] font-semibold whitespace-nowrap">
-                  <Check className="w-3.5 h-3.5" /> Free Cancellation
+              {hasCancellation && (
+                <span className="flex items-center gap-1 font-montserrat text-[13px] text-sett-primary font-semibold whitespace-nowrap">
+                  <Check className="w-3.5 h-3.5" /> {t.addHotel.freeCancellation}
                 </span>
               )}
             </div>
@@ -534,48 +772,35 @@ function HotelResultCard({
 
           {/* ── Room Table (desktop) ── */}
           <div className="hidden sm:block px-5 pb-4 overflow-x-auto">
-            <div className="border border-[#E6EAF0] rounded-[10px] overflow-hidden">
+            <div className="border border-sett-border-light rounded-[10px] overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-[#E6EAF0]">
-                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] py-2.5 px-4">
-                      Room Type
+                  <tr className="border-b border-sett-border-light">
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      {t.addHotel.roomType}
                     </th>
-                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] py-2.5 px-4">
-                      Rate Basis
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      {t.addHotel.rooms}
                     </th>
-                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-[#A3A3A3] py-2.5 px-4">
-                      Per Night
+                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      {t.addHotel.perNight}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {best.roomDescriptions && best.roomDescriptions.length > 0 ? (
-                    best.roomDescriptions.map((desc, i) => {
-                      const perNight = best.buyingPricePerRoomPerNight;
-                      return (
-                        <tr key={i} className="border-t border-[#E6EAF0]">
-                          <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#1D1D1D]">{desc}</td>
-                          <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#4A4A4A]">
-                            {best.mealName || 'Room Only'}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-[#1D1D1D]">
-                            &euro;{perNight.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr className="border-t border-[#E6EAF0]">
-                      <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#1D1D1D]">Standard Room</td>
-                      <td className="py-2.5 px-4 font-montserrat text-[14px] text-[#4A4A4A]">
-                        {best.mealName || 'Room Only'}
+                  {roomTypes.map((rt, i) => (
+                    <tr key={i} className="border-t border-sett-border-light">
+                      <td className="py-2.5 px-4 font-montserrat text-[14px] text-sett-text-primary capitalize">
+                        {rt.roomType.replace(/_/g, ' ')}
                       </td>
-                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-[#1D1D1D]">
-                        &euro;{best.buyingPricePerRoomPerNight.toFixed(2)}
+                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
+                        {rt.roomsAllocated}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        &euro;{sellPrice.toFixed(2)}
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -583,29 +808,25 @@ function HotelResultCard({
 
           {/* ── Room cards (mobile) ── */}
           <div className="sm:hidden px-4 pb-4 space-y-2">
-            {(best.roomDescriptions && best.roomDescriptions.length > 0
-              ? best.roomDescriptions
-              : ['Standard Room']
-            ).map((desc, i) => {
-              const perNight = best.buyingPricePerRoomPerNight;
-              return (
-                <div key={i} className="border border-[#E6EAF0] rounded-[10px] p-3">
-                  <p className="font-montserrat text-[14px] text-[#1D1D1D] font-medium">{desc}</p>
-                  <div className="flex justify-between mt-2">
-                    <span className="font-montserrat text-[12px] text-[#A3A3A3]">{best.mealName || 'Room Only'}</span>
-                    <span className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]">&euro;{perNight.toFixed(2)}</span>
-                  </div>
+            {roomTypes.map((rt, i) => (
+              <div key={i} className="border border-sett-border-light rounded-[10px] p-3">
+                <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize">
+                  {rt.roomType.replace(/_/g, ' ')}
+                </p>
+                <div className="flex justify-between mt-2">
+                  <span className="font-montserrat text-[12px] text-sett-text-accent">{rt.roomsAllocated} room{rt.roomsAllocated !== 1 ? 's' : ''}</span>
+                  <span className="font-montserrat text-[14px] font-semibold text-sett-text-primary">&euro;{sellPrice.toFixed(2)}</span>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
           {/* Notes / cancel info */}
-          {(best.cancelDeadline || hotel.note) && (
+          {(hotel.cxlDeadline || hotel.note) && (
             <div className="px-3 sm:px-4 pb-3 space-y-1">
-              {best.cancelDeadline && (
+              {hotel.cxlDeadline && (
                 <p className="text-caption text-sett-text-accent">
-                  Cancel before: {new Date(best.cancelDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </p>
               )}
               {hotel.note && (

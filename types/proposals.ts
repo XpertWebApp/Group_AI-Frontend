@@ -50,3 +50,12 @@ export interface AddProposalServicePayload {
 export interface SendProposalPayload {
   sendToEmail?: string;
 }
+
+export interface ApproveProposalPayload {
+  agentEmail?: string;
+  adminNotes?: string;
+}
+
+export interface DeclineProposalPayload {
+  rejectionReason: string;
+}

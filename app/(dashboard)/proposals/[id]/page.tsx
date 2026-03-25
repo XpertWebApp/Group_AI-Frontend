@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
@@ -10,9 +11,11 @@ import { AddHotelModal } from '@/components/forms/AddHotelModal';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { proposalsApi } from '@/lib/api/proposals';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 import type { Proposal, ProposalHotel, ProposalService } from '@/types';
 
 export default function ProposalPage() {
+  const { t } = useLanguage();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -129,7 +132,7 @@ export default function ProposalPage() {
       const axios = await import('axios');
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         const owner = (err.response?.data as { error?: { owner?: string } })?.error?.owner;
-        alert(owner ? `Proposal is locked by another user.` : 'Proposal is locked.');
+        toast.error(owner ? `Proposal is locked by another user.` : 'Proposal is locked.');
       }
     } finally {
       setActionLoading(false);

@@ -15,7 +15,7 @@ interface StepperNavProps {
 
 export function StepperNav({ steps, currentStep }: StepperNavProps) {
   return (
-    <div className="w-full flex justify-center items-center py-5 pl-5 pr-[22px] rounded-[14px] border border-[#E6EAF0] bg-white">
+    <div className="w-full flex justify-center items-center py-5 pl-5 pr-[22px] rounded-[14px] border border-sett-border-light bg-white">
       <div className="flex items-center gap-5 w-full">
         {steps.map((step, i) => {
           const isCompleted = i < currentStep;
@@ -48,7 +48,7 @@ export function StepperNav({ steps, currentStep }: StepperNavProps) {
               <div
                 className={cn(
                   'w-full h-[10px] rounded-[4px]',
-                  isReached ? 'bg-[#AAC737]' : 'bg-[#f0f0f0]'
+                  isReached ? 'bg-sett-primary' : 'bg-[#f0f0f0]'
                 )}
               />
 

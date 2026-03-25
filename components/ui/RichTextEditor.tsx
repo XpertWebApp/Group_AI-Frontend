@@ -47,14 +47,14 @@ function InsertModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="w-[448px] p-5 flex flex-col justify-center items-start gap-6 rounded-[14px] border-2 border-[#E6EAF0] bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
+      <div className="w-[448px] p-5 flex flex-col justify-center items-start gap-6 rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
         <div>
-          <h2 className="font-montserrat text-[18px] font-semibold leading-normal text-[#1D1D1D]">
+          <h2 className="font-montserrat text-[18px] font-semibold leading-normal text-sett-text-primary">
             {title}
           </h2>
         </div>
         <div className="w-full">
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
             {label}
           </label>
           <input
@@ -62,7 +62,7 @@ function InsertModal({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
-            className="w-full p-3 rounded-[14px] border border-[#E6EAF0] bg-white font-montserrat text-[14px] font-normal leading-normal text-[#1D1D1D] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#AAC737]"
+            className="w-full p-3 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:ring-2 focus:ring-sett-primary"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && value.trim()) {
@@ -77,7 +77,7 @@ function InsertModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-[#E6EAF0] bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-[#4A4A4A]"
+            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary"
           >
             Cancel
           </button>
@@ -90,7 +90,7 @@ function InsertModal({
               }
             }}
             disabled={!value.trim()}
-            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-[#AAC737] shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50"
+            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50"
           >
             Insert
           </button>
@@ -162,12 +162,12 @@ export function RichTextEditor({
 
   return (
     <>
-      <div className={cn('border border-[#E6EAF0] rounded-[14px] overflow-hidden', className)}>
+      <div className={cn('border border-sett-border-light rounded-[14px] overflow-hidden', className)}>
         {/* Toolbar */}
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-[#E6EAF0] bg-[#F7F7F7]">
+        <div className="flex items-center gap-1 px-3 py-2 border-b border-sett-border-light bg-[#F7F7F7]">
           {toolbarButtons.map((btn, i) => {
             if ('type' in btn && btn.type === 'separator') {
-              return <span key={`sep-${i}`} className="w-px h-5 bg-[#E6EAF0] mx-1" />;
+              return <span key={`sep-${i}`} className="w-px h-5 bg-sett-border-light mx-1" />;
             }
             const Icon = btn.icon!;
             const handleClick = () => {
@@ -185,7 +185,7 @@ export function RichTextEditor({
                 type="button"
                 onClick={handleClick}
                 title={btn.title}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-[#4A4A4A] hover:bg-[#E6EAF0] transition-colors"
+                className="w-8 h-8 flex items-center justify-center rounded-md text-sett-text-secondary hover:bg-sett-border-light transition-colors"
               >
                 <Icon className="w-[18px] h-[18px]" />
               </button>
@@ -199,7 +199,7 @@ export function RichTextEditor({
           contentEditable
           onInput={handleInput}
           dangerouslySetInnerHTML={{ __html: value }}
-          className="w-full px-4 py-3 font-montserrat text-[14px] font-normal leading-normal text-[#1D1D1D] focus:outline-none bg-white overflow-y-auto"
+          className="w-full px-4 py-3 font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary focus:outline-none bg-white overflow-y-auto"
           style={{ minHeight }}
         />
       </div>

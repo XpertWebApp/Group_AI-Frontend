@@ -19,7 +19,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className={cn("block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5", labelClassName)}>
+          <label className={cn("block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5", labelClassName)}>
             {label.endsWith('*') ? (
               <>
                 {label.slice(0, -1).trimEnd()}{' '}
@@ -35,7 +35,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             type={inputType}
             className={cn(
-              'w-full p-3 rounded-[14px] border border-[#E6EAF0] bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-[#A3A3A3] placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal',
+              'w-full p-3 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal',
               'focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               error ? 'border-red-500' : 'border-sett-border',

@@ -2,39 +2,173 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * ═══════════════════════════════════════════════════════════
+ *  SETT Hub Brand Theme — CSS Variables & Base Styles
+ *  Source: SETT-Hub-Brand-Guidelines-v2.pdf (March 2026)
+ * ═══════════════════════════════════════════════════════════
+ */
+
 :root {
-  --sett-sidebar: #1a2d46;
-  --sett-primary: #6dbe22;
-  --sett-background: #f8f8f8;
+  /* ── Core Brand Colors (guidelines §2) ── */
+  --sett-green: #AAC737;
+  --sett-navy: #071c42;
+  --sett-grey: #686868;
+  --sett-white: #FFFFFF;
+  --sett-black: #0a0a0a;
+  --sett-green-dark: #7a9420;
+  --sett-green-light: #c8e050;
+
+  /* ── Semantic Tokens ── */
+  --sett-primary: #AAC737;
+  --sett-primary-hover: #7a9420;
+  --sett-sidebar: #071c42;
+  --sett-sidebar-border: #14284C;
+  --sett-background: #F8F9FB;
+  --sett-card-bg: #FFFFFF;
+  --sett-border: #E0E0E0;
+  --sett-border-light: #E6EAF0;
+
+  /* ── Text Colors ── */
+  --sett-text-primary: #071c42;
+  --sett-text-secondary: #686868;
+  --sett-text-muted: #A3A3A3;
+
+  /* ── Form Inputs (guidelines §5.5) ── */
+  --sett-input-border: #D0D0D0;
+  --sett-input-focus: #AAC737;
+  --sett-input-error: #CC3333;
+  --sett-input-focus-shadow: 0 0 0 3px rgba(170, 199, 55, 0.15);
+
+  /* ── Table (guidelines §5.2) ── */
+  --sett-table-header-bg: #071c42;
+  --sett-table-alt-row: #F8F9FA;
+  --sett-table-selected-row: #F5F9E8;
+  --sett-table-border: #E0E0E0;
 }
 
+/* ── Base Styles ── */
 body {
-  @apply bg-sett-background text-sett-text-primary antialiased;
+  @apply bg-sett-background antialiased;
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+  color: var(--sett-text-primary);
 }
 
-/* 4px / 8px grid alignment */
+/* ── Grid Utilities ── */
 @layer utilities {
   .grid-4 { @apply gap-1; }
   .grid-8 { @apply gap-2; }
 }
 
-/* Green calendar icon for date inputs */
+/* ── Form Inputs (guidelines §5.5) ── */
+@layer components {
+  /* Primary CTA Button (guidelines §5.1) */
+  .btn-primary {
+    background-color: var(--sett-green);
+    color: var(--sett-navy);
+    font-weight: 700;
+    padding: 14px 32px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+  }
+  .btn-primary:hover {
+    background-color: var(--sett-green-dark);
+  }
+
+  /* Secondary Button (guidelines §5.1) */
+  .btn-secondary {
+    background-color: transparent;
+    color: var(--sett-green);
+    border: 2px solid var(--sett-green);
+    font-weight: 700;
+    padding: 12px 30px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 14px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  .btn-secondary:hover {
+    background-color: var(--sett-green);
+    color: var(--sett-navy);
+  }
+
+  /* Card/Panel (guidelines §5.3) */
+  .sett-card {
+    background: var(--sett-card-bg);
+    border: 1px solid var(--sett-border);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Card with green accent border (guidelines §5.3) */
+  .sett-card-accent {
+    background: var(--sett-card-bg);
+    border: 1px solid var(--sett-border);
+    border-left: 3px solid var(--sett-green);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Table header row (guidelines §5.2) */
+  .sett-table-header {
+    background-color: var(--sett-table-header-bg);
+    color: var(--sett-white);
+    font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  /* Form input base (guidelines §5.5) */
+  .sett-input {
+    border: 1px solid var(--sett-input-border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--sett-text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .sett-input:focus {
+    outline: none;
+    border-color: var(--sett-input-focus);
+    box-shadow: var(--sett-input-focus-shadow);
+  }
+  .sett-input-error {
+    border-color: var(--sett-input-error);
+  }
+
+  /* Form label (guidelines §5.5) */
+  .sett-label {
+    font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--sett-navy);
+  }
+}
+
+/* ── Date Input Styling ── */
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(55%) sepia(60%) saturate(500%) hue-rotate(45deg) brightness(95%);
   cursor: pointer;
 }
 
-/* Style date input placeholder text (mm/dd/yyyy) */
 input[type="date"]::-webkit-datetime-edit-month-field,
 input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-year-field,
 input[type="date"]::-webkit-datetime-edit-text {
-  font-family: 'Montserrat', sans-serif;
+  font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
   font-size: 14px;
   font-weight: 400;
   line-height: normal;
 }
 
 input[type="date"]:invalid::-webkit-datetime-edit {
-  color: #A3A3A3;
+  color: var(--sett-text-muted);
 }

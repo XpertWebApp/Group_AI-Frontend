@@ -170,6 +170,19 @@ export interface HotelBestOption {
   roomDescriptions: string[];
 }
 
+export interface PerTypeAllocation {
+  roomType: string;
+  roomsAllocated: number;
+}
+
+export interface SupplierSplitItem {
+  tid: string;
+  rooms: number;
+  supplierCode: string;
+  sessionId?: string;
+  [key: string]: unknown;
+}
+
 export interface HotelSearchResult {
   hotelCode: string;
   hotelName: string;
@@ -178,18 +191,24 @@ export interface HotelSearchResult {
   address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;
-  sessionId: string;
-  status: 'include' | 'flag' | 'omit';
-  totalAvailableRooms: number;
-  highestMidRangePrice: number;
   currency: string;
-  bestOption: HotelBestOption;
-  usableOptions?: unknown[];
-  selectedOptions?: unknown[];
-  note?: string | null;
+  sellingPricePerRoomPerNight: number;
+  highestMidRangePrice: number;
+  roomsAllocated: number;
+  capacityStatus?: 'CONFIRMED' | 'LIMITED';
+  cxlDeadline?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  // Legacy compat
+  supplierSplit?: SupplierSplitItem[];
+  perTypeAllocations?: PerTypeAllocation[];
+  note?: string | null;
+  // Legacy / backward compat fields
+  sessionId?: string;
+  status?: 'include' | 'flag' | 'omit';
+  totalAvailableRooms?: number;
+  bestOption?: HotelBestOption;
+  usableOptions?: unknown[];
+  selectedOptions?: unknown[];
   name?: string;
 }
 
@@ -258,6 +277,51 @@ export interface CalculatePriceResult {
   buyingPrice: number;
   sellPrice: number;
   markupPercent: number;
+  rawSellPrice?: number;
+  markup?: number;
+  effectiveMarkupPercent?: number;
+}
+
+// ──── Async Hotel Search Types ────
+
+export interface HotelSearchInitResponse {
+  requestId: string;
+  totalCandidates: number;
+  jobsQueued: number;
+  message: string;
+  sseEndpoint: string;
+  statusEndpoint: string;
+}
+
+export interface HotelSearchJobStatus {
+  id: string;
+  hotelCode: string;
+  hotelName: string;
+  status: 'QUEUED' | 'RUNNING' | 'PROBING' | 'COMPLETED' | 'SKIPPED_INSUFFICIENT' | 'FAILED';
+  resultJson?: HotelSearchResult | null;
+}
+
+export interface HotelSearchStatusResponse {
+  requestId: string;
+  summary: {
+    total: number;
+    queued: number;
+    running: number;
+    completed: number;
+    skipped: number;
+    failed: number;
+  };
+  jobs: HotelSearchJobStatus[];
+}
+
+export interface PaginatedResponse<T> {
+  requests: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 // ──── Dashboard Types ────
@@ -273,11 +337,12 @@ export interface Notification {
   id: string;
   type: string;
   title: string;
-  message: string;
+  body: string;
   entityId?: string | null;
   entityType?: string | null;
   read: boolean;
   createdAt: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface ApiResponse<T> {

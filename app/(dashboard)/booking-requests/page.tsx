@@ -102,54 +102,52 @@ export default function BookingRequestsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateRange, setDateRange] = useState('');
   const [page, setPage] = useState(1);
+  const [serverPagination, setServerPagination] = useState<{
+    total: number;
+    totalPages: number;
+  } | null>(null);
 
   const loadRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await requestsApi.list({ limit: 100, sortBy: 'createdAt', sortOrder: 'desc' });
-      setRequests(data);
+      const result = await requestsApi.list({
+        page,
+        limit: PAGE_SIZE,
+        search: search.trim() || undefined,
+        status: statusFilter || undefined,
+        sortBy: 'createdAt',
+        sortOrder: 'desc',
+      });
+      setRequests(result.requests);
+      if (result.pagination) {
+        setServerPagination({
+          total: result.pagination.total,
+          totalPages: result.pagination.totalPages,
+        });
+      }
     } catch {
       // keep empty
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, search, statusFilter]);
 
   useEffect(() => {
     loadRequests();
   }, [loadRequests]);
 
-  /* client-side filtering */
+  /* client-side filtering for dateRange only (not supported by backend) */
   const filtered = useMemo(() => {
-    let list = [...requests];
+    if (!dateRange) return requests;
+    return requests.filter((r) => matchesDateRange(r, dateRange));
+  }, [requests, dateRange]);
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (r) =>
-          customerName(r).toLowerCase().includes(q) ||
-          (r.destinationName ?? '').toLowerCase().includes(q) ||
-          String(r.referenceNumber ?? '').includes(q) ||
-          r.id.toLowerCase().includes(q)
-      );
-    }
-
-    if (statusFilter) {
-      list = list.filter((r) => r.status === statusFilter);
-    }
-
-    if (dateRange) {
-      list = list.filter((r) => matchesDateRange(r, dateRange));
-    }
-
-    return list;
-  }, [requests, search, statusFilter, dateRange]);
-
-  /* pagination */
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  /* pagination — prefer server pagination, fallback to client */
+  const totalPages = serverPagination?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalItems = serverPagination?.total ?? filtered.length;
   const safeCurrentPage = Math.min(page, totalPages);
+  const rows = serverPagination ? filtered : filtered.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
   const start = (safeCurrentPage - 1) * PAGE_SIZE;
-  const rows = filtered.slice(start, start + PAGE_SIZE);
 
   // Reset page when filters change
   useEffect(() => {
@@ -354,8 +352,8 @@ export default function BookingRequestsPage() {
       {!loading && filtered.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
-            {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, filtered.length)} {t.requests.of}{' '}
-            {filtered.length} {t.requests.requestsLabel}
+            {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, totalItems)} {t.requests.of}{' '}
+            {totalItems} {t.requests.requestsLabel}
           </p>
           <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
             <button

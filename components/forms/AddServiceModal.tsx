@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils/cn';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 import type { AddProposalServicePayload } from '@/types/proposals';
 import type { ProposalService } from '@/types';
 
@@ -33,6 +34,7 @@ interface AddServiceModalProps {
 }
 
 export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }: AddServiceModalProps) {
+  const { t } = useLanguage();
   const [serviceName, setServiceName] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
@@ -125,19 +127,19 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={initialData ? 'Edit Service' : 'Add Service'}>
+    <Modal open={open} onClose={onClose} title={initialData ? t.services.editService : t.services.addService}>
       <p className="text-body text-sett-text-accent mb-4">
-        {initialData ? 'Update the service details.' : 'Add a new service to your event.'}
+        {initialData ? t.services.editServiceDesc : t.services.addServiceDesc}
       </p>
       <div className="space-y-4">
         {/* Service Name with dropdown */}
         <div className="relative" ref={dropdownRef}>
           <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-            Service Name
+            {t.services.serviceName}
           </label>
           <input
             type="text"
-            placeholder="Select services"
+            placeholder={t.services.selectServices}
             value={serviceName}
             onChange={(e) => {
               setServiceName(e.target.value);
@@ -149,7 +151,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           {showDropdown && filteredOptions.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-white border border-sett-border rounded-input shadow-lg max-h-48 overflow-y-auto">
               <p className="px-3 py-2 text-label text-sett-text-accent uppercase tracking-wide border-b border-sett-border">
-                List of services
+                {t.services.serviceList}
               </p>
               {filteredOptions.map((opt) => (
                 <button
@@ -182,7 +184,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              Date From
+              {t.services.dateFrom}
             </label>
             <input
               type="date"
@@ -193,7 +195,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           </div>
           <div>
             <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-              Date To
+              {t.services.dateTo}
             </label>
             <input
               type="date"
@@ -207,7 +209,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
         {/* Buy Price / Sell Price */}
         <div className="grid grid-cols-2 gap-4">
           <Input
-            label="Buy Price (&euro;)"
+            label={`${t.services.buyPrice} (\u20AC)`}
             type="number"
             min={0}
             step={0.01}
@@ -216,7 +218,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
             onChange={(e) => handleBuyChange(e.target.value)}
           />
           <Input
-            label="Sell Price (&euro;)"
+            label={`${t.services.sellPrice} (\u20AC)`}
             type="number"
             min={0}
             step={0.01}
@@ -229,7 +231,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
         {/* Markup / Quantity */}
         <div className="grid grid-cols-2 gap-4">
           <Input
-            label="Markup (%)"
+            label={t.services.markupPct}
             type="number"
             min={0}
             step={0.5}
@@ -238,7 +240,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
             onChange={(e) => handleMarkupChange(e.target.value)}
           />
           <Input
-            label="Quantity"
+            label={t.services.quantity}
             type="number"
             min={1}
             value={quantity}
@@ -255,7 +257,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
               onChange={(e) => setIsDay(e.target.checked)}
               className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
             />
-            <span className="text-body text-sett-text-primary font-medium">Day</span>
+            <span className="text-body text-sett-text-primary font-medium">{t.services.day}</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -264,14 +266,14 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
               onChange={(e) => setIsNight(e.target.checked)}
               className="w-4 h-4 rounded border-sett-border text-sett-primary focus:ring-sett-primary"
             />
-            <span className="text-body text-sett-text-primary font-medium">Night</span>
+            <span className="text-body text-sett-text-primary font-medium">{t.services.night}</span>
           </label>
         </div>
       </div>
 
       <div className="flex gap-3 justify-end mt-6">
         <Button variant="secondary" onClick={onClose} disabled={isLoading}>
-          Cancel
+          {t.modals.cancel}
         </Button>
         <Button
           variant="primary"
@@ -279,7 +281,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           isLoading={isLoading}
           disabled={!serviceName.trim()}
         >
-          {initialData ? 'Update Service' : 'Add Service'}
+          {initialData ? t.services.updateService : t.services.addService}
         </Button>
       </div>
     </Modal>

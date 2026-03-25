@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { proposalsApi } from '@/lib/api/proposals';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 
@@ -19,10 +22,25 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 export function ContractPreviewModal({ open, onClose, request, proposal }: ContractPreviewModalProps) {
+  const { t } = useLanguage();
+  const [downloading, setDownloading] = useState(false);
   const hotels = proposal.hotels ?? [];
   const services = proposal.services ?? [];
   const rooms = request.rooms as RoomsConfig | null | undefined;
   const contactName = [request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—';
+
+  const handleDownloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const blobUrl = await proposalsApi.previewPdf(proposal.id);
+      window.open(blobUrl, '_blank');
+    } catch {
+      // fallback to browser print
+      window.print();
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const hotelTotal = hotels.reduce((s, h) => s + Number(h.totalPrice ?? 0), 0);
   const serviceTotal = services.reduce(
@@ -32,30 +50,30 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
   const grandTotal = hotelTotal + serviceTotal;
 
   return (
-    <Modal open={open} onClose={onClose} title="Contract Preview — English" className="max-w-3xl">
+    <Modal open={open} onClose={onClose} title={t.contract.title} className="max-w-3xl">
       <div className="space-y-6 text-body text-sett-text-primary">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-sett-border pb-4">
           <div>
-            <h2 className="text-heading-md font-bold">SETT</h2>
-            <p className="text-caption text-sett-text-accent">Sports Events Tours & Travel</p>
+            <h2 className="text-heading-md font-bold">{t.contract.companyName}</h2>
+            <p className="text-caption text-sett-text-accent">{t.contract.companySubtitle}</p>
           </div>
           <div className="text-right text-caption text-sett-text-secondary">
-            <p>Reservation #{request.referenceNumber ?? request.id.slice(0, 8)}</p>
-            <p>Date: {formatDate(request.createdAt)}</p>
+            <p>{t.contract.reservationNumber}{request.referenceNumber ?? request.id.slice(0, 8)}</p>
+            <p>{t.contract.date}: {formatDate(request.createdAt)}</p>
           </div>
         </div>
 
         {/* S.E.T.T Worldwide Reservation File */}
         <div>
-          <h3 className="text-body font-bold mb-2">S.E.T.T WORLDWIDE RESERVATION FILE</h3>
+          <h3 className="text-body font-bold mb-2">{t.contract.reservationFile}</h3>
           <div className="grid grid-cols-2 gap-4 text-caption">
             <div>
-              <span className="text-sett-text-accent">Reservation Ref.:</span>{' '}
+              <span className="text-sett-text-accent">{t.contract.reservationRef}:</span>{' '}
               <span>{request.referenceNumber ?? request.id.slice(0, 8)}</span>
             </div>
             <div>
-              <span className="text-sett-text-accent">Hotel Category:</span>{' '}
+              <span className="text-sett-text-accent">{t.contract.hotelCategory}:</span>{' '}
               <span>{request.starRating ? `${request.starRating}-Star` : '—'}</span>
             </div>
           </div>
@@ -63,29 +81,29 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
 
         {/* Prepared For */}
         <div className="bg-sett-fill rounded-card p-4">
-          <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">Prepared For</h4>
+          <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">{t.contract.preparedFor}</h4>
           <div className="grid grid-cols-2 gap-2 text-caption">
-            <div><span className="text-sett-text-accent">Contact:</span> {contactName}</div>
-            <div><span className="text-sett-text-accent">Email:</span> {request.contactEmail ?? '—'}</div>
-            <div><span className="text-sett-text-accent">Company:</span> {request.companyName ?? '—'}</div>
-            <div><span className="text-sett-text-accent">Phone:</span> {request.contactPhone ?? '—'}</div>
+            <div><span className="text-sett-text-accent">{t.contract.contact}:</span> {contactName}</div>
+            <div><span className="text-sett-text-accent">{t.contract.email}:</span> {request.contactEmail ?? '—'}</div>
+            <div><span className="text-sett-text-accent">{t.contract.company}:</span> {request.companyName ?? '—'}</div>
+            <div><span className="text-sett-text-accent">{t.contract.phone}:</span> {request.contactPhone ?? '—'}</div>
           </div>
         </div>
 
         {/* Trip Details */}
         <div>
-          <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">Trip Details</h4>
+          <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">{t.contract.tripDetails}</h4>
           <div className="grid grid-cols-3 gap-2 text-caption">
-            <div><span className="text-sett-text-accent">Destination:</span> {request.destinationName ?? '—'}</div>
-            <div><span className="text-sett-text-accent">Check-in:</span> {formatDate(request.checkinDate)}</div>
-            <div><span className="text-sett-text-accent">Check-out:</span> {formatDate(request.checkoutDate)}</div>
+            <div><span className="text-sett-text-accent">{t.contract.destination}:</span> {request.destinationName ?? '—'}</div>
+            <div><span className="text-sett-text-accent">{t.contract.checkIn}:</span> {formatDate(request.checkinDate)}</div>
+            <div><span className="text-sett-text-accent">{t.contract.checkOut}:</span> {formatDate(request.checkoutDate)}</div>
           </div>
         </div>
 
         {/* Hotel Details */}
         {hotels.length > 0 && (
           <div>
-            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">Hotel Details</h4>
+            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">{t.contract.hotelDetails}</h4>
             {hotels.map((hotel, idx) => {
               const roomEntries = hotel.rooms
                 ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
@@ -99,12 +117,12 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                     <table className="w-full text-caption border border-sett-border">
                       <thead>
                         <tr className="bg-sett-fill">
-                          <th className="text-left px-2 py-1 border-b border-sett-border">Room Type</th>
-                          <th className="text-right px-2 py-1 border-b border-sett-border">Net</th>
-                          <th className="text-right px-2 py-1 border-b border-sett-border">Sell</th>
-                          <th className="text-right px-2 py-1 border-b border-sett-border">Qty</th>
-                          <th className="text-right px-2 py-1 border-b border-sett-border">Nights</th>
-                          <th className="text-right px-2 py-1 border-b border-sett-border">Total</th>
+                          <th className="text-left px-2 py-1 border-b border-sett-border">{t.contract.roomType}</th>
+                          <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.net}</th>
+                          <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.sell}</th>
+                          <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.qty}</th>
+                          <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.nights}</th>
+                          <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.total}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -137,15 +155,15 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
         {/* Service Details */}
         {services.length > 0 && (
           <div>
-            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">Service Details</h4>
+            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">{t.contract.serviceDetails}</h4>
             <table className="w-full text-caption border border-sett-border">
               <thead>
                 <tr className="bg-sett-fill">
-                  <th className="text-left px-2 py-1 border-b border-sett-border">Service</th>
-                  <th className="text-right px-2 py-1 border-b border-sett-border">Qty</th>
-                  <th className="text-right px-2 py-1 border-b border-sett-border">Buy</th>
-                  <th className="text-right px-2 py-1 border-b border-sett-border">Sell</th>
-                  <th className="text-right px-2 py-1 border-b border-sett-border">Total</th>
+                  <th className="text-left px-2 py-1 border-b border-sett-border">{t.contract.service}</th>
+                  <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.qty}</th>
+                  <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.buy}</th>
+                  <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.sell}</th>
+                  <th className="text-right px-2 py-1 border-b border-sett-border">{t.contract.total}</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,14 +185,14 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
 
         {/* Grand Total */}
         <div className="bg-sett-fill rounded-card p-4 flex justify-between items-center">
-          <span className="font-bold">Grand Total</span>
+          <span className="font-bold">{t.contract.grandTotal}</span>
           <span className="text-heading-sm font-bold">&euro;{grandTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
         </div>
 
         {/* Cancellation Conditions */}
         {request.cancellationConditions && (
           <div>
-            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">Cancellation Conditions</h4>
+            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">{t.contract.cancellationConditions}</h4>
             <p className="text-caption text-sett-text-secondary whitespace-pre-line">{request.cancellationConditions}</p>
           </div>
         )}
@@ -182,7 +200,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
         {/* Terms & Conditions */}
         {request.termsAndConditions && (
           <div>
-            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">Terms & Conditions</h4>
+            <h4 className="text-label font-bold text-sett-text-primary uppercase tracking-wide mb-2">{t.contract.termsConditions}</h4>
             <p className="text-caption text-sett-text-secondary whitespace-pre-line">{request.termsAndConditions}</p>
           </div>
         )}
@@ -190,10 +208,10 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
 
       <div className="flex gap-3 justify-end mt-6 border-t border-sett-border pt-4">
         <Button variant="secondary" onClick={onClose}>
-          Close
+          {t.modals.close}
         </Button>
-        <Button variant="primary" onClick={() => window.print()}>
-          Download PDF
+        <Button variant="primary" onClick={handleDownloadPdf} isLoading={downloading}>
+          {t.modals.downloadPdf}
         </Button>
       </div>
     </Modal>

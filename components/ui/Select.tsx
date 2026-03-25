@@ -14,15 +14,19 @@ interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>
   error?: string;
   options: SelectOption[];
   placeholder?: string;
+  /** Compact filter variant — shorter height, tighter padding, subtle fill */
+  variant?: 'default' | 'filter';
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, placeholder, value, ...props }, ref) => {
+  ({ className, label, error, options, placeholder, value, variant = 'default', ...props }, ref) => {
     const isPlaceholder = !value || value === '';
+    const isFilter = variant === 'filter';
+
     return (
       <div>
         {label && (
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-[#1D1D1D] uppercase mb-1.5">
+          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
             {label.endsWith('*') ? (
               <>
                 {label.slice(0, -1).trimEnd()}{' '}
@@ -38,17 +42,23 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             ref={ref}
             value={value}
             className={cn(
-              'w-full p-3 rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal appearance-none pr-9',
-              isPlaceholder ? 'text-[#A3A3A3]' : 'text-sett-text-primary',
+              'w-full rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal appearance-none cursor-pointer',
+              isFilter ? 'py-[10px] pl-3 pr-8' : 'p-3 pr-9',
+              isPlaceholder ? 'text-sett-text-accent' : 'text-sett-text-primary',
               'focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent',
               'disabled:opacity-50 disabled:cursor-not-allowed',
-              error ? 'border-red-500' : 'border-[#E6EAF0]',
+              'transition-colors duration-150',
+              error
+                ? 'border-red-500'
+                : isFilter
+                  ? 'border-sett-border hover:border-sett-primary/40'
+                  : 'border-sett-border-light',
               className
             )}
             {...props}
           >
             {placeholder && (
-              <option value="" disabled className="text-[#A3A3A3]">
+              <option value="" disabled className="text-sett-text-accent">
                 {placeholder}
               </option>
             )}
@@ -58,7 +68,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-muted pointer-events-none" />
+          <ChevronDown
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 pointer-events-none transition-colors',
+              isFilter
+                ? 'right-2.5 w-3.5 h-3.5 text-sett-text-secondary'
+                : 'right-3 w-4 h-4 text-sett-text-muted'
+            )}
+          />
         </div>
         {error && <p className="mt-1 text-caption text-red-500">{error}</p>}
       </div>

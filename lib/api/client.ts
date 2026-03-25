@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import toast from 'react-hot-toast';
 import type { ApiError } from '@/types';
 
 const baseURL =
@@ -56,6 +57,12 @@ apiClient.interceptors.response.use(
       } else if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
+    }
+    // Show toast for API errors (skip 401s which are handled above)
+    if (typeof window !== 'undefined' && error.response?.status !== 401) {
+      const apiError = error.response?.data?.error;
+      const message = apiError?.message || error.message || 'An unexpected error occurred';
+      toast.error(message);
     }
     return Promise.reject(error);
   }
