@@ -23,10 +23,10 @@ export function RoomCounter({ label, value, onChange, max }: RoomCounterProps) {
           onClick={() => onChange(Math.max(0, value - 1))}
           disabled={value === 0}
           className={cn(
-            'w-7 h-7 rounded-[14px] flex items-center justify-center border-[0.8px] border-sett-primary transition-colors',
+            'w-7 h-7 rounded-[14px] flex items-center justify-center border-[0.8px] border-sett-primary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
             value === 0
               ? 'opacity-40 cursor-not-allowed'
-              : 'text-sett-primary hover:bg-sett-light-green-bg'
+              : 'text-sett-primary hover:bg-sett-light-green-bg hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]'
           )}
         >
           <Minus className="w-3.5 h-3.5" />
@@ -39,10 +39,10 @@ export function RoomCounter({ label, value, onChange, max }: RoomCounterProps) {
           onClick={() => onChange(value + 1)}
           disabled={isMaxReached}
           className={cn(
-            'w-7 h-7 rounded-[14px] flex items-center justify-center border-[0.8px] border-sett-primary transition-colors',
+            'w-7 h-7 rounded-[14px] flex items-center justify-center border-[0.8px] border-sett-primary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
             isMaxReached
               ? 'opacity-40 cursor-not-allowed bg-sett-primary text-white'
-              : 'bg-sett-primary text-white shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] hover:bg-sett-primary-hover'
+              : 'bg-sett-primary text-white shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] hover:bg-sett-primary-hover hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]'
           )}
         >
           <Plus className="w-3.5 h-3.5" />

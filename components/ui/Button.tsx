@@ -59,7 +59,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         type={type}
         disabled={disabled || isLoading}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-button focus:outline-none focus:ring-2 focus:ring-sett-primary focus:ring-offset-2',
+          'inline-flex items-center justify-center gap-2 rounded-button focus:outline-none focus:ring-2 focus:ring-sett-primary focus:ring-offset-2 transition-transform duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]',
           variantClasses[variant],
           sizeClasses[size],
           fullWidth && 'w-full',
