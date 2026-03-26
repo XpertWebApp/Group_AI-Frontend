@@ -3,7 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal } from 'lucide-react';
+import {
+  ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal,
+  Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
+  Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
+  Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
+  WashingMachine, Dog, Flower2, TreePine, type LucideIcon,
+} from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { PageLoader, Spinner } from '@/components/ui/Loader';
@@ -21,6 +27,56 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 type SearchPhase = 'idle' | 'searching' | 'polling' | 'done' | 'error';
 
 const POLL_INTERVAL_MS = 3000;
+
+/** Map amenity name (lowercased) to a Lucide icon */
+const AMENITY_ICON_MAP: Record<string, LucideIcon> = {
+  'air conditioning': Snowflake,
+  'bar': Wine,
+  'bathroom with bath': Bath,
+  'bathroom with shower': ShowerHead,
+  'business center': Briefcase,
+  'business centre': Briefcase,
+  'disabled access': Accessibility,
+  'internet': Wifi,
+  'wi-fi': Wifi,
+  'wifi': Wifi,
+  'free wifi': Wifi,
+  'non smoking rooms': CigaretteOff,
+  'non-smoking rooms': CigaretteOff,
+  'smoking rooms': Cigarette,
+  'parking': ParkingSquare,
+  'restaurant': UtensilsCrossed,
+  'safe': ShieldCheck,
+  'tv cable / satellite': Tv,
+  'tv cable/satellite': Tv,
+  'tea / coffee facilities': Coffee,
+  'tea/coffee facilities': Coffee,
+  'lounge area': Sofa,
+  'lounge': Sofa,
+  'gym': Dumbbell,
+  'fitness': Dumbbell,
+  'fitness center': Dumbbell,
+  'fitness centre': Dumbbell,
+  'gym / fitness centre': Dumbbell,
+  'gym / fitness center': Dumbbell,
+  'gym/fitness centre': Dumbbell,
+  'gym/fitness center': Dumbbell,
+  'swimming pool': Waves,
+  'pool': Waves,
+  'spa': Sparkles,
+  'laundry': WashingMachine,
+  'laundry service': WashingMachine,
+  'pets allowed': Dog,
+  'pet friendly': Dog,
+  'garden': Flower2,
+  'terrace': TreePine,
+  'concierge': ConciergeBell,
+  'room service': ConciergeBell,
+};
+
+function getAmenityIcon(name: string): LucideIcon | null {
+  return AMENITY_ICON_MAP[name.toLowerCase().trim()] ?? null;
+}
 
 export default function AddHotelPage() {
   const params = useParams();
@@ -661,24 +717,30 @@ export default function AddHotelPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => (
-                      <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
-                        <span className={cn(
-                          'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                          amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
-                        )}
-                          onClick={() => toggleAmenity(facility.id)}
-                        >
-                          {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
-                        </span>
-                        <span className="font-montserrat text-[14px] text-sett-text-secondary">
-                          {facility.name}
-                          {facility.hotelCount !== undefined && (
-                            <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
+                    {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
+                      const AmenityIcon = getAmenityIcon(facility.name);
+                      return (
+                        <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                          <span className={cn(
+                            'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                            amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
                           )}
-                        </span>
-                      </label>
-                    ))}
+                            onClick={() => toggleAmenity(facility.id)}
+                          >
+                            {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                          </span>
+                          {AmenityIcon && (
+                            <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
+                          )}
+                          <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                            {facility.name}
+                            {facility.hotelCount !== undefined && (
+                              <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -782,6 +844,11 @@ function HotelResultCard({
               (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
           />
+          {(hotel.supplierSplit?.[0]?.supplierCode ?? hotel.bestOption?.supplierCode) && (
+            <span className="absolute bottom-0 right-0 rounded-tl-[14px] bg-[#F7F7F7] px-3 py-2 font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+              {hotel.supplierSplit?.[0]?.supplierCode ?? hotel.bestOption?.supplierCode}
+            </span>
+          )}
         </div>
 
         {/* ── Hotel Details ── */}

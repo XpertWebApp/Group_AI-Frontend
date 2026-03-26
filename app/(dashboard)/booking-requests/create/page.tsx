@@ -356,15 +356,7 @@ export default function CreateBookingRequestPage() {
                 {t.common.next}
               </button>
             ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-primary bg-white font-montserrat text-[16px] font-semibold leading-normal text-sett-primary transition-colors duration-200 hover:bg-sett-primary hover:text-sett-navy"
-                >
-                  {t.createForm.addHotels}
-                </button>
-                <button
+              <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
@@ -372,7 +364,6 @@ export default function CreateBookingRequestPage() {
                 >
                   {isSubmitting ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t.createForm.createRequestBtn}
                 </button>
-              </>
             )}
           </div>
         </div>
