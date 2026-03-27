@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Header } from '@/components/layout/Header';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { StepperNav } from '@/components/ui/StepperNav';
@@ -394,6 +393,41 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-caption text-red-500">{message}</p>;
 }
 
+interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  hasError?: boolean;
+}
+
+const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
+  ({ hasError, value, onClick, onChange, placeholder }, ref) => (
+    <div className="relative w-full">
+      <input
+        ref={ref}
+        value={value as string}
+        onClick={onClick}
+        onChange={onChange}
+        placeholder={placeholder}
+        readOnly
+        className={cn(
+          inputClass(!!hasError),
+          'w-full pr-10 cursor-pointer'
+        )}
+      />
+      <span
+        onClick={onClick}
+        className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAC737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </span>
+    </div>
+  )
+);
+DateInput.displayName = 'DateInput';
+
 function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const { t } = useLanguage();
   const [destQuery, setDestQuery] = useState(formData.destination);
@@ -523,10 +557,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 placeholderText="MM/DD/YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
-                className={cn(inputClass(!!errors.checkInDate), 'w-full cursor-pointer')}
                 wrapperClassName="w-full"
                 todayButton="Today"
                 showPopperArrow={false}
+                customInput={<DateInput hasError={!!errors.checkInDate} />}
               />
             </div>
             <FieldError message={errors.checkInDate} />
@@ -545,10 +579,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 placeholderText="MM/DD/YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
-                className={cn(inputClass(!!errors.checkOutDate), 'w-full cursor-pointer')}
                 wrapperClassName="w-full"
                 todayButton="Today"
                 showPopperArrow={false}
+                customInput={<DateInput hasError={!!errors.checkOutDate} />}
               />
             </div>
             <FieldError message={errors.checkOutDate} />
