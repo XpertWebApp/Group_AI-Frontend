@@ -28,11 +28,13 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
 
+  const isAdmin = user?.role === 'ADMIN';
+
   const navItems = [
     { href: '/dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
     { href: '/booking-requests', label: t.nav.groupRequests, icon: Users },
     { href: '/booking-requests/create', label: t.nav.createRequest, icon: PlusCircle },
-    { href: '/settings', label: t.nav.settings, icon: Settings },
+    ...(isAdmin ? [{ href: '/settings', label: t.nav.settings, icon: Settings }] : []),
   ];
 
   const displayName =

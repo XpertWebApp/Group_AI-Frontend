@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { hotelsApi } from '@/lib/api/hotels';
 import type { HotelSearchResult } from '@/types';
 import type { AddProposalHotelPayload } from '@/types/proposals';
@@ -105,15 +106,17 @@ export function AddHotelModal({ open, onClose, onAdd, isLoading }: AddHotelModal
               onChange={(e) => setTotalPrice(e.target.value)}
             />
             <div className="flex gap-2">
-              <select
+              <Select
+                variant="filter"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="px-3 py-2.5 rounded-input border border-sett-border bg-white text-body"
-              >
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="USD">USD</option>
-              </select>
+                options={[
+                  { value: 'EUR', label: 'EUR' },
+                  { value: 'GBP', label: 'GBP' },
+                  { value: 'USD', label: 'USD' },
+                ]}
+                className="w-[100px]"
+              />
             </div>
           </div>
         )}

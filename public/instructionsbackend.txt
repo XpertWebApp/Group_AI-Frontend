@@ -1,170 +1,73 @@
-Frontend Integration Guide — Dynamic Amenities (Facilities)
-Overview
-The amenities/facilities filter on the "Add Hotel" page is now fully dynamic. The backend provides:
-
-A list of available amenities per destination (for the sidebar)
-Amenity-based hotel filtering during search
-Per-hotel amenity data in each search result
-1. Load Amenities for the Filter Sidebar
-When: As soon as the "Add Hotel" page opens (you already know the destinationId from the booking request).
-
-Endpoint:
-
-
-GET /api/v1/hotels/facilities/by-destination/{destinationId}
-Example:
-
-
-GET /api/v1/hotels/facilities/by-destination/4621
-Response:
+Frontend: Role-Based Settings Visibility
+How It Works
+The login response (POST /api/v1/auth/login) already returns the user's role:
 
 
 {
-  "success": true,
-  "message": "Facilities for destination retrieved",
-  "data": {
-    "facilities": [
-      { "id": 64, "name": "Swimming pool", "hotelCount": 312 },
-      { "id": 8388608, "name": "Spa", "hotelCount": 185 },
-      { "id": 32, "name": "Gym / fitness centre", "hotelCount": 274 },
-      { "id": 512, "name": "Restaurant", "hotelCount": 410 },
-      { "id": 2097152, "name": "Free WiFi", "hotelCount": 489 },
-      { "id": 16, "name": "Bar", "hotelCount": 298 }
-    ]
+  "user": {
+    "id": "uuid",
+    "email": "admin@sett.ai",
+    "firstName": "Admin",
+    "lastName": null,
+    "role": "ADMIN"
+  },
+  "tokens": {
+    "accessToken": "...",
+    "refreshToken": "..."
   }
 }
-What each field means:
+The role field is either "ADMIN" or "USER".
 
-Field	Type	Description
-id	number	Unique facility ID — use this when sending filter requests
-name	string	Display label for the checkbox (e.g. "Swimming pool")
-hotelCount	number	How many hotels in this destination have this facility — useful for showing counts like "Pool (312)"
-Usage:
+The same role is also embedded in the JWT access token payload ({ id, email, role }), so you can decode it client-side if needed.
 
-Replace the current hardcoded amenity list (Free Cancellation, Pool, Spa, Gym, Restaurant, WiFi) with this dynamic list.
-Each item becomes a checkbox in the sidebar.
-The list is already sorted alphabetically by the backend.
-hotelCount is optional to display — but helpful to show users which filters are useful (e.g. grey out or hide amenities with 0 hotels).
-Note: If you ever need the full list of all amenities regardless of destination (e.g. for a global settings page), use GET /api/v1/hotels/facilities instead.
+What to Do
+1. Store the role after login
 
-2. Pass Selected Amenities to Hotel Search
-When: User clicks "Search" or triggers the hotel search (the existing POST call you already make).
+When the user logs in, store user.role alongside the tokens (in your auth context/store).
 
-Endpoint (unchanged — just add one new field):
+2. Hide the Settings nav item for Staff users
+
+In the sidebar navigation, conditionally render the "Settings" link:
 
 
-POST /api/v1/requests/{requestId}/hotel-search
-Updated Request Body:
+// Only show Settings for admin users
+{user.role === 'ADMIN' && (
+  <NavItem to="/settings" icon={SettingsIcon} label="Settings" />
+)}
+3. Protect the Settings route
+
+Add a route guard so Staff users can't manually navigate to /settings via URL:
 
 
-{
-  "mealType": "BB",
-  "includeAlternativeStars": true,
-  "facilityIds": [64, 8388608, 32]
-}
-The new field:
-
-Field	Type	Required	Description
-facilityIds	number[]	No	Array of facility IDs the user checked. Only hotels that have ALL selected facilities will be searched. Omit or send [] to skip filtering.
-How it works:
-
-This is AND logic — if the user selects Pool + Spa + WiFi, only hotels that have all three will be probed.
-If facilityIds is omitted or empty, all hotels are searched (same as before — fully backward compatible).
-The filtering happens before probe jobs are dispatched, so it also speeds up the search (fewer hotels to probe).
-Example — no amenities selected (same as before):
-
-
-{
-  "mealType": "BB"
-}
-Example — user selected Pool and Spa:
-
-
-{
-  "mealType": "BB",
-  "facilityIds": [64, 8388608]
-}
-3. Display Per-Hotel Amenities on Result Cards
-When: You receive an SSE hotelProbeCompleted event (the same events you already listen to).
-
-What changed: Each result object in the hotelProbeCompleted event now includes a facilities array.
-
-SSE Event Payload (updated):
-
-
-{
-  "hotelCode": "HPG_DXB_12345",
-  "status": "CONFIRMED",
-  "roomsFound": 8,
-  "capacityVerificationRequired": false,
-  "result": {
-    "hotelCode": "HPG_DXB_12345",
-    "hotelName": "La Suite Dubai Hotel & Apartments",
-    "starRating": 4,
-    "imageUrl": "/api/v1/hotels/image?key=abc123...",
-    "addressCity": "Dubai",
-    "addressCountry": "AE",
-    "roomsFound": 8,
-    "roomsAllocated": 8,
-    "highestMidRangePrice": 38.00,
-    "sellingPricePerRoomPerNight": 44,
-    "currency": "EUR",
-    "facilities": [
-      { "id": 64, "name": "Swimming pool" },
-      { "id": 8388608, "name": "Spa" },
-      { "id": 32, "name": "Gym / fitness centre" },
-      { "id": 512, "name": "Restaurant" },
-      { "id": 2097152, "name": "Free WiFi" },
-      { "id": 16, "name": "Bar" },
-      { "id": 4, "name": "Air conditioning" },
-      { "id": 256, "name": "Parking" }
-    ],
-    "supplierSplit": [ ... ],
-    "perTypeAllocations": [ ... ]
+// Route guard component
+function AdminRoute({ children }) {
+  const { user } = useAuth();
+  if (user.role !== 'ADMIN') {
+    return <Navigate to="/dashboard" replace />;
   }
+  return children;
 }
-The facilities array:
 
-Field	Type	Description
-id	number	Facility ID (same IDs used in filter)
-name	string	Display name
-Usage:
+// In your router
+<Route path="/settings/*" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+4. Backend enforcement (already done)
 
-Show amenity icons/tags on each hotel result card (e.g. small icons for Pool, WiFi, Spa below the hotel name).
-You can match facility.id to your icon map for rendering specific icons.
-If facilities is empty ([]), the hotel has no synced amenity data — show nothing or a placeholder.
-4. Suggested Icon Mapping
-Here are all 24 facility IDs currently in the system. Map these to your icon library:
+Even if a Staff user somehow reaches the settings page, every /api/v1/settings/* endpoint returns:
 
-ID	Name	Suggested Icon
-1	Lounge Area	sofa / lounge
-2	Disabled access	wheelchair / accessible
-4	Air conditioning	snowflake / ac
-8	Cots available	baby / crib
-16	Bar	wine-glass / bar
-32	Gym / fitness centre	dumbbell / gym
-64	Swimming pool	pool / water
-128	Pets Are Welcome	paw / pet
-256	Parking	car / parking
-512	Restaurant	utensils / restaurant
-1024	Telephone	phone
-2048	Mini Bar	glass / minibar
-4096	Iron/Ironing board	iron
-8192	TV Cable / Satellite	tv
-16384	Safe	lock / safe
-32768	Tea / Coffee Facilities	coffee
-65536	Bathroom with Bath	bath
-131072	Bathroom with Shower	shower
-262144	Non smoking rooms	no-smoking
-524288	Smoking rooms	smoking
-1048576	Internet	wifi / globe
-2097152	Free WiFi	wifi
-8388608	Spa	spa / hot-tub
-16777216	Business Center	briefcase / business
-5. Quick Checklist
- Replace hardcoded amenity list with GET /api/v1/hotels/facilities/by-destination/{destinationId} call on page load
- Store selected facility IDs in component state
- Pass facilityIds array in the POST /api/v1/requests/:id/hotel-search body
- Read result.facilities from each hotelProbeCompleted SSE event
- Render amenity icons/tags on hotel result cards
- (Optional) Show hotelCount next to each filter checkbox
+
+{
+  "success": false,
+  "data": null,
+  "message": "Admin access required",
+  "error": "FORBIDDEN"
+}
+Status code: 403
+
+Role Mapping Reference
+role value	Display label	Settings access	All other pages
+ADMIN	"Admin"	Full access	Full access
+USER	"Staff"	Hidden / 403	Full access
+Summary
+Check user.role === 'ADMIN' to show/hide the Settings nav item
+Add a route guard on /settings/* that redirects Staff to /dashboard
+The backend already blocks all settings APIs with 403 for non-admin users — this is just the UI layer to match

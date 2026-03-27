@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -511,28 +513,44 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkInDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
             </label>
-            <input
-              type="date"
-              min={new Date().toISOString().split('T')[0]}
-              max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
-              value={formData.checkInDate}
-              onChange={(e) => updateField('checkInDate', e.target.value)}
-              className={cn(inputClass(!!errors.checkInDate), !formData.checkInDate && 'text-sett-text-accent')}
-            />
+            <div className="sett-datepicker">
+              <DatePicker
+                selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
+                onChange={(date: Date | null) => updateField('checkInDate', date ? date.toISOString().split('T')[0] : '')}
+                minDate={new Date()}
+                maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                dateFormat="MM/dd/yyyy"
+                placeholderText="MM/DD/YYYY"
+                popperClassName="sett-datepicker-popper"
+                popperPlacement="bottom-end"
+                className={cn(inputClass(!!errors.checkInDate), 'w-full cursor-pointer')}
+                wrapperClassName="w-full"
+                todayButton="Today"
+                showPopperArrow={false}
+              />
+            </div>
             <FieldError message={errors.checkInDate} />
           </div>
           <div>
             <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkOutDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
             </label>
-            <input
-              type="date"
-              min={formData.checkInDate || new Date().toISOString().split('T')[0]}
-              max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
-              value={formData.checkOutDate}
-              onChange={(e) => updateField('checkOutDate', e.target.value)}
-              className={cn(inputClass(!!errors.checkOutDate), !formData.checkOutDate && 'text-sett-text-accent')}
-            />
+            <div className="sett-datepicker">
+              <DatePicker
+                selected={formData.checkOutDate ? new Date(formData.checkOutDate) : null}
+                onChange={(date: Date | null) => updateField('checkOutDate', date ? date.toISOString().split('T')[0] : '')}
+                minDate={formData.checkInDate ? new Date(formData.checkInDate) : new Date()}
+                maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                dateFormat="MM/dd/yyyy"
+                placeholderText="MM/DD/YYYY"
+                popperClassName="sett-datepicker-popper"
+                popperPlacement="bottom-end"
+                className={cn(inputClass(!!errors.checkOutDate), 'w-full cursor-pointer')}
+                wrapperClassName="w-full"
+                todayButton="Today"
+                showPopperArrow={false}
+              />
+            </div>
             <FieldError message={errors.checkOutDate} />
           </div>
         </div>
