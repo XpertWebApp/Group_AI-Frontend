@@ -103,7 +103,7 @@ export function Select({
         disabled={disabled}
         className={cn(
           'w-full flex items-center justify-between rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal cursor-pointer',
-          isFilter ? 'py-[10px] pl-3 pr-3' : 'p-3 pr-3',
+          isFilter ? 'h-[41px] p-3' : 'p-3 pr-3',
           isPlaceholder ? 'text-sett-text-accent' : 'text-sett-text-primary',
           'transition-all duration-150',
           'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -112,7 +112,7 @@ export function Select({
             : error
               ? 'border-red-500'
               : isFilter
-                ? 'border-sett-border hover:border-sett-primary/40'
+                ? 'border-[#68686833] hover:border-sett-primary/40'
                 : 'border-sett-border-light hover:border-sett-primary/40',
         )}
       >
