@@ -61,7 +61,7 @@ export default function DashboardPage() {
       {loading ? (
         <StatCardSkeleton cards={4} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {STAT_CARDS.map((card) => {
             const raw = stats?.[card.key] ?? (card.key === 'pending' ? stats?.pendingRequests : undefined);
             // Handle both flat number and nested { value, vsLastMonth } formats
@@ -92,7 +92,7 @@ export default function DashboardPage() {
       {/* Recent Offers Section */}
       <section>
         <div className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] border border-sett-border-light overflow-hidden">
-          <div className="flex justify-between items-start p-5 border-b border-sett-border-light">
+          <div className="flex flex-col gap-3 p-5 border-b border-sett-border-light sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
               <div>
@@ -104,15 +104,15 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link href="/booking-requests">
-                <Button variant="outline" size="sm">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Link href="/booking-requests" className="flex-1 sm:flex-none">
+                <Button variant="outline" size="sm" fullWidth>
                   <Eye className="w-4 h-4" />
                   {t.dashboard.viewAll}
                 </Button>
               </Link>
-              <Link href="/booking-requests/create">
-                <Button variant="primary" size="sm">
+              <Link href="/booking-requests/create" className="flex-1 sm:flex-none">
+                <Button variant="primary" size="sm" fullWidth>
                   <Plus className="w-4 h-4" />
                   {t.dashboard.createRequest}
                 </Button>
@@ -122,10 +122,10 @@ export default function DashboardPage() {
           {/* Loading skeleton */}
           {loading && (
             <>
-              <div className="hidden md:block">
+              <div className="hidden xl:block">
                 <TableSkeleton rows={5} columns={8} />
               </div>
-              <div className="md:hidden">
+              <div className="xl:hidden">
                 <CardSkeleton cards={4} />
               </div>
             </>
@@ -140,8 +140,8 @@ export default function DashboardPage() {
 
           {/* Desktop table */}
           {!loading && offers.length > 0 && (
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full min-w-[1200px]">
+            <div className="hidden xl:block overflow-x-auto">
+              <table className="w-full min-w-[900px]">
                 <thead>
                   <tr className="h-[57px] border-t border-b border-sett-border-light">
                     <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.offerId}</th>
@@ -188,14 +188,14 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Mobile card view */}
+          {/* Mobile/Tablet card view */}
           {!loading && offers.length > 0 && (
-            <div className="md:hidden divide-y divide-sett-border">
+            <div className="xl:hidden p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
               {offers.map((row) => (
                 <Link
                   key={row.id}
                   href={`/booking-requests/${row.requestId ?? row.id}`}
-                  className="block p-4 hover:bg-sett-background/50 transition-colors"
+                  className="block p-4 rounded-[14px] border border-sett-border-light hover:bg-sett-background/50 hover:border-sett-primary/30 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-body font-semibold text-sett-text-primary">

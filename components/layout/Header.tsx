@@ -48,7 +48,15 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <LanguageToggle />
+        {/* Language Toggle */}
+        <div className="relative group">
+          <LanguageToggle />
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-sett-navy text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md z-50">
+            Switch Language
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-sett-navy" />
+          </span>
+        </div>
+
         {onRefresh && (
           <button
             type="button"
@@ -57,30 +65,47 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
             aria-label="Refresh"
           />
         )}
-        <button
-          type="button"
-          onClick={() => setNotificationsOpen(true)}
-          className="relative p-2 rounded-lg hover:bg-sett-border/50 transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5 text-sett-text-secondary" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sett-primary opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sett-primary" />
-            </span>
-          )}
-        </button>
-        {onLogoutClick && (
+
+        {/* Notifications */}
+        <div className="relative group">
           <button
             type="button"
-            onClick={onLogoutClick}
-            className="p-2 rounded-lg hover:bg-sett-border/50 transition-colors text-sett-text-secondary hover:text-sett-text-primary"
-            aria-label="Logout"
+            onClick={() => setNotificationsOpen(true)}
+            className="relative p-2 rounded-lg hover:bg-sett-border/50 transition-colors"
+            aria-label="Notifications"
           >
-            <LogOut className="w-5 h-5" />
+            <Bell className="w-5 h-5 text-sett-text-secondary" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sett-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sett-primary" />
+              </span>
+            )}
           </button>
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-sett-navy text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md z-50">
+            Notifications
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-sett-navy" />
+          </span>
+        </div>
+
+        {/* Logout */}
+        {onLogoutClick && (
+          <div className="relative group">
+            <button
+              type="button"
+              onClick={onLogoutClick}
+              className="p-2 rounded-lg hover:bg-sett-border/50 transition-colors text-sett-text-secondary hover:text-sett-text-primary"
+              aria-label="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+            <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-sett-navy text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md z-50">
+              Logout
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-sett-navy" />
+            </span>
+          </div>
         )}
+
         {actions}
       </div>
       </div>

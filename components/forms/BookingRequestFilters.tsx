@@ -29,8 +29,10 @@ export function BookingRequestFilters({
     { value: '', label: t.requests.allStatus },
     { value: 'pending', label: t.requests.pending },
     { value: 'draft', label: t.requests.draft },
-    { value: 'sent', label: t.requests.sent },
-    { value: 'declined', label: t.requests.declined },
+    { value: 'processing', label: t.requests.processing },
+    { value: 'ai_generated', label: t.requests.aiGenerated },
+    { value: 'completed', label: t.requests.completed },
+    { value: 'cancelled', label: t.requests.cancelled },
   ];
 
   const dateOptions = [

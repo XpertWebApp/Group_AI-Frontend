@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { Header } from '@/components/layout/Header';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { StepperNav } from '@/components/ui/StepperNav';
@@ -392,6 +393,34 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-caption text-red-500">{message}</p>;
 }
 
+interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  hasError?: boolean;
+}
+const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
+  ({ hasError, value, onClick, placeholder }, ref) => (
+    <div className="relative w-full">
+      <input
+        ref={ref}
+        value={value as string}
+        onClick={onClick}
+        onChange={() => {}}
+        placeholder={placeholder}
+        readOnly
+        className={cn(inputClass(!!hasError), 'w-full pr-10 cursor-pointer')}
+      />
+      <span onClick={onClick} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAC737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </span>
+    </div>
+  )
+);
+DateInput.displayName = 'DateInput';
+
 function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const { t } = useLanguage();
   const [destQuery, setDestQuery] = useState(formData.destination);
@@ -399,6 +428,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const [destLoading, setDestLoading] = useState(false);
   const [destOpen, setDestOpen] = useState(false);
   const destWrapperRef = useRef<HTMLDivElement>(null);
+  const justSelectedRef = useRef(false);
 
   const hotelCategoryOptions = [
     { value: '3', label: t.createForm.star3 },
@@ -420,6 +450,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   ];
 
   useEffect(() => {
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
     if (destQuery.length < 2) {
       setDestResults([]);
       return;
@@ -452,6 +487,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   }, []);
 
   const handleDestinationSelect = (dest: Destination) => {
+    justSelectedRef.current = true;
     setDestQuery(dest.name);
     updateField('destination', dest.name);
     updateField('destinationId', dest.id);
@@ -511,28 +547,44 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkInDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
             </label>
-            <input
-              type="date"
-              min={new Date().toISOString().split('T')[0]}
-              max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
-              value={formData.checkInDate}
-              onChange={(e) => updateField('checkInDate', e.target.value)}
-              className={cn(inputClass(!!errors.checkInDate), !formData.checkInDate && 'text-sett-text-accent')}
-            />
+            <div className="sett-datepicker">
+              <DatePicker
+                selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
+                onChange={(date: Date | null) => updateField('checkInDate', date ? date.toISOString().split('T')[0] : '')}
+                minDate={new Date()}
+                maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                dateFormat="MM/dd/yyyy"
+                placeholderText="MM/DD/YYYY"
+                popperClassName="sett-datepicker-popper"
+                popperPlacement="bottom-end"
+                wrapperClassName="w-full"
+                todayButton="Today"
+                showPopperArrow={false}
+                customInput={<DateInput hasError={!!errors.checkInDate} />}
+              />
+            </div>
             <FieldError message={errors.checkInDate} />
           </div>
           <div>
             <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkOutDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
             </label>
-            <input
-              type="date"
-              min={formData.checkInDate || new Date().toISOString().split('T')[0]}
-              max={new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]}
-              value={formData.checkOutDate}
-              onChange={(e) => updateField('checkOutDate', e.target.value)}
-              className={cn(inputClass(!!errors.checkOutDate), !formData.checkOutDate && 'text-sett-text-accent')}
-            />
+            <div className="sett-datepicker">
+              <DatePicker
+                selected={formData.checkOutDate ? new Date(formData.checkOutDate) : null}
+                onChange={(date: Date | null) => updateField('checkOutDate', date ? date.toISOString().split('T')[0] : '')}
+                minDate={formData.checkInDate ? new Date(formData.checkInDate) : new Date()}
+                maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                dateFormat="MM/dd/yyyy"
+                placeholderText="MM/DD/YYYY"
+                popperClassName="sett-datepicker-popper"
+                popperPlacement="bottom-end"
+                wrapperClassName="w-full"
+                todayButton="Today"
+                showPopperArrow={false}
+                customInput={<DateInput hasError={!!errors.checkOutDate} />}
+              />
+            </div>
             <FieldError message={errors.checkOutDate} />
           </div>
         </div>
