@@ -429,6 +429,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const [destOpen, setDestOpen] = useState(false);
   const destWrapperRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
+  const userTypingRef = useRef(false);
 
   const hotelCategoryOptions = [
     { value: '3', label: t.createForm.star3 },
@@ -450,6 +451,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   ];
 
   useEffect(() => {
+    if (!userTypingRef.current) return;
+
     if (justSelectedRef.current) {
       justSelectedRef.current = false;
       return;
@@ -488,6 +491,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
 
   const handleDestinationSelect = (dest: Destination) => {
     justSelectedRef.current = true;
+    userTypingRef.current = false;
     setDestQuery(dest.name);
     updateField('destination', dest.name);
     updateField('destinationId', dest.id);
@@ -496,6 +500,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   };
 
   const handleDestinationInputChange = (value: string) => {
+    userTypingRef.current = true;
     setDestQuery(value);
     updateField('destination', value);
     updateField('destinationId', 0);
@@ -623,10 +628,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.groupSizePlaceholder}
             value={formData.groupSize}
             onChange={(e) => {
-              const val = e.target.value;
+              const val = e.target.value.replace(/[^0-9]/g, '');
               if (val === '' || Number(val) >= 0) updateField('groupSize', val);
             }}
-            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
             error={errors.groupSize}
           />
         </div>
