@@ -43,23 +43,11 @@ export function BookingRequestFilters({
   ];
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-      {/* Search */}
-      <div className="relative flex-1 min-w-0">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-secondary" />
-        <input
-          type="search"
-          placeholder={t.requests.searchPlaceholder}
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full pl-10 pr-3 py-[10px] rounded-[14px] border border-sett-border bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent transition-colors duration-150 hover:border-sett-primary/40 focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent"
-        />
-      </div>
-
-      {/* Filter controls */}
+    <div className="flex flex-col gap-3">
+      {/* Top row: filter icon + dropdowns + create button */}
       <div className="flex items-center gap-2.5 flex-wrap">
-        {/* Filter icon label — visible on sm+ */}
-        <div className="hidden sm:flex items-center gap-1.5 text-sett-text-secondary mr-0.5">
+        {/* Filter icon */}
+        <div className="flex items-center text-sett-text-secondary">
           <SlidersHorizontal className="w-4 h-4" />
         </div>
 
@@ -68,22 +56,34 @@ export function BookingRequestFilters({
           options={dateOptions}
           value={dateRange}
           onChange={(e) => onDateRangeChange(e.target.value)}
-          className="w-full xs:w-[148px]"
+          className="w-[148px]"
         />
         <Select
           variant="filter"
           options={statusOptions}
           value={status}
           onChange={(e) => onStatusChange(e.target.value)}
-          className="w-full xs:w-[148px]"
+          className="w-[148px]"
         />
 
-        <Link href="/booking-requests/create" className="w-full sm:w-auto sm:ml-1">
-          <Button variant="primary" size="md" className="text-white w-full sm:w-auto">
+        <Link href="/booking-requests/create" className="ml-auto">
+          <Button variant="primary" size="md" className="text-white whitespace-nowrap">
             <Plus className="w-4 h-4 mr-1" />
             {t.nav.createRequest}
           </Button>
         </Link>
+      </div>
+
+      {/* Search bar — full width below */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-secondary" />
+        <input
+          type="search"
+          placeholder={t.requests.searchPlaceholder}
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full pl-10 pr-3 py-[10px] rounded-[14px] border border-sett-border bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent transition-colors duration-150 hover:border-sett-primary/40 focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent"
+        />
       </div>
     </div>
   );

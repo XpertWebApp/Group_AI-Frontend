@@ -7,7 +7,6 @@ import {
   MapPin,
   Calendar,
   Star,
-  Pencil,
   Building2,
   FileText,
   Phone,
@@ -26,6 +25,7 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
+import { EditRequestModal } from '@/components/forms/EditRequestModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
@@ -50,7 +50,8 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <Star
           key={i}
-          className={`w-4 h-4 ${i < rating ? 'fill-sett-primary text-sett-primary' : 'fill-none text-sett-text-accent'}`}
+          style={{ width: 16, height: 16 }}
+          className={i < rating ? 'fill-[#AAC737] text-[#AAC737]' : 'fill-none text-[#D1D1D1]'}
         />
       ))}
     </div>
@@ -83,6 +84,7 @@ export default function RequestDetailPage() {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [editRequestOpen, setEditRequestOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -183,10 +185,16 @@ export default function RequestDetailPage() {
   };
 
   const handleAddService = async (payload: Parameters<typeof proposalsApi.addService>[1]) => {
-    if (!proposal) return;
     setActionLoading(true);
     try {
-      const { service, proposal: updatedProposal } = await proposalsApi.addService(proposal.id, payload);
+      let proposalId = proposal?.id;
+      if (!proposalId) {
+        const created = await requestsApi.createProposal(id, {});
+        proposalId = created.id;
+        const full = await proposalsApi.get(proposalId);
+        if (full) setProposal(full);
+      }
+      const { service, proposal: updatedProposal } = await proposalsApi.addService(proposalId, payload);
       setProposal((p) =>
         p
           ? {
@@ -379,7 +387,7 @@ export default function RequestDetailPage() {
       </div>
 
       {/* ════════════════════ MAIN CONTENT CARD ════════════════════ */}
-      <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+      <div className="bg-white rounded-[14px] border border-[#686868]/40 p-5">
 
       {/* ════════════════════ REQUEST SUMMARY ════════════════════ */}
       <div className="mb-6">
@@ -392,9 +400,11 @@ export default function RequestDetailPage() {
                 <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
                   {t.offer.requestSummary}
                 </h2>
-                <Pencil className="w-4 h-4 text-sett-text-accent cursor-pointer hover:text-sett-text-primary" />
+                <button type="button" onClick={() => setEditRequestOpen(true)} className="p-0.5 rounded hover:opacity-70 transition-opacity">
+                  <SquarePen className="w-4 h-4 text-sett-primary" />
+                </button>
               </div>
-              <p className="font-montserrat text-[14px] font-normal text-sett-text-secondary mt-0.5">
+              <p className="font-montserrat text-[14px] font-normal leading-none text-[#4A4A4A] mt-0.5">
                 {t.offer.bookingDetails}
               </p>
             </div>
@@ -413,51 +423,78 @@ export default function RequestDetailPage() {
         {!summaryCollapsed && (
           <>
         {/* ── Trip Details ── */}
-        <div className="mb-6 mt-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">{t.offer.tripDetails}</h3>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
-                <MapPin className="w-4 h-4 text-sett-text-accent shrink-0" />
-                {request.destinationName || '—'}
-              </div>
-              <span className="text-sett-text-accent hidden sm:inline">·</span>
-              <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
-                <Calendar className="w-4 h-4 text-sett-text-accent shrink-0" />
-                {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
+        <div className="mt-6 mb-6">
+          <div className="flex items-center justify-between min-h-[51px]">
+            {/* Left: Trip Details label + Location + Date */}
+            <div className="flex flex-col gap-[14px]">
+              <h3 className="font-montserrat text-[16px] font-semibold leading-none text-sett-text-primary">
+                {t.offer.tripDetails}
+              </h3>
+              <div className="flex items-center gap-[10px]">
+                {/* Location */}
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
+                  <span className="font-montserrat text-[14px] font-medium leading-none text-[#4A4A4A]">
+                    {request.destinationName || '—'}
+                  </span>
+                </div>
+                {/* Dot separator */}
+                <div className="w-1 h-1 rounded-[18px] bg-[#E6EAF0] shrink-0" />
+                {/* Date */}
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
+                  <span className="font-montserrat text-[14px] font-medium leading-none text-[#4A4A4A]">
+                    {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+
+            {/* Right: Stats — width:535 height:46 gap:20px */}
+            <div className="flex items-center gap-5">
+              {/* Hotel Category — width:155 height:46 gap:14px */}
+              <div className="flex flex-col gap-[14px] items-center" style={{ width: 155 }}>
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                   {t.offer.hotelCategory}
                 </p>
-                <div className="flex items-center gap-1 mt-0.5 justify-center">
-                  <span className="font-montserrat text-[14px] font-medium text-sett-text-secondary">
+                {/* value row — height:17 gap:8px */}
+                <div className="flex items-center gap-2">
+                  <span className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
                     ({request.starRating}-Star)
                   </span>
                   {request.starRating && <StarRating rating={request.starRating} />}
                 </div>
               </div>
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+              {/* Vertical divider */}
+              <div className="w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+              {/* Budget Range */}
+              <div className="flex flex-col gap-[14px] items-center">
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                   {t.offer.budgetRange}
                 </p>
-                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5">
+                <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
                   {request.budgetRange || '—'}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+              {/* Vertical divider */}
+              <div className="w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+              {/* Group Type */}
+              <div className="flex flex-col gap-[14px] items-center">
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                   {t.offer.groupType}
                 </p>
-                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5 capitalize">
+                <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D] capitalize">
                   {request.groupType || '—'}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">{t.offer.guests}</p>
-                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5">
+              {/* Vertical divider */}
+              <div className="w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+              {/* Guests */}
+              <div className="flex flex-col gap-[14px] items-center">
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                  {t.offer.guests}
+                </p>
+                <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
                   {request.groupSize ?? '—'}
                 </p>
               </div>
@@ -465,14 +502,16 @@ export default function RequestDetailPage() {
           </div>
         </div>
 
-        <hr className="border-sett-border mb-6" />
+        <hr className="border-[#686868]/40 mb-6" />
 
         {/* ── Room & Accommodations ── */}
-        <div className="mb-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">
+        <div className="flex flex-col gap-5 mb-6">
+          {/* Heading — height:20 */}
+          <h3 className="font-montserrat text-[16px] font-semibold leading-none text-[#1D1D1D]">
             {t.offer.roomAccommodations}
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
+          {/* Cards row — height:86 gap:20px */}
+          <div className="flex w-full gap-5">
             {[
               { label: t.offer.single, value: rooms?.single },
               { label: t.offer.double, value: rooms?.double },
@@ -481,33 +520,61 @@ export default function RequestDetailPage() {
             ].map((room) => (
               <div
                 key={room.label}
-                className="border border-sett-border-light rounded-[14px] p-4 text-center"
+                className="flex flex-1 flex-col items-center justify-center gap-[14px] border border-[#686868]/40 rounded-[14px]"
+                style={{ height: 86 }}
               >
-                <p className="font-montserrat text-[18px] font-bold text-sett-text-primary">
-                  {room.value || '—'}
+                <p className="font-montserrat text-[18px] font-bold leading-none text-[#1D1D1D]">
+                  {room.value ?? '—'}
                 </p>
-                <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
+                <p className="font-montserrat text-[12px] font-semibold leading-none uppercase text-sett-text-accent">
                   {room.label}
                 </p>
               </div>
             ))}
           </div>
 
+          {/* Bed Configuration for Double Room — outer: 14px radius, border #68686866, h:166 */}
+          <div className="w-full rounded-[14px] border border-[#686868]/40 bg-white p-5">
+            <h4 className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D] mb-5">
+              Bed Configuration for Double Room
+            </h4>
+            {/* Inner cards row — gap:20px, h:86 */}
+            <div className="flex w-full gap-5">
+              {[
+                { label: 'Standard Double Bed', value: rooms?.standardDoubleBeds },
+                { label: 'Twin Bed', value: rooms?.twinBeds },
+              ].map((bed) => (
+                <div
+                  key={bed.label}
+                  className="flex flex-1 flex-col items-center justify-center gap-[14px] border border-[#686868]/40 rounded-[14px]"
+                  style={{ height: 86 }}
+                >
+                  <p className="font-montserrat text-[18px] font-bold leading-none text-[#1D1D1D]">
+                    {bed.value ?? '—'}
+                  </p>
+                  <p className="font-montserrat text-[12px] font-semibold leading-none uppercase text-sett-text-accent">
+                    {bed.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {rooms?.extraRoomsNote && (
-            <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mb-4">
-              <span className="font-semibold text-body text-sett-text-primary">{t.offer.extras}: </span>
-              <span className="text-body text-sett-text-secondary">{rooms.extraRoomsNote}</span>
+            <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px]" style={{ minHeight: 57 }}>
+              <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.extras}:</span>
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{rooms.extraRoomsNote}</span>
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-            <div className="border border-sett-border-light rounded-[14px] p-3 sm:p-4 text-center">
+            <div className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center">
               <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{breakfastLabel}</p>
               <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                 {t.offer.breakfastPreference}
               </p>
             </div>
-            <div className="border border-sett-border-light rounded-[14px] p-3 sm:p-4 text-center">
+            <div className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center">
               <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{locationLabel}</p>
               <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                 {t.offer.hotelLocation}
@@ -516,18 +583,14 @@ export default function RequestDetailPage() {
           </div>
 
           {request.specialRequirements && (
-            <div className="bg-[#EDF4FE] rounded-card px-4 py-3">
-              <span className="font-semibold text-body text-sett-text-primary">
-                {t.offer.specialRequirement}:{' '}
-              </span>
-              <span className="text-body text-sett-text-secondary">
-                {request.specialRequirements}
-              </span>
+            <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px]" style={{ minHeight: 57 }}>
+              <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.specialRequirements}</span>
             </div>
           )}
         </div>
 
-        <hr className="border-sett-border mb-6" />
+        <hr className="border-[#686868]/40 mb-6" />
 
         {/* ── Customer Details ── */}
         <div className="mb-6">
@@ -542,7 +605,7 @@ export default function RequestDetailPage() {
                   {t.offer.companyName}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary font-medium">
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
                 {request.companyName || '—'}
               </p>
             </div>
@@ -554,11 +617,11 @@ export default function RequestDetailPage() {
                 </span>
               </div>
               {request.guestListFileKey ? (
-                <a href="#" className="text-body text-sett-primary hover:underline font-medium">
+                <a href="#" className="font-montserrat text-[14px] font-semibold leading-none text-sett-primary hover:underline">
                   {request.guestListFileKey}
                 </a>
               ) : (
-                <p className="text-body text-sett-text-secondary">—</p>
+                <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">—</p>
               )}
             </div>
             <div>
@@ -568,7 +631,7 @@ export default function RequestDetailPage() {
                   {t.offer.contactPerson}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary font-medium">
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
                 {[request.firstName, request.lastName].filter(Boolean).join(' ') ||
                   request.contactName ||
                   '—'}
@@ -581,7 +644,7 @@ export default function RequestDetailPage() {
                   {t.offer.emailAddress}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary">{request.contactEmail || '—'}</p>
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">{request.contactEmail || '—'}</p>
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-1">
@@ -590,20 +653,18 @@ export default function RequestDetailPage() {
                   {t.offer.phoneNumber}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary">{request.contactPhone || '—'}</p>
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">{request.contactPhone || '—'}</p>
             </div>
           </div>
           {request.customerNotes && (
-            <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mt-3">
-              <span className="font-semibold text-body text-sett-text-primary">
-                {t.offer.specialRequirement}:{' '}
-              </span>
-              <span className="text-body text-sett-text-secondary">{request.customerNotes}</span>
+            <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] mt-3" style={{ minHeight: 57 }}>
+              <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.customerNotes}</span>
             </div>
           )}
         </div>
 
-        <hr className="border-sett-border mb-6" />
+        <hr className="border-[#686868]/40 mb-6" />
 
         {/* ── Policies ── */}
         <div>
@@ -613,7 +674,7 @@ export default function RequestDetailPage() {
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                 {t.offer.termsConditions}
               </p>
-              <p className="text-body text-sett-text-secondary whitespace-pre-line">
+              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D] whitespace-pre-line" style={{ lineHeight: '22px' }}>
                 {request.termsAndConditions}
               </p>
             </div>
@@ -623,7 +684,7 @@ export default function RequestDetailPage() {
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                 {t.offer.cancellationConditions}
               </p>
-              <p className="text-body text-sett-text-secondary whitespace-pre-line">
+              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D] whitespace-pre-line" style={{ lineHeight: '22px' }}>
                 {request.cancellationConditions}
               </p>
             </div>
@@ -764,37 +825,52 @@ export default function RequestDetailPage() {
             </div>
 
             {/* Room Breakdown */}
-            <div className="bg-sett-card rounded-card border border-sett-border p-5">
-              <h4 className="text-heading-sm font-bold text-sett-text-primary mb-4">
-                {t.offer.roomBreakdown}
-              </h4>
-              <dl className="space-y-3">
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.totalPurchase}</dt>
-                  <dd className="font-semibold text-sett-text-primary">
-                    &euro;{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </dd>
+            <div className="bg-white flex flex-col" style={{ borderRadius: 14, border: '1px solid #6868681A' }}>
+              {/* Title */}
+              <div className="px-5 pt-5 pb-5">
+                <h4 className="font-montserrat font-semibold text-[18px] leading-none tracking-normal text-[#1D1D1D]">
+                  {t.offer.roomBreakdown}
+                </h4>
+              </div>
+              {/* Divider below title */}
+              <div className="mx-5" style={{ borderTop: '1px solid #6868681A' }} />
+              {/* Rows */}
+              <div className="px-5 pt-5 pb-5 flex flex-col gap-4">
+                {/* Total Purchase */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalPurchase}</span>
+                  <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
+                    €{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <hr className="border-sett-border" />
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.totalSell}</dt>
-                  <dd className="font-semibold text-sett-text-primary">
-                    &euro;{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </dd>
+                {/* Divider below Total Purchase */}
+                <div style={{ borderTop: '1px solid #6868681A' }} />
+                {/* Total Sell */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalSell}</span>
+                  <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
+                    €{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.marginEur}</dt>
-                  <dd className="font-semibold text-sett-primary">
-                    &euro;{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </dd>
+                {/* Divider below Total Sell */}
+                <div style={{ borderTop: '1px solid #6868681A' }} />
+                {/* Margin */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginEur}</span>
+                  <span className="font-montserrat font-bold text-[18px] leading-none text-right" style={{ color: '#667F00' }}>
+                    €{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.marginPct}</dt>
-                  <dd className="font-semibold text-sett-primary">
+                {/* Green divider below Margin */}
+                <div style={{ borderTop: '1px solid #AAC737' }} />
+                {/* Margin % */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginPct}</span>
+                  <span className="font-montserrat font-bold text-[16px] leading-none text-right" style={{ color: '#AAC737' }}>
                     {totals.margin.toFixed(1)}%
-                  </dd>
+                  </span>
                 </div>
-              </dl>
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -941,6 +1017,15 @@ export default function RequestDetailPage() {
         confirmLabel={t.offer.declineConfirm}
         variant="danger"
       />
+
+      {request && (
+        <EditRequestModal
+          open={editRequestOpen}
+          request={request}
+          onClose={() => setEditRequestOpen(false)}
+          onSaved={(updated) => setRequest(updated)}
+        />
+      )}
 
       <SuccessModal
         open={successOpen}

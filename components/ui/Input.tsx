@@ -40,7 +40,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'disabled:opacity-50 disabled:cursor-not-allowed',
               error ? 'border-red-500' : 'border-sett-border',
               isPassword && 'pr-10',
-              isPassword && !showPassword && 'text-[20px] tracking-[0.2em]',
+              isPassword && !showPassword && 'text-[20px] tracking-[0.2em] placeholder:text-[14px] placeholder:tracking-normal',
               className
             )}
             {...props}

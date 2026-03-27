@@ -179,9 +179,10 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    if (!data.phone.trim()) {
+    const phoneDigits = data.phone.replace(/\D/g, '');
+    if (!data.phone.trim() || phoneDigits.length <= 3) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (data.phone.replace(/[\s\-()]/g, '').length < 7) {
+    } else if (phoneDigits.length < 11) {
       errors.phone = t.createForm.invalidPhone;
     }
   }
@@ -216,6 +217,13 @@ export default function CreateBookingRequestPage() {
     });
   };
 
+  const scrollToTop = () => {
+    const main = document.querySelector('main');
+    if (main) {
+      main.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const handleNext = () => {
     setAttempted(true);
     const stepErrors = validateStep(currentStep, formData, t);
@@ -235,7 +243,7 @@ export default function CreateBookingRequestPage() {
     setErrors({});
     if (currentStep < STEPS.length - 1) {
       setCurrentStep((s) => s + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToTop();
     }
   };
 
@@ -244,7 +252,7 @@ export default function CreateBookingRequestPage() {
     setErrors({});
     if (currentStep > 0) {
       setCurrentStep((s) => s - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToTop();
     }
   };
 
@@ -432,9 +440,17 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const userTypingRef = useRef(false);
 
   const hotelCategoryOptions = [
-    { value: '3', label: t.createForm.star3 },
-    { value: '4', label: t.createForm.star4 },
-    { value: '5', label: t.createForm.star5 },
+    { value: '1',   label: t.createForm.star1 },
+    { value: '1.5', label: t.createForm.star1_5 },
+    { value: '2',   label: t.createForm.star2 },
+    { value: '2.5', label: t.createForm.star2_5 },
+    { value: '3',   label: t.createForm.star3 },
+    { value: '3.5', label: t.createForm.star3_5 },
+    { value: '4',   label: t.createForm.star4 },
+    { value: '4.5', label: t.createForm.star4_5 },
+    { value: '5',   label: t.createForm.star5 },
+    { value: '5.5', label: t.createForm.star5_5 },
+    { value: '6',   label: t.createForm.star6 },
   ];
   const budgetRangeOptions = [
     { value: 'economy', label: t.createForm.economy },

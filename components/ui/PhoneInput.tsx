@@ -10,48 +10,61 @@ import { ChevronDown } from 'lucide-react';
 interface PhoneInputProps {
   value: string;
   onChange: (phone: string) => void;
+  onValidChange?: (isValid: boolean) => void;
   error?: string;
-  placeholder?: string;
+  label?: string;
 }
 
-export function PhoneInput({ value, onChange, error, placeholder = '+1 234 567 8900' }: PhoneInputProps) {
+export function PhoneInput({
+  value,
+  onChange,
+  onValidChange,
+  error,
+  label = 'PHONE NUMBER',
+}: PhoneInputProps) {
   const { inputValue, handlePhoneValueChange, inputRef, country, setCountry } = usePhoneInput({
     defaultCountry: 'au',
     value,
     onChange: (data) => {
       onChange(data.phone);
+      // Total E.164 digits (country code + national number) must be >= 10
+      // e.g. AU: 61 + 412345678 = 11 digits, US: 1 + 2125551234 = 11 digits
+      const totalDigits = data.phone.replace(/\D/g, '').length;
+      onValidChange?.(totalDigits >= 10);
     },
+    disableDialCodeAndPrefix: true,
   });
 
   return (
     <div className="w-full">
-      <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-        PHONE NUMBER <span className="text-red-500">*</span>
+      <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+        {label} <span className="text-[#FB2C36]">*</span>
       </label>
       <div
         className={cn(
-          'flex items-center rounded-input border bg-white transition-colors',
-          error ? 'border-red-500' : 'border-sett-border',
+          'flex items-center rounded-[14px] border bg-white transition-all duration-150',
+          error ? 'border-red-500' : 'border-sett-border-light',
           'focus-within:ring-2 focus-within:ring-sett-primary focus-within:border-transparent'
         )}
       >
-        {/* Country selector */}
+        {/* Country selector — shows flag + dial code */}
         <CountrySelector
           country={country.iso2}
+          dialCode={country.dialCode}
           onSelect={setCountry}
         />
 
         {/* Divider */}
-        <div className="w-px h-6 bg-sett-border flex-shrink-0" />
+        <div className="w-px h-5 bg-sett-border-light flex-shrink-0" />
 
-        {/* Phone number input */}
+        {/* National number input only */}
         <input
           ref={inputRef}
           type="tel"
           value={inputValue}
           onChange={handlePhoneValueChange}
-          placeholder={placeholder}
-          className="flex-1 px-3 py-2.5 text-body text-sett-text-primary placeholder:text-sett-text-muted bg-transparent focus:outline-none"
+          placeholder="412 345 678"
+          className="flex-1 px-3 py-3 font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent bg-transparent focus:outline-none"
         />
       </div>
       {error && <p className="mt-1 text-caption text-red-500">{error}</p>}
@@ -59,13 +72,15 @@ export function PhoneInput({ value, onChange, error, placeholder = '+1 234 567 8
   );
 }
 
-/* ─── Country Selector with flag + chevron ─── */
+/* ─── Country Selector — flag + dial code + chevron ─── */
 
 function CountrySelector({
   country,
+  dialCode,
   onSelect,
 }: {
   country: CountryIso2;
+  dialCode: string;
   onSelect: (iso2: CountryIso2) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -73,6 +88,7 @@ function CountrySelector({
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!open) return;
     function handleClickOutside(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -80,7 +96,7 @@ function CountrySelector({
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [open]);
 
   const countries = defaultCountries
     .map((c) => parseCountry(c))
@@ -95,22 +111,25 @@ function CountrySelector({
       <button
         type="button"
         onClick={() => { setOpen((o) => !o); setSearch(''); }}
-        className="flex items-center gap-1.5 px-3 py-2.5 hover:bg-sett-fill/50 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-3 hover:bg-sett-fill/50 transition-colors rounded-l-[14px]"
       >
         <FlagImage iso2={country} size="20px" />
-        <ChevronDown className="w-3.5 h-3.5 text-sett-text-muted" />
+        <span className="font-montserrat text-[14px] font-normal text-sett-text-primary">
+          +{dialCode}
+        </span>
+        <ChevronDown className={cn('w-3.5 h-3.5 text-sett-text-muted transition-transform duration-200', open && 'rotate-180')} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-64 bg-white border border-sett-border rounded-lg shadow-lg overflow-hidden">
+        <div className="absolute top-full left-0 z-50 mt-1.5 w-68 bg-white border border-sett-border-light rounded-[14px] shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden">
           {/* Search */}
-          <div className="p-2 border-b border-sett-border">
+          <div className="p-2 border-b border-sett-border-light">
             <input
               type="text"
               placeholder="Search country..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-body text-sett-text-primary placeholder:text-sett-text-muted border border-sett-border rounded focus:outline-none focus:ring-1 focus:ring-sett-primary"
+              className="w-full px-2.5 py-1.5 font-montserrat text-[14px] text-sett-text-primary placeholder:text-sett-text-accent border border-sett-border-light rounded-[10px] focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent"
               autoFocus
             />
           </div>
@@ -121,18 +140,15 @@ function CountrySelector({
               <li key={c.iso2}>
                 <button
                   type="button"
-                  onClick={() => {
-                    onSelect(c.iso2);
-                    setOpen(false);
-                  }}
+                  onClick={() => { onSelect(c.iso2); setOpen(false); }}
                   className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2 text-body hover:bg-sett-fill transition-colors text-left',
-                    c.iso2 === country && 'bg-sett-light-green-bg'
+                    'w-full flex items-center gap-2.5 px-3 py-2 font-montserrat text-[14px] hover:bg-[#F7F7F7] transition-colors text-left',
+                    c.iso2 === country && 'bg-sett-light-green-bg text-sett-primary font-medium'
                   )}
                 >
                   <FlagImage iso2={c.iso2} size="18px" />
-                  <span className="text-sett-text-primary truncate flex-1">{c.name}</span>
-                  <span className="text-sett-text-muted text-caption">+{c.dialCode}</span>
+                  <span className="truncate flex-1">{c.name}</span>
+                  <span className="text-sett-text-muted text-[12px] shrink-0">+{c.dialCode}</span>
                 </button>
               </li>
             ))}
