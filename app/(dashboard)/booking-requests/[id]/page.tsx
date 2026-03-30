@@ -108,6 +108,7 @@ export default function RequestDetailPage() {
 
   useEffect(() => {
     loadData();
+
   }, [loadData]);
 
   const rooms = request?.rooms as RoomsConfig | null | undefined;
@@ -368,6 +369,9 @@ export default function RequestDetailPage() {
         ? t.offer.outsideCityCenter
         : '—';
 
+
+       
+
   return (
     <>
       <Header title={t.createForm.title} />
@@ -422,6 +426,7 @@ export default function RequestDetailPage() {
             size="sm"
             onClick={handleAddHotelsClick}
             isLoading={actionLoading}
+            disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
           >
             {t.offer.addHotels}
           </Button>
@@ -726,7 +731,13 @@ export default function RequestDetailPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.offer.hotels}</h3>
-              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading}>
+              <Button 
+              variant="primary" 
+              size="sm" 
+              onClick={handleAddHotelsClick}
+               isLoading={actionLoading}
+               disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+               >
                 {t.offer.addHotel}
               </Button>
             </div>
@@ -761,7 +772,8 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 onClick={() => setAddServiceOpen(true)}
-                className="px-4 py-1.5 border-2 border-sett-primary rounded-button text-body text-sett-primary font-bold uppercase tracking-[0.08em] hover:bg-sett-primary hover:text-sett-navy transition-colors duration-200"
+                className="px-4 py-1.5 border-2 border-sett-primary rounded-button text-body text-sett-primary font-bold uppercase tracking-[0.08em] hover:bg-sett-primary hover:text-sett-navy disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-sett-primary disabled:border-gray-300 transition-colors duration-200"
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
               >
                 {t.offer.addService}
               </button>
@@ -1106,6 +1118,7 @@ function MarkupDropdown({
   useEffect(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
+    
     setPos({ top: rect.bottom + 4, left: rect.right - 140 });
   }, [open]);
 
