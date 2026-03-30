@@ -195,6 +195,7 @@ export const translations = {
     // ── Offer / Request Detail Page ──
     offer: {
       requestSummary: 'Request Summary',
+      emailInvalid: 'Please enter a valid email address',
       bookingDetails: 'Booking details for this offer',
       addHotels: 'Add Hotels',
       tripDetails: 'Trip Details',
@@ -689,6 +690,7 @@ export const translations = {
     // ── Offer / Request Detail Page ──
     offer: {
       requestSummary: 'Anfragezusammenfassung',
+      emailInvalid: "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       bookingDetails: 'Buchungsdetails für dieses Angebot',
       addHotels: 'Hotels hinzufügen',
       tripDetails: 'Reisedetails',
