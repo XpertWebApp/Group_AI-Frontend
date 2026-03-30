@@ -12,9 +12,10 @@ interface PhoneInputProps {
   onChange: (phone: string) => void;
   error?: string;
   placeholder?: string;
+  hideLabel?: boolean;
 }
 
-export function PhoneInput({ value, onChange, error, placeholder = '+1 234 567 8900' }: PhoneInputProps) {
+export function PhoneInput({ value, onChange, error, placeholder = '+1 234 567 8900', hideLabel }: PhoneInputProps) {
   const { inputValue, handlePhoneValueChange, inputRef, country, setCountry } = usePhoneInput({
     defaultCountry: 'au',
     value,
@@ -25,9 +26,11 @@ export function PhoneInput({ value, onChange, error, placeholder = '+1 234 567 8
 
   return (
     <div className="w-full">
-      <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
-        PHONE NUMBER <span className="text-red-500">*</span>
-      </label>
+      {!hideLabel && (
+        <label className="block text-label font-medium text-sett-text-primary uppercase tracking-wide mb-1.5">
+          PHONE NUMBER <span className="text-red-500">*</span>
+        </label>
+      )}
       <div
         className={cn(
           'flex items-center rounded-input border bg-white transition-colors',

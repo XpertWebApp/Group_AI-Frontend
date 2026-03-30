@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { ApiResponse } from '@/types';
 
 /* ── Overview ── */
 export interface SettingsOverview {
@@ -22,6 +23,20 @@ export interface EmailSettings {
   smtpUsername: string;
   smtpPassword: string;
   fromEmail: string;
+  fromName: string;
+}
+
+export interface EmailConfigUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string | null;
+  isActive: boolean;
+  googleConnected: boolean;
+}
+
+export interface EmailConfig {
+  users: EmailConfigUser[];
   fromName: string;
 }
 
@@ -96,6 +111,24 @@ export const settingsApi = {
     }
     const { data } = await apiClient.put<{ data: EmailSettings }>('/settings/email', body);
     return data.data;
+  },
+
+  /* Email Config (new Google-based) */
+  getEmailConfig: async (): Promise<EmailConfig> => {
+    const { data } = await apiClient.get<ApiResponse<EmailConfig>>('/settings/email');
+    if (!data.success || !data.data) throw new Error('Failed to load email config');
+    return data.data;
+  },
+  updateFromName: async (fromName: string): Promise<void> => {
+    await apiClient.put('/settings/email', { fromName });
+  },
+  disconnectGoogle: async (userId: string): Promise<void> => {
+    await apiClient.post(`/settings/email/disconnect/${userId}`);
+  },
+  getGoogleConnectUrl: async (): Promise<string> => {
+    const { data } = await apiClient.get<ApiResponse<{ url: string }>>('/auth/google/connect');
+    if (!data.success || !data.data?.url) throw new Error('Failed to get Google connect URL');
+    return data.data.url;
   },
 
   /* Company */
