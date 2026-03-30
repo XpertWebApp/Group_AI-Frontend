@@ -571,7 +571,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             <div className="sett-datepicker">
               <DatePicker
                 selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
-                onChange={(date: Date | null) => updateField('checkInDate', date ? date.toISOString().split('T')[0] : '')}
+                onChange={(date: Date | null) => updateField('checkInDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                 dateFormat="MM/dd/yyyy"
@@ -593,7 +593,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             <div className="sett-datepicker">
               <DatePicker
                 selected={formData.checkOutDate ? new Date(formData.checkOutDate) : null}
-                onChange={(date: Date | null) => updateField('checkOutDate', date ? date.toISOString().split('T')[0] : '')}
+                onChange={(date: Date | null) => updateField('checkOutDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={formData.checkInDate ? new Date(formData.checkInDate) : new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                 dateFormat="MM/dd/yyyy"

@@ -115,12 +115,25 @@ export function RichTextEditor({
   className,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const isInternalChange = useRef(false);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [imageModalOpen, setImageModalOpen] = useState(false);
+
+  // Sync value into the editor only on mount or when value changes externally
+  useEffect(() => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
 
   const exec = useCallback((command: string, val?: string) => {
     document.execCommand(command, false, val);
     if (editorRef.current) {
+      isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
     }
     editorRef.current?.focus();
@@ -128,6 +141,7 @@ export function RichTextEditor({
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
+      isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
     }
   }, [onChange]);
@@ -197,10 +211,10 @@ export function RichTextEditor({
         <div
           ref={editorRef}
           contentEditable
+          suppressContentEditableWarning
           onInput={handleInput}
-          dangerouslySetInnerHTML={{ __html: value }}
           className="w-full px-4 py-3 font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary focus:outline-none bg-white overflow-y-auto"
-          style={{ minHeight }}
+          style={{ minHeight, direction: 'ltr', textAlign: 'left' }}
         />
       </div>
 

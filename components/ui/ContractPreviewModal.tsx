@@ -82,7 +82,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
               type="button"
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="flex items-center justify-center gap-1 font-montserrat font-semibold text-[14px] leading-none uppercase tracking-normal text-white hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95 transition-all duration-200 disabled:opacity-60"
+              className="flex items-center justify-center gap-1 font-montserrat font-semibold text-[16px] leading-none tracking-normal text-white hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95 transition-all duration-200 disabled:opacity-60"
               style={{
                 width: 176,
                 height: 44,
@@ -250,47 +250,96 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
             {hotels.length > 0 && (
               <>
                 <div className="px-5 py-5">
-                  <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#071C42' }}>
+                  {/* Section Title */}
+                  <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#1D1D1D' }}>
                     {t.contract.hotelDetails}
                   </h3>
-                  {hotels.map((hotel, idx) => {
+
+                  {hotels.map((hotel) => {
                     const roomEntries = hotel.rooms
                       ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
                       : [];
+                    const subtotal = roomEntries.reduce(
+                      (sum, [, d]) => sum + Number(d.sell ?? 0) * (d.qty ?? 1) * (d.nights ?? 1),
+                      0
+                    );
                     return (
-                      <div key={hotel.id} className="mb-5 last:mb-0">
-                        <p className="font-semibold text-[14px] mb-3 text-[#1D1D1D]">
-                          {idx + 1}. {hotel.hotelName ?? hotel.hotelCode}
-                          {hotel.tid && <span className="text-[12px] text-[#686868] font-normal ml-2">Reference number: {hotel.tid}</span>}
-                        </p>
+                      <div key={hotel.id} className="mb-5 last:mb-0 flex flex-col" style={{ gap: 8 }}>
+                        {/* Hotel name + Reference number row */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <svg className="w-4 h-4 text-[#AAC737]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                              <path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" />
+                            </svg>
+                            <span className="font-semibold text-[14px] leading-none text-[#1D1D1D]">
+                              {hotel.hotelName ?? hotel.hotelCode}
+                            </span>
+                          </div>
+                          {hotel.tid && (
+                            <span className="text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
+                              <span className="font-semibold">Reference number:</span>{' '}
+                              <span className="font-medium">{hotel.tid}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Room table */}
                         {roomEntries.length > 0 && (
-                          <table className="w-full text-[13px]" style={{ border: '1px solid #68686866', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr className="bg-[#F7F7F7]">
-                                <th className="text-left px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.roomType}</th>
-                                <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.net}</th>
-                                <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.sell}</th>
-                                <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.qty}</th>
-                                <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.nights}</th>
-                                <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.total}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {roomEntries.map(([type, detail]) => (
-                                <tr key={type} style={{ borderBottom: '1px solid #68686866' }}>
-                                  <td className="px-3 py-2.5 capitalize">{type.replace(/_/g, ' ')}</td>
-                                  <td className="px-3 py-2.5 text-right">{Number(detail.net ?? 0).toFixed(2)}</td>
-                                  <td className="px-3 py-2.5 text-right">{Number(detail.sell ?? 0).toFixed(2)}</td>
-                                  <td className="px-3 py-2.5 text-right">{detail.qty ?? 1}</td>
-                                  <td className="px-3 py-2.5 text-right">{detail.nights ?? 1}</td>
-                                  <td className="px-3 py-2.5 text-right font-semibold">
-                                    {(Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1)).toFixed(2)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <div style={{ borderRadius: 14, border: '1px solid #E6EAF0', overflow: 'hidden' }}>
+                            {/* Table header */}
+                            <div className="flex items-center px-[13px] py-[14px]" style={{ borderBottom: '1px solid #E6EAF0' }}>
+                              <span className="flex-1 font-semibold text-[12px] uppercase" style={{ color: '#4A4A4A' }}>
+                                {t.contract.destination ?? 'Destination'}
+                              </span>
+                              <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 80, color: '#4A4A4A' }}>
+                                Rate
+                              </span>
+                              <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 55, color: '#4A4A4A' }}>
+                                {t.contract.qty}
+                              </span>
+                              <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 65, color: '#4A4A4A' }}>
+                                {t.contract.nights}
+                              </span>
+                              <span className="font-semibold text-[12px] uppercase text-right" style={{ width: 100, color: '#4A4A4A' }}>
+                                Total (EUR)
+                              </span>
+                            </div>
+
+                            {/* Room rows */}
+                            {roomEntries.map(([type, detail]) => {
+                              const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
+                              return (
+                                <div key={type} className="flex items-center px-[13px] py-3" style={{ borderBottom: '1px solid #E6EAF0' }}>
+                                  <span className="flex-1 font-normal text-[13px] text-[#1D1D1D] capitalize">
+                                    {type.replace(/_/g, ' ')}
+                                  </span>
+                                  <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 80 }}>
+                                    €{Number(detail.sell ?? 0).toFixed(2)}
+                                  </span>
+                                  <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 55 }}>
+                                    {detail.qty ?? 1}
+                                  </span>
+                                  <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 65 }}>
+                                    {detail.nights ?? 1}
+                                  </span>
+                                  <span className="font-bold text-[13px] text-[#1D1D1D] text-right" style={{ width: 100 }}>
+                                    €{rowTotal.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                            {/* Subtotal row */}
+                            <div className="flex items-center justify-end px-[13px] py-3">
+                              <span className="font-medium text-[13px] text-[#686868] mr-3">Subtotal</span>
+                              <span className="font-bold text-[14px] text-[#1D1D1D]" style={{ width: 100, textAlign: 'right' }}>
+                                €{subtotal.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
                         )}
+
                         {roomEntries.length === 0 && (
                           <p className="text-[13px] text-[#686868]">
                             Total: {hotel.currency} {Number(hotel.totalPrice).toFixed(2)}
@@ -358,15 +407,76 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
             )}
 
             {/* ── TERMS & CONDITIONS ── */}
-            {request.termsAndConditions && (
-              <>
-                <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-                <div className="px-5 py-5">
-                  <h3 className="font-semibold text-[16px] leading-none uppercase mb-4" style={{ color: '#071C42' }}>{t.contract.termsConditions}</h3>
-                  <p className="font-normal text-[13px] text-[#686868] whitespace-pre-line leading-relaxed">{request.termsAndConditions}</p>
+            <>
+              <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
+              <div className="px-5 py-5">
+                <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#1D1D1D' }}>
+                  {t.contract.termsConditions}
+                </h3>
+
+                {/* T&C bullet list */}
+                {request.termsAndConditions && (
+                  <ul className="flex flex-col gap-3 mb-5">
+                    {request.termsAndConditions.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => (
+                      <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
+                        <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
+                        <span>{line.replace(/^[\s·•\-–]+/, '').trim()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Payment notice */}
+                <div
+                  className="flex items-center px-4 py-3 mb-5"
+                  style={{ background: '#FEF2F2', borderRadius: 14, borderLeft: '3px solid #F87171' }}
+                >
+                  <p className="font-normal text-[14px] text-[#1D1D1D]">
+                    Please pay{' '}
+                    <span className="font-bold">
+                      {grandTotal.toLocaleString('de-DE', { minimumFractionDigits: 2 })} EUR
+                    </span>{' '}
+                    until{' '}
+                    <span className="font-bold">
+                      {request.checkoutDate
+                        ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
+                            .toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                        : '—'}
+                    </span>
+                    .
+                  </p>
                 </div>
-              </>
-            )}
+
+                {/* Standard terms */}
+                <ul className="flex flex-col gap-3">
+                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
+                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
+                    <span>Rates and availability is based on the booked number of rooms and passengers / nights only and can be subject to changes if any of these parameters is changed/amended</span>
+                  </li>
+                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
+                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
+                    <span>Should there be any changes in the taxes/city taxes during the contract&apos;s validity, so will the rates be amended according to the resulting new tax/city taxes regulations</span>
+                  </li>
+                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
+                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
+                    <span>All Rates are NET Rates (no commission included) and need to be paid without any deductions or bank fees.</span>
+                  </li>
+                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
+                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
+                    <span>This document is printed out electronically and is valid without stamp and signature</span>
+                  </li>
+                </ul>
+              </div>
+            </>
+
+            {/* ── Divider ── */}
+            <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
+
+            {/* ── ISSUED BY ── */}
+            <div className="px-5 py-5 flex flex-col items-end">
+              <span className="font-semibold text-[14px] uppercase text-[#1D1D1D]">Issued By</span>
+              <span className="font-normal text-[14px] text-[#1D1D1D] mt-1">Oliver Riefler</span>
+            </div>
           </div>
         </div>
       </div>

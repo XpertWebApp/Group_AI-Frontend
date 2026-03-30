@@ -164,8 +164,8 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
     if (selectedServices.length === 0) return;
     await onAdd({
       serviceName: selectedServices.join(', '),
-      dateFrom: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
-      dateTo: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
+      dateFrom: dateFrom ? `${dateFrom.getFullYear()}-${String(dateFrom.getMonth() + 1).padStart(2, '0')}-${String(dateFrom.getDate()).padStart(2, '0')}` : undefined,
+      dateTo: dateTo ? `${dateTo.getFullYear()}-${String(dateTo.getMonth() + 1).padStart(2, '0')}-${String(dateTo.getDate()).padStart(2, '0')}` : undefined,
       buyPrice: buyPrice ? Number(buyPrice) : undefined,
       sellPrice: sellPrice ? Number(sellPrice) : undefined,
       quantity: quantity ? parseInt(quantity, 10) || 1 : 1,

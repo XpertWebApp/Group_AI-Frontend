@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -81,6 +82,7 @@ export default function RequestDetailPage() {
   const [sendEmail, setSendEmail] = useState('');
   const [sendNotes, setSendNotes] = useState('');
   const [sendError, setSendError] = useState('');
+  const [sendEmailError, setSendEmailError] = useState('');
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -269,6 +271,7 @@ export default function RequestDetailPage() {
   const handleApproveAndSend = async () => {
     if (!proposal) return;
     setSendError('');
+    setSendEmailError('');
 
     // Validate at least 1 hotel
     if (!proposal.hotels || proposal.hotels.length === 0) {
@@ -277,8 +280,13 @@ export default function RequestDetailPage() {
     }
 
     // Validate email
-    if (!sendEmail.trim()) {
-      setSendError(t.offer.emailRequired);
+    const emailVal = sendEmail.trim();
+    if (!emailVal) {
+      setSendEmailError(t.offer.emailRequired);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+      setSendEmailError(t.offer.emailInvalid ?? 'Please enter a valid email address');
       return;
     }
 
@@ -379,8 +387,8 @@ export default function RequestDetailPage() {
         <span className="font-montserrat text-[18px] font-bold text-sett-text-primary">
           Offer #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
-        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
-          {(proposal?.status ?? request.status)
+        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.proposals?.[0]?.status ?? request.status)}>
+          {(proposal?.status ?? request.proposals?.[0]?.status ?? request.status)
             .replace(/_/g, ' ')
             .replace(/\b\w/g, (c) => c.toUpperCase())}
         </Badge>
@@ -473,7 +481,7 @@ export default function RequestDetailPage() {
                   {t.offer.budgetRange}
                 </p>
                 <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
-                  {request.budgetRange || '—'}
+                  {request.budgetRange ? request.budgetRange.charAt(0).toUpperCase() + request.budgetRange.slice(1) : '—'}
                 </p>
               </div>
               {/* Vertical divider */}
@@ -653,7 +661,11 @@ export default function RequestDetailPage() {
                   {t.offer.phoneNumber}
                 </span>
               </div>
-              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">{request.contactPhone || '—'}</p>
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+                {request.contactPhone
+                  ? request.contactPhone.replace(/[^\d+]/g, '').replace(/(\+?\d{3})(?=\d)/g, '$1 ').trim()
+                  : '—'}
+              </p>
             </div>
           </div>
           {request.customerNotes && (
@@ -740,8 +752,8 @@ export default function RequestDetailPage() {
             )}
           </div>
 
-          {/* Additional Services */}
-          <div>
+          {/* Additional Services — only show when hotels are added */}
+          {hotels.length > 0 && <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-heading-sm font-bold text-sett-text-primary">
                 {t.offer.additionalServices}
@@ -808,7 +820,7 @@ export default function RequestDetailPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Right sidebar — only show when proposal exists with hotels */}
@@ -883,11 +895,21 @@ export default function RequestDetailPage() {
                 <Save className="w-4 h-4" />
                 {t.offer.saveDraft}
               </Button>
-              <Button variant="primary" size="sm" onClick={() => setSendOpen(true)}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setSendOpen(true)}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+              >
                 <Send className="w-4 h-4" />
                 {t.offer.approveAndSend}
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => setDeclineOpen(true)}>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeclineOpen(true)}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+              >
                 <XCircle className="w-4 h-4" />
                 {t.offer.markDeclined}
               </Button>
@@ -968,10 +990,17 @@ export default function RequestDetailPage() {
                 <input
                   type="email"
                   value={sendEmail}
-                  onChange={(e) => setSendEmail(e.target.value)}
+                  onChange={(e) => { setSendEmail(e.target.value); if (sendEmailError) setSendEmailError(''); }}
                   placeholder={t.offer.emailPlaceholder}
-                  className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none focus:border-sett-primary"
+                  className={`w-full px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none ${
+                    sendEmailError
+                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-sett-border-light focus:border-sett-primary'
+                  }`}
                 />
+                {sendEmailError && (
+                  <p className="mt-1 font-montserrat text-[12px] text-red-500">{sendEmailError}</p>
+                )}
               </div>
               <div>
                 <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
@@ -990,7 +1019,7 @@ export default function RequestDetailPage() {
             <div className="flex gap-3 justify-end mt-6">
               <Button
                 variant="secondary"
-                onClick={() => { setSendOpen(false); setSendError(''); setSendEmail(''); setSendNotes(''); }}
+                onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmail(''); setSendNotes(''); }}
                 disabled={actionLoading}
               >
                 {t.common.cancel}
@@ -1066,22 +1095,46 @@ function MarkupDropdown({
 }) {
   const [isCustom, setIsCustom] = useState(false);
   const [customValue, setCustomValue] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const isPreset = MARKUP_PRESETS.includes(Math.round(value) as typeof MARKUP_PRESETS[number]);
+
+  // Position the dropdown using getBoundingClientRect
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.right - 140 });
+  }, [open]);
 
   // Close dropdown on outside click
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setIsCustom(false);
-      }
+      if (
+        triggerRef.current?.contains(e.target as Node) ||
+        panelRef.current?.contains(e.target as Node)
+      ) return;
+      setOpen(false);
+      setIsCustom(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  // Close on scroll so it doesn't float detached
+  useEffect(() => {
+    if (!open) return;
+    const handleScroll = () => { setOpen(false); setIsCustom(false); };
+    const main = document.querySelector('main');
+    main?.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      main?.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [open]);
 
   const handleSelect = (preset: number) => {
@@ -1101,8 +1154,9 @@ function MarkupDropdown({
   };
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 px-2 py-1 rounded border border-sett-border hover:border-sett-primary text-body text-sett-text-primary bg-white transition-colors min-w-[72px] justify-between"
@@ -1113,58 +1167,64 @@ function MarkupDropdown({
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 right-0 bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1">
-          {MARKUP_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => handleSelect(preset)}
-              className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors ${
-                Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
-              }`}
-            >
-              {preset}%
-            </button>
-          ))}
-          <hr className="border-sett-border my-1" />
-          {isCustom ? (
-            <div className="px-3 py-1.5 flex items-center gap-1">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={customValue}
-                onChange={(e) => setCustomValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCustomSubmit();
-                  if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
-                }}
-                autoFocus
-                className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
-                placeholder="0-100"
-              />
-              <span className="text-body text-sett-text-accent">%</span>
+      {open &&
+        ReactDOM.createPortal(
+          <div
+            ref={panelRef}
+            className="fixed z-[9999] bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            {MARKUP_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => handleSelect(preset)}
+                className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors ${
+                  Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
+                }`}
+              >
+                {preset}%
+              </button>
+            ))}
+            <hr className="border-sett-border my-1" />
+            {isCustom ? (
+              <div className="px-3 py-1.5 flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={customValue}
+                  onChange={(e) => setCustomValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCustomSubmit();
+                    if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
+                  }}
+                  autoFocus
+                  className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
+                  placeholder="0-100"
+                />
+                <span className="text-body text-sett-text-accent">%</span>
+                <button
+                  type="button"
+                  onClick={handleCustomSubmit}
+                  className="text-sett-primary text-body font-medium hover:underline ml-1"
+                >
+                  OK
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={handleCustomSubmit}
-                className="text-sett-primary text-body font-medium hover:underline ml-1"
+                onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(Math.round(value))); }}
+                className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
               >
-                OK
+                Custom...
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(Math.round(value))); }}
-              className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
-            >
-              Custom...
-            </button>
-          )}
-        </div>
-      )}
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
