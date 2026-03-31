@@ -51,6 +51,10 @@ function formatStatus(status: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function effectiveStatus(r: BookingRequest): string {
+  return r.proposals?.[0]?.status ?? r.status;
+}
+
 function getProposalTotals(r: BookingRequest): { totalSell: number | null; margin: number | null } {
   const p = r.proposals?.[0];
   if (!p) return { totalSell: null, margin: null };
@@ -259,8 +263,8 @@ export default function BookingRequestsPage() {
                         {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                       </td>
                       <td className="px-5 py-5">
-                        <Badge variant={getStatusBadgeVariant(row.status)}>
-                          {formatStatus(row.status)}
+                        <Badge variant={getStatusBadgeVariant(effectiveStatus(row))}>
+                          {formatStatus(effectiveStatus(row))}
                         </Badge>
                       </td>
                       <td className="px-5 py-5 text-body text-sett-text-secondary">
@@ -295,8 +299,8 @@ export default function BookingRequestsPage() {
                     <span className="text-body font-semibold text-sett-text-primary">
                       #{row.referenceNumber ?? row.id.slice(0, 4)}
                     </span>
-                    <Badge variant={getStatusBadgeVariant(row.status)}>
-                      {formatStatus(row.status)}
+                    <Badge variant={getStatusBadgeVariant(effectiveStatus(row))}>
+                      {formatStatus(effectiveStatus(row))}
                     </Badge>
                   </div>
 

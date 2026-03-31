@@ -179,9 +179,10 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    if (!data.phone.trim()) {
+    const phoneDigits = data.phone.replace(/\D/g, '');
+    if (!data.phone.trim() || phoneDigits.length <= 3) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (data.phone.replace(/[\s\-()]/g, '').length < 7) {
+    } else if (phoneDigits.length < 11) {
       errors.phone = t.createForm.invalidPhone;
     }
   }
@@ -216,6 +217,13 @@ export default function CreateBookingRequestPage() {
     });
   };
 
+  const scrollToTop = () => {
+    const main = document.querySelector('main');
+    if (main) {
+      main.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const handleNext = () => {
     setAttempted(true);
     const stepErrors = validateStep(currentStep, formData, t);
@@ -235,7 +243,7 @@ export default function CreateBookingRequestPage() {
     setErrors({});
     if (currentStep < STEPS.length - 1) {
       setCurrentStep((s) => s + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToTop();
     }
   };
 
@@ -244,7 +252,7 @@ export default function CreateBookingRequestPage() {
     setErrors({});
     if (currentStep > 0) {
       setCurrentStep((s) => s - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollToTop();
     }
   };
 
@@ -396,26 +404,19 @@ function FieldError({ message }: { message?: string }) {
 interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hasError?: boolean;
 }
-
 const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
-  ({ hasError, value, onClick, onChange, placeholder }, ref) => (
+  ({ hasError, value, onClick, placeholder }, ref) => (
     <div className="relative w-full">
       <input
         ref={ref}
         value={value as string}
         onClick={onClick}
-        onChange={onChange}
+        onChange={() => {}}
         placeholder={placeholder}
         readOnly
-        className={cn(
-          inputClass(!!hasError),
-          'w-full pr-10 cursor-pointer'
-        )}
+        className={cn(inputClass(!!hasError), 'w-full pr-10 cursor-pointer')}
       />
-      <span
-        onClick={onClick}
-        className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
-      >
+      <span onClick={onClick} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAC737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
           <line x1="16" y1="2" x2="16" y2="6" />
@@ -435,11 +436,21 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const [destLoading, setDestLoading] = useState(false);
   const [destOpen, setDestOpen] = useState(false);
   const destWrapperRef = useRef<HTMLDivElement>(null);
+  const justSelectedRef = useRef(false);
+  const userTypingRef = useRef(false);
 
   const hotelCategoryOptions = [
-    { value: '3', label: t.createForm.star3 },
-    { value: '4', label: t.createForm.star4 },
-    { value: '5', label: t.createForm.star5 },
+    { value: '1',   label: t.createForm.star1 },
+    { value: '1.5', label: t.createForm.star1_5 },
+    { value: '2',   label: t.createForm.star2 },
+    { value: '2.5', label: t.createForm.star2_5 },
+    { value: '3',   label: t.createForm.star3 },
+    { value: '3.5', label: t.createForm.star3_5 },
+    { value: '4',   label: t.createForm.star4 },
+    { value: '4.5', label: t.createForm.star4_5 },
+    { value: '5',   label: t.createForm.star5 },
+    { value: '5.5', label: t.createForm.star5_5 },
+    { value: '6',   label: t.createForm.star6 },
   ];
   const budgetRangeOptions = [
     { value: 'economy', label: t.createForm.economy },
@@ -456,6 +467,13 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   ];
 
   useEffect(() => {
+    if (!userTypingRef.current) return;
+
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
+      return;
+    }
+
     if (destQuery.length < 2) {
       setDestResults([]);
       return;
@@ -488,6 +506,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   }, []);
 
   const handleDestinationSelect = (dest: Destination) => {
+    justSelectedRef.current = true;
+    userTypingRef.current = false;
     setDestQuery(dest.name);
     updateField('destination', dest.name);
     updateField('destinationId', dest.id);
@@ -496,6 +516,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   };
 
   const handleDestinationInputChange = (value: string) => {
+    userTypingRef.current = true;
     setDestQuery(value);
     updateField('destination', value);
     updateField('destinationId', 0);
@@ -550,7 +571,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             <div className="sett-datepicker">
               <DatePicker
                 selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
-                onChange={(date: Date | null) => updateField('checkInDate', date ? date.toISOString().split('T')[0] : '')}
+                onChange={(date: Date | null) => updateField('checkInDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                 dateFormat="MM/dd/yyyy"
@@ -572,7 +593,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             <div className="sett-datepicker">
               <DatePicker
                 selected={formData.checkOutDate ? new Date(formData.checkOutDate) : null}
-                onChange={(date: Date | null) => updateField('checkOutDate', date ? date.toISOString().split('T')[0] : '')}
+                onChange={(date: Date | null) => updateField('checkOutDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={formData.checkInDate ? new Date(formData.checkInDate) : new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                 dateFormat="MM/dd/yyyy"
@@ -623,10 +644,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.groupSizePlaceholder}
             value={formData.groupSize}
             onChange={(e) => {
-              const val = e.target.value;
+              const val = e.target.value.replace(/[^0-9]/g, '');
               if (val === '' || Number(val) >= 0) updateField('groupSize', val);
             }}
-            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
+            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
             error={errors.groupSize}
           />
         </div>

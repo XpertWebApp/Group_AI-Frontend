@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   MapPin,
   Calendar,
   Star,
-  Pencil,
   Building2,
   FileText,
   Phone,
@@ -26,6 +26,7 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
+import { EditRequestModal } from '@/components/forms/EditRequestModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
@@ -50,7 +51,8 @@ function StarRating({ rating }: { rating: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <Star
           key={i}
-          className={`w-4 h-4 ${i < rating ? 'fill-sett-primary text-sett-primary' : 'fill-none text-sett-text-accent'}`}
+          style={{ width: 16, height: 16 }}
+          className={i < rating ? 'fill-[#AAC737] text-[#AAC737]' : 'fill-none text-[#D1D1D1]'}
         />
       ))}
     </div>
@@ -80,9 +82,11 @@ export default function RequestDetailPage() {
   const [sendEmail, setSendEmail] = useState('');
   const [sendNotes, setSendNotes] = useState('');
   const [sendError, setSendError] = useState('');
+  const [sendEmailError, setSendEmailError] = useState('');
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [editRequestOpen, setEditRequestOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -104,6 +108,7 @@ export default function RequestDetailPage() {
 
   useEffect(() => {
     loadData();
+
   }, [loadData]);
 
   const rooms = request?.rooms as RoomsConfig | null | undefined;
@@ -183,10 +188,16 @@ export default function RequestDetailPage() {
   };
 
   const handleAddService = async (payload: Parameters<typeof proposalsApi.addService>[1]) => {
-    if (!proposal) return;
     setActionLoading(true);
     try {
-      const { service, proposal: updatedProposal } = await proposalsApi.addService(proposal.id, payload);
+      let proposalId = proposal?.id;
+      if (!proposalId) {
+        const created = await requestsApi.createProposal(id, {});
+        proposalId = created.id;
+        const full = await proposalsApi.get(proposalId);
+        if (full) setProposal(full);
+      }
+      const { service, proposal: updatedProposal } = await proposalsApi.addService(proposalId, payload);
       setProposal((p) =>
         p
           ? {
@@ -261,6 +272,7 @@ export default function RequestDetailPage() {
   const handleApproveAndSend = async () => {
     if (!proposal) return;
     setSendError('');
+    setSendEmailError('');
 
     // Validate at least 1 hotel
     if (!proposal.hotels || proposal.hotels.length === 0) {
@@ -269,8 +281,13 @@ export default function RequestDetailPage() {
     }
 
     // Validate email
-    if (!sendEmail.trim()) {
-      setSendError(t.offer.emailRequired);
+    const emailVal = sendEmail.trim();
+    if (!emailVal) {
+      setSendEmailError(t.offer.emailRequired);
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+      setSendEmailError(t.offer.emailInvalid ?? 'Please enter a valid email address');
       return;
     }
 
@@ -352,6 +369,9 @@ export default function RequestDetailPage() {
         ? t.offer.outsideCityCenter
         : '—';
 
+
+       
+
   return (
     <>
       <Header title={t.createForm.title} />
@@ -371,15 +391,15 @@ export default function RequestDetailPage() {
         <span className="font-montserrat text-[18px] font-bold text-sett-text-primary">
           Offer #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
-        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
-          {(proposal?.status ?? request.status)
+        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.proposals?.[0]?.status ?? request.status)}>
+          {(proposal?.status ?? request.proposals?.[0]?.status ?? request.status)
             .replace(/_/g, ' ')
             .replace(/\b\w/g, (c) => c.toUpperCase())}
         </Badge>
       </div>
 
       {/* ════════════════════ MAIN CONTENT CARD ════════════════════ */}
-      <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+      <div className="bg-white rounded-[14px] border border-[#686868]/40 p-5">
 
       {/* ════════════════════ REQUEST SUMMARY ════════════════════ */}
       <div className="mb-6">
@@ -392,9 +412,11 @@ export default function RequestDetailPage() {
                 <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
                   {t.offer.requestSummary}
                 </h2>
-                <Pencil className="w-4 h-4 text-sett-text-accent cursor-pointer hover:text-sett-text-primary" />
+                <button type="button" onClick={() => setEditRequestOpen(true)} className="p-0.5 rounded hover:opacity-70 transition-opacity">
+                  <SquarePen className="w-4 h-4 text-sett-primary" />
+                </button>
               </div>
-              <p className="font-montserrat text-[14px] font-normal text-sett-text-secondary mt-0.5">
+              <p className="font-montserrat text-[14px] font-normal leading-none text-[#4A4A4A] mt-0.5">
                 {t.offer.bookingDetails}
               </p>
             </div>
@@ -404,6 +426,7 @@ export default function RequestDetailPage() {
             size="sm"
             onClick={handleAddHotelsClick}
             isLoading={actionLoading}
+            disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
           >
             {t.offer.addHotels}
           </Button>
@@ -413,51 +436,78 @@ export default function RequestDetailPage() {
         {!summaryCollapsed && (
           <>
         {/* ── Trip Details ── */}
-        <div className="mb-6 mt-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">{t.offer.tripDetails}</h3>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
-                <MapPin className="w-4 h-4 text-sett-text-accent shrink-0" />
-                {request.destinationName || '—'}
-              </div>
-              <span className="text-sett-text-accent hidden sm:inline">·</span>
-              <div className="flex items-center gap-1.5 text-body text-sett-text-secondary">
-                <Calendar className="w-4 h-4 text-sett-text-accent shrink-0" />
-                {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
+        <div className="mt-6 mb-6">
+          <div className="flex items-center justify-between min-h-[51px]">
+            {/* Left: Trip Details label + Location + Date */}
+            <div className="flex flex-col gap-[14px]">
+              <h3 className="font-montserrat text-[16px] font-semibold leading-none text-sett-text-primary">
+                {t.offer.tripDetails}
+              </h3>
+              <div className="flex items-center gap-[10px]">
+                {/* Location */}
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
+                  <span className="font-montserrat text-[14px] font-medium leading-none text-[#4A4A4A]">
+                    {request.destinationName || '—'}
+                  </span>
+                </div>
+                {/* Dot separator */}
+                <div className="w-1 h-1 rounded-[18px] bg-[#E6EAF0] shrink-0" />
+                {/* Date */}
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
+                  <span className="font-montserrat text-[14px] font-medium leading-none text-[#4A4A4A]">
+                    {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+
+            {/* Right: Stats — width:535 height:46 gap:20px */}
+            <div className="flex items-center gap-5">
+              {/* Hotel Category — width:155 height:46 gap:14px */}
+              <div className="flex flex-col gap-[14px] items-center" style={{ width: 155 }}>
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                   {t.offer.hotelCategory}
                 </p>
-                <div className="flex items-center gap-1 mt-0.5 justify-center">
-                  <span className="font-montserrat text-[14px] font-medium text-sett-text-secondary">
+                {/* value row — height:17 gap:8px */}
+                <div className="flex items-center gap-2">
+                  <span className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
                     ({request.starRating}-Star)
                   </span>
                   {request.starRating && <StarRating rating={request.starRating} />}
                 </div>
               </div>
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+              {/* Vertical divider */}
+              <div className="w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+              {/* Budget Range */}
+              <div className="flex flex-col gap-[14px] items-center">
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                   {t.offer.budgetRange}
                 </p>
-                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5">
-                  {request.budgetRange || '—'}
+                <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                  {request.budgetRange ? request.budgetRange.charAt(0).toUpperCase() + request.budgetRange.slice(1) : '—'}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">
+              {/* Vertical divider */}
+              <div className="w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+              {/* Group Type */}
+              <div className="flex flex-col gap-[14px] items-center">
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                   {t.offer.groupType}
                 </p>
-                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5 capitalize">
+                <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D] capitalize">
                   {request.groupType || '—'}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal uppercase text-sett-text-accent">{t.offer.guests}</p>
-                <p className="font-montserrat text-[14px] font-medium text-sett-text-secondary mt-0.5">
+              {/* Vertical divider */}
+              <div className="w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+              {/* Guests */}
+              <div className="flex flex-col gap-[14px] items-center">
+                <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                  {t.offer.guests}
+                </p>
+                <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
                   {request.groupSize ?? '—'}
                 </p>
               </div>
@@ -465,14 +515,16 @@ export default function RequestDetailPage() {
           </div>
         </div>
 
-        <hr className="border-sett-border mb-6" />
+        <hr className="border-[#686868]/40 mb-6" />
 
         {/* ── Room & Accommodations ── */}
-        <div className="mb-6">
-          <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">
+        <div className="flex flex-col gap-5 mb-6">
+          {/* Heading — height:20 */}
+          <h3 className="font-montserrat text-[16px] font-semibold leading-none text-[#1D1D1D]">
             {t.offer.roomAccommodations}
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
+          {/* Cards row — height:86 gap:20px */}
+          <div className="flex w-full gap-5">
             {[
               { label: t.offer.single, value: rooms?.single },
               { label: t.offer.double, value: rooms?.double },
@@ -481,33 +533,61 @@ export default function RequestDetailPage() {
             ].map((room) => (
               <div
                 key={room.label}
-                className="border border-sett-border-light rounded-[14px] p-4 text-center"
+                className="flex flex-1 flex-col items-center justify-center gap-[14px] border border-[#686868]/40 rounded-[14px]"
+                style={{ height: 86 }}
               >
-                <p className="font-montserrat text-[18px] font-bold text-sett-text-primary">
-                  {room.value || '—'}
+                <p className="font-montserrat text-[18px] font-bold leading-none text-[#1D1D1D]">
+                  {room.value ?? '—'}
                 </p>
-                <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
+                <p className="font-montserrat text-[12px] font-semibold leading-none uppercase text-sett-text-accent">
                   {room.label}
                 </p>
               </div>
             ))}
           </div>
 
+          {/* Bed Configuration for Double Room — outer: 14px radius, border #68686866, h:166 */}
+          <div className="w-full rounded-[14px] border border-[#686868]/40 bg-white p-5">
+            <h4 className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D] mb-5">
+              Bed Configuration for Double Room
+            </h4>
+            {/* Inner cards row — gap:20px, h:86 */}
+            <div className="flex w-full gap-5">
+              {[
+                { label: 'Standard Double Bed', value: rooms?.standardDoubleBeds },
+                { label: 'Twin Bed', value: rooms?.twinBeds },
+              ].map((bed) => (
+                <div
+                  key={bed.label}
+                  className="flex flex-1 flex-col items-center justify-center gap-[14px] border border-[#686868]/40 rounded-[14px]"
+                  style={{ height: 86 }}
+                >
+                  <p className="font-montserrat text-[18px] font-bold leading-none text-[#1D1D1D]">
+                    {bed.value ?? '—'}
+                  </p>
+                  <p className="font-montserrat text-[12px] font-semibold leading-none uppercase text-sett-text-accent">
+                    {bed.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {rooms?.extraRoomsNote && (
-            <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mb-4">
-              <span className="font-semibold text-body text-sett-text-primary">{t.offer.extras}: </span>
-              <span className="text-body text-sett-text-secondary">{rooms.extraRoomsNote}</span>
+            <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px]" style={{ minHeight: 57 }}>
+              <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.extras}:</span>
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{rooms.extraRoomsNote}</span>
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-            <div className="border border-sett-border-light rounded-[14px] p-3 sm:p-4 text-center">
+            <div className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center">
               <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{breakfastLabel}</p>
               <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                 {t.offer.breakfastPreference}
               </p>
             </div>
-            <div className="border border-sett-border-light rounded-[14px] p-3 sm:p-4 text-center">
+            <div className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center">
               <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{locationLabel}</p>
               <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                 {t.offer.hotelLocation}
@@ -516,18 +596,14 @@ export default function RequestDetailPage() {
           </div>
 
           {request.specialRequirements && (
-            <div className="bg-[#EDF4FE] rounded-card px-4 py-3">
-              <span className="font-semibold text-body text-sett-text-primary">
-                {t.offer.specialRequirement}:{' '}
-              </span>
-              <span className="text-body text-sett-text-secondary">
-                {request.specialRequirements}
-              </span>
+            <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px]" style={{ minHeight: 57 }}>
+              <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.specialRequirements}</span>
             </div>
           )}
         </div>
 
-        <hr className="border-sett-border mb-6" />
+        <hr className="border-[#686868]/40 mb-6" />
 
         {/* ── Customer Details ── */}
         <div className="mb-6">
@@ -542,7 +618,7 @@ export default function RequestDetailPage() {
                   {t.offer.companyName}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary font-medium">
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
                 {request.companyName || '—'}
               </p>
             </div>
@@ -554,11 +630,11 @@ export default function RequestDetailPage() {
                 </span>
               </div>
               {request.guestListFileKey ? (
-                <a href="#" className="text-body text-sett-primary hover:underline font-medium">
+                <a href="#" className="font-montserrat text-[14px] font-semibold leading-none text-sett-primary hover:underline">
                   {request.guestListFileKey}
                 </a>
               ) : (
-                <p className="text-body text-sett-text-secondary">—</p>
+                <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">—</p>
               )}
             </div>
             <div>
@@ -568,7 +644,7 @@ export default function RequestDetailPage() {
                   {t.offer.contactPerson}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary font-medium">
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
                 {[request.firstName, request.lastName].filter(Boolean).join(' ') ||
                   request.contactName ||
                   '—'}
@@ -581,7 +657,7 @@ export default function RequestDetailPage() {
                   {t.offer.emailAddress}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary">{request.contactEmail || '—'}</p>
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">{request.contactEmail || '—'}</p>
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-1">
@@ -590,20 +666,22 @@ export default function RequestDetailPage() {
                   {t.offer.phoneNumber}
                 </span>
               </div>
-              <p className="text-body text-sett-text-primary">{request.contactPhone || '—'}</p>
+              <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+                {request.contactPhone
+                  ? request.contactPhone.replace(/[^\d+]/g, '').replace(/(\+?\d{3})(?=\d)/g, '$1 ').trim()
+                  : '—'}
+              </p>
             </div>
           </div>
           {request.customerNotes && (
-            <div className="bg-[#EDF4FE] rounded-card px-4 py-3 mt-3">
-              <span className="font-semibold text-body text-sett-text-primary">
-                {t.offer.specialRequirement}:{' '}
-              </span>
-              <span className="text-body text-sett-text-secondary">{request.customerNotes}</span>
+            <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] mt-3" style={{ minHeight: 57 }}>
+              <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.customerNotes}</span>
             </div>
           )}
         </div>
 
-        <hr className="border-sett-border mb-6" />
+        <hr className="border-[#686868]/40 mb-6" />
 
         {/* ── Policies ── */}
         <div>
@@ -613,7 +691,7 @@ export default function RequestDetailPage() {
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                 {t.offer.termsConditions}
               </p>
-              <p className="text-body text-sett-text-secondary whitespace-pre-line">
+              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D] whitespace-pre-line" style={{ lineHeight: '22px' }}>
                 {request.termsAndConditions}
               </p>
             </div>
@@ -623,7 +701,7 @@ export default function RequestDetailPage() {
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                 {t.offer.cancellationConditions}
               </p>
-              <p className="text-body text-sett-text-secondary whitespace-pre-line">
+              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D] whitespace-pre-line" style={{ lineHeight: '22px' }}>
                 {request.cancellationConditions}
               </p>
             </div>
@@ -653,7 +731,13 @@ export default function RequestDetailPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.offer.hotels}</h3>
-              <Button variant="primary" size="sm" onClick={handleAddHotelsClick} isLoading={actionLoading}>
+              <Button 
+              variant="primary" 
+              size="sm" 
+              onClick={handleAddHotelsClick}
+               isLoading={actionLoading}
+               disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+               >
                 {t.offer.addHotel}
               </Button>
             </div>
@@ -679,8 +763,8 @@ export default function RequestDetailPage() {
             )}
           </div>
 
-          {/* Additional Services */}
-          <div>
+          {/* Additional Services — only show when hotels are added */}
+          {hotels.length > 0 && <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-heading-sm font-bold text-sett-text-primary">
                 {t.offer.additionalServices}
@@ -688,7 +772,8 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 onClick={() => setAddServiceOpen(true)}
-                className="px-4 py-1.5 border-2 border-sett-primary rounded-button text-body text-sett-primary font-bold uppercase tracking-[0.08em] hover:bg-sett-primary hover:text-sett-navy transition-colors duration-200"
+                className="px-4 py-1.5 border-2 border-sett-primary rounded-button text-body text-sett-primary font-bold uppercase tracking-[0.08em] hover:bg-sett-primary hover:text-sett-navy disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-sett-primary disabled:border-gray-300 transition-colors duration-200"
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
               >
                 {t.offer.addService}
               </button>
@@ -747,7 +832,7 @@ export default function RequestDetailPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Right sidebar — only show when proposal exists with hotels */}
@@ -764,37 +849,52 @@ export default function RequestDetailPage() {
             </div>
 
             {/* Room Breakdown */}
-            <div className="bg-sett-card rounded-card border border-sett-border p-5">
-              <h4 className="text-heading-sm font-bold text-sett-text-primary mb-4">
-                {t.offer.roomBreakdown}
-              </h4>
-              <dl className="space-y-3">
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.totalPurchase}</dt>
-                  <dd className="font-semibold text-sett-text-primary">
-                    &euro;{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </dd>
+            <div className="bg-white flex flex-col" style={{ borderRadius: 14, border: '1px solid #6868681A' }}>
+              {/* Title */}
+              <div className="px-5 pt-5 pb-5">
+                <h4 className="font-montserrat font-semibold text-[18px] leading-none tracking-normal text-[#1D1D1D]">
+                  {t.offer.roomBreakdown}
+                </h4>
+              </div>
+              {/* Divider below title */}
+              <div className="mx-5" style={{ borderTop: '1px solid #6868681A' }} />
+              {/* Rows */}
+              <div className="px-5 pt-5 pb-5 flex flex-col gap-4">
+                {/* Total Purchase */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalPurchase}</span>
+                  <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
+                    €{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <hr className="border-sett-border" />
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.totalSell}</dt>
-                  <dd className="font-semibold text-sett-text-primary">
-                    &euro;{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </dd>
+                {/* Divider below Total Purchase */}
+                <div style={{ borderTop: '1px solid #6868681A' }} />
+                {/* Total Sell */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalSell}</span>
+                  <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
+                    €{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.marginEur}</dt>
-                  <dd className="font-semibold text-sett-primary">
-                    &euro;{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
-                  </dd>
+                {/* Divider below Total Sell */}
+                <div style={{ borderTop: '1px solid #6868681A' }} />
+                {/* Margin */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginEur}</span>
+                  <span className="font-montserrat font-bold text-[18px] leading-none text-right" style={{ color: '#667F00' }}>
+                    €{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
-                <div className="flex justify-between text-body">
-                  <dt className="text-sett-text-secondary">{t.offer.marginPct}</dt>
-                  <dd className="font-semibold text-sett-primary">
+                {/* Green divider below Margin */}
+                <div style={{ borderTop: '1px solid #AAC737' }} />
+                {/* Margin % */}
+                <div className="flex items-center justify-between">
+                  <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginPct}</span>
+                  <span className="font-montserrat font-bold text-[16px] leading-none text-right" style={{ color: '#AAC737' }}>
                     {totals.margin.toFixed(1)}%
-                  </dd>
+                  </span>
                 </div>
-              </dl>
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -807,11 +907,21 @@ export default function RequestDetailPage() {
                 <Save className="w-4 h-4" />
                 {t.offer.saveDraft}
               </Button>
-              <Button variant="primary" size="sm" onClick={() => setSendOpen(true)}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setSendOpen(true)}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+              >
                 <Send className="w-4 h-4" />
                 {t.offer.approveAndSend}
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => setDeclineOpen(true)}>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setDeclineOpen(true)}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+              >
                 <XCircle className="w-4 h-4" />
                 {t.offer.markDeclined}
               </Button>
@@ -892,10 +1002,17 @@ export default function RequestDetailPage() {
                 <input
                   type="email"
                   value={sendEmail}
-                  onChange={(e) => setSendEmail(e.target.value)}
+                  onChange={(e) => { setSendEmail(e.target.value); if (sendEmailError) setSendEmailError(''); }}
                   placeholder={t.offer.emailPlaceholder}
-                  className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none focus:border-sett-primary"
+                  className={`w-full px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none ${
+                    sendEmailError
+                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                      : 'border-sett-border-light focus:border-sett-primary'
+                  }`}
                 />
+                {sendEmailError && (
+                  <p className="mt-1 font-montserrat text-[12px] text-red-500">{sendEmailError}</p>
+                )}
               </div>
               <div>
                 <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
@@ -914,7 +1031,7 @@ export default function RequestDetailPage() {
             <div className="flex gap-3 justify-end mt-6">
               <Button
                 variant="secondary"
-                onClick={() => { setSendOpen(false); setSendError(''); setSendEmail(''); setSendNotes(''); }}
+                onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmail(''); setSendNotes(''); }}
                 disabled={actionLoading}
               >
                 {t.common.cancel}
@@ -941,6 +1058,15 @@ export default function RequestDetailPage() {
         confirmLabel={t.offer.declineConfirm}
         variant="danger"
       />
+
+      {request && (
+        <EditRequestModal
+          open={editRequestOpen}
+          request={request}
+          onClose={() => setEditRequestOpen(false)}
+          onSaved={(updated) => setRequest(updated)}
+        />
+      )}
 
       <SuccessModal
         open={successOpen}
@@ -981,22 +1107,47 @@ function MarkupDropdown({
 }) {
   const [isCustom, setIsCustom] = useState(false);
   const [customValue, setCustomValue] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
   const isPreset = MARKUP_PRESETS.includes(Math.round(value) as typeof MARKUP_PRESETS[number]);
+
+  // Position the dropdown using getBoundingClientRect
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    
+    setPos({ top: rect.bottom + 4, left: rect.right - 140 });
+  }, [open]);
 
   // Close dropdown on outside click
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setIsCustom(false);
-      }
+      if (
+        triggerRef.current?.contains(e.target as Node) ||
+        panelRef.current?.contains(e.target as Node)
+      ) return;
+      setOpen(false);
+      setIsCustom(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  // Close on scroll so it doesn't float detached
+  useEffect(() => {
+    if (!open) return;
+    const handleScroll = () => { setOpen(false); setIsCustom(false); };
+    const main = document.querySelector('main');
+    main?.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      main?.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, [open]);
 
   const handleSelect = (preset: number) => {
@@ -1016,8 +1167,9 @@ function MarkupDropdown({
   };
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 px-2 py-1 rounded border border-sett-border hover:border-sett-primary text-body text-sett-text-primary bg-white transition-colors min-w-[72px] justify-between"
@@ -1028,58 +1180,64 @@ function MarkupDropdown({
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 right-0 bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1">
-          {MARKUP_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => handleSelect(preset)}
-              className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors ${
-                Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
-              }`}
-            >
-              {preset}%
-            </button>
-          ))}
-          <hr className="border-sett-border my-1" />
-          {isCustom ? (
-            <div className="px-3 py-1.5 flex items-center gap-1">
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={customValue}
-                onChange={(e) => setCustomValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCustomSubmit();
-                  if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
-                }}
-                autoFocus
-                className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
-                placeholder="0-100"
-              />
-              <span className="text-body text-sett-text-accent">%</span>
+      {open &&
+        ReactDOM.createPortal(
+          <div
+            ref={panelRef}
+            className="fixed z-[9999] bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1"
+            style={{ top: pos.top, left: pos.left }}
+          >
+            {MARKUP_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => handleSelect(preset)}
+                className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors ${
+                  Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
+                }`}
+              >
+                {preset}%
+              </button>
+            ))}
+            <hr className="border-sett-border my-1" />
+            {isCustom ? (
+              <div className="px-3 py-1.5 flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={customValue}
+                  onChange={(e) => setCustomValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCustomSubmit();
+                    if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
+                  }}
+                  autoFocus
+                  className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
+                  placeholder="0-100"
+                />
+                <span className="text-body text-sett-text-accent">%</span>
+                <button
+                  type="button"
+                  onClick={handleCustomSubmit}
+                  className="text-sett-primary text-body font-medium hover:underline ml-1"
+                >
+                  OK
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
-                onClick={handleCustomSubmit}
-                className="text-sett-primary text-body font-medium hover:underline ml-1"
+                onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(Math.round(value))); }}
+                className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
               >
-                OK
+                Custom...
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(Math.round(value))); }}
-              className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
-            >
-              Custom...
-            </button>
-          )}
-        </div>
-      )}
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

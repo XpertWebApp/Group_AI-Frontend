@@ -142,8 +142,7 @@ export default function CompanyDetailsPage() {
               value={form.phoneNumber}
               onChange={(phone) => update('phoneNumber', phone)}
               error={errors.phoneNumber}
-              placeholder="+1 234 567 8900"
-              hideLabel
+              label=""
             />
           </div>
         );

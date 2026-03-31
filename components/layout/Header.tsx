@@ -48,12 +48,15 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-2">
-        <div className="relative group/tooltip-lang">
+        {/* Language Toggle */}
+        <div className="relative group">
           <LanguageToggle />
-          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-[#1D1D1D] text-white font-montserrat text-[11px] whitespace-nowrap opacity-0 group-hover/tooltip-lang:opacity-100 transition-opacity duration-200 z-50">
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-sett-navy text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md z-50">
             Switch Language
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-sett-navy" />
           </span>
         </div>
+
         {onRefresh && (
           <button
             type="button"
@@ -62,7 +65,9 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
             aria-label="Refresh"
           />
         )}
-        <div className="relative group/tooltip-bell">
+
+        {/* Notifications */}
+        <div className="relative group">
           <button
             type="button"
             onClick={() => setNotificationsOpen(true)}
@@ -77,12 +82,15 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
               </span>
             )}
           </button>
-          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-[#1D1D1D] text-white font-montserrat text-[11px] whitespace-nowrap opacity-0 group-hover/tooltip-bell:opacity-100 transition-opacity duration-200 z-50">
+          <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-sett-navy text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md z-50">
             Notifications
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-sett-navy" />
           </span>
         </div>
+
+        {/* Logout */}
         {onLogoutClick && (
-          <div className="relative group/tooltip-logout">
+          <div className="relative group">
             <button
               type="button"
               onClick={onLogoutClick}
@@ -91,11 +99,13 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
             >
               <LogOut className="w-5 h-5" />
             </button>
-            <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-[#1D1D1D] text-white font-montserrat text-[11px] whitespace-nowrap opacity-0 group-hover/tooltip-logout:opacity-100 transition-opacity duration-200 z-50">
+            <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2.5 py-1 rounded-md bg-sett-navy text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md z-50">
               Logout
+              <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-sett-navy" />
             </span>
           </div>
         )}
+
         {actions}
       </div>
       </div>

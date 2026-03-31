@@ -93,17 +93,17 @@ export function Select({
         </label>
       )}
 
-      {/* Hidden native select for form compatibility */}
+      {/* Hidden input for form compatibility */}
       <input type="hidden" name={name} value={value || ''} />
 
-      {/* Trigger */}
+      {/* Trigger button */}
       <button
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
         className={cn(
           'w-full flex items-center justify-between rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal cursor-pointer',
-          isFilter ? 'py-[10px] pl-3 pr-3' : 'p-3 pr-3',
+          isFilter ? 'h-[41px] p-3' : 'p-3 pr-3',
           isPlaceholder ? 'text-sett-text-accent' : 'text-sett-text-primary',
           'transition-all duration-150',
           'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -112,7 +112,7 @@ export function Select({
             : error
               ? 'border-red-500'
               : isFilter
-                ? 'border-sett-border hover:border-sett-primary/40'
+                ? 'border-[#68686833] hover:border-sett-primary/40'
                 : 'border-sett-border-light hover:border-sett-primary/40',
         )}
       >
@@ -126,13 +126,13 @@ export function Select({
         />
       </button>
 
-      {/* Dropdown Panel */}
+      {/* Dropdown panel */}
       {open && (
         <div
           ref={listRef}
-          className="absolute z-50 mt-1.5 w-full rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+          className="absolute z-50 mt-1.5 w-full rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
         >
-          <div className="max-h-[240px] overflow-y-auto py-1.5 scrollbar-thin">
+          <div className="max-h-[240px] overflow-y-auto py-1.5">
             {placeholder && (
               <button
                 type="button"
