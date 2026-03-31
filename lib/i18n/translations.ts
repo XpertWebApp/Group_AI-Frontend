@@ -591,6 +591,7 @@ export const translations = {
     // ── Policies ──
     policiesPage: {
       title: 'Policies',
+      description: 'Manage terms, conditions, and cancellation policies for proposals',
       back: 'Back',
       english: 'English',
       german: 'Deutsch',
@@ -1211,6 +1212,7 @@ export const translations = {
     // ── Richtlinien ──
     policiesPage: {
       title: 'Richtlinien',
+      description: 'Bedingungen, Konditionen und Stornierungsrichtlinien für Angebote verwalten',
       back: 'Zurück',
       english: 'English',
       german: 'Deutsch',

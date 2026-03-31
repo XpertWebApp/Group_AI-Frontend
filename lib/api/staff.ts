@@ -36,7 +36,7 @@ export const staffApi = {
   },
 
   blockUnblock: async (id: string, action: 'block' | 'unblock') => {
-    const { data } = await apiClient.patch<{ data: StaffMember }>(`/settings/staff/${id}/status`, { action });
+    const { data } = await apiClient.patch<{ data: StaffMember }>(`/settings/staff/${id}/status`, { isActive: action === 'unblock' });
     return data.data;
   },
 

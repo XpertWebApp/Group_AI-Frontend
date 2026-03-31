@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, SquarePen } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
-import { Button } from '@/components/ui/Button';
+
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { settingsApi, type CompanySettings } from '@/lib/api/settings';
@@ -56,7 +56,6 @@ export default function CompanyDetailsPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [touched, setTouched] = useState<Set<keyof CompanySettings>>(new Set());
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -75,7 +74,7 @@ export default function CompanyDetailsPage() {
 
   const update = (field: keyof CompanySettings, value: string) => {
     setForm((p) => ({ ...p, [field]: value }));
-    setTouched((prev) => new Set(prev).add(field));
+
     // Clear error on change
     if (errors[field]) {
       setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
@@ -93,7 +92,7 @@ export default function CompanyDetailsPage() {
     const validationErrors = validateForm(form);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      setTouched(new Set(Object.keys(form) as (keyof CompanySettings)[]));
+
       return;
     }
 
@@ -103,7 +102,7 @@ export default function CompanyDetailsPage() {
       setOriginalForm(form);
       setEditing(false);
       setErrors({});
-      setTouched(new Set());
+
       toast.success(t.toasts.settingsSaved);
     } catch {
       // handled by api client
@@ -116,7 +115,6 @@ export default function CompanyDetailsPage() {
     setForm(originalForm);
     setEditing(false);
     setErrors({});
-    setTouched(new Set());
   };
 
   const inputBase = 'w-full h-[41px] rounded-[14px] font-montserrat text-[14px] text-[#1D1D1D] placeholder:text-[#A3A3A3] focus:outline-none';
@@ -257,21 +255,23 @@ export default function CompanyDetailsPage() {
 
                 {/* Action buttons — edit mode */}
                 {editing && (
-                  <div className="flex items-center gap-3 mt-2">
-                    <Button
-                      variant="primary"
-                      onClick={handleSave}
-                      isLoading={saving}
-                    >
-                      {t.companyDetails.save}
-                    </Button>
+                  <div className="flex items-center justify-between mt-2">
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="px-4 py-2.5 rounded-[14px] font-montserrat text-[14px] font-semibold text-[#4A4A4A] border hover:bg-[#F7F7F7] transition-colors"
-                      style={{ border: '1px solid #E6EAF0' }}
+                      className="flex items-center justify-center rounded-[14px] font-montserrat text-[14px] font-semibold text-[#4A4A4A] hover:bg-[#F7F7F7] transition-colors"
+                      style={{ width: 180, height: 44, border: '1px solid #E6EAF0' }}
                     >
                       {t.common.cancel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="flex items-center justify-center rounded-[14px] font-montserrat text-[14px] font-semibold text-white disabled:opacity-50 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95"
+                      style={{ width: 180, height: 44, background: '#AAC737', boxShadow: '4px 4px 5px 0px #FFFFFF40 inset, 0px 8px 20px 0px #00000021' }}
+                    >
+                      {saving ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t.companyDetails.save}
                     </button>
                   </div>
                 )}

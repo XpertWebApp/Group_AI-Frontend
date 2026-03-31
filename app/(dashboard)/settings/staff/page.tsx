@@ -125,8 +125,9 @@ export default function StaffManagementPage() {
   };
 
   // ── Actions menu visibility rules ──
-  const canBlockUnblock = (m: StaffMember) => m.role !== 'Admin' && m.id !== currentUserId.current;
-  const canDelete = (m: StaffMember) => m.role !== 'Admin' && m.id !== currentUserId.current;
+  const isSelf = (m: StaffMember) => m.id === currentUserId.current;
+  const canBlockUnblock = (m: StaffMember) => !isSelf(m);
+  const canDelete = (m: StaffMember) => !isSelf(m);
 
   // ── Add Staff ──
   const handleAddStaff = async (payload: { fullName: string; email: string }) => {
@@ -389,8 +390,8 @@ export default function StaffManagementPage() {
 
       {/* ── Block/Unblock Modal ── */}
       {blockTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" role="dialog" aria-modal="true">
-          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#606162]/80" role="dialog" aria-modal="true">
+          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_20px_0_rgba(0,0,0,0.14)]">
             <div className="p-5 pb-4">
               <h2 className="font-montserrat text-[18px] font-semibold leading-none text-[#1D1D1D] mb-2">
                 {blockTarget.status === 'active' ? t.staffManagement.blockTitle : t.staffManagement.unblockTitle}
@@ -411,8 +412,8 @@ export default function StaffManagementPage() {
 
       {/* ── Delete Modal ── */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" role="dialog" aria-modal="true">
-          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#606162]/80" role="dialog" aria-modal="true">
+          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_20px_0_rgba(0,0,0,0.14)]">
             <div className="p-5 pb-4">
               <h2 className="font-montserrat text-[18px] font-semibold leading-none text-[#1D1D1D] mb-2">
                 {t.staffManagement.deleteTitle}
@@ -433,8 +434,8 @@ export default function StaffManagementPage() {
 
       {/* ── Reset Password Modal ── */}
       {resetTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" role="dialog" aria-modal="true">
-          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#606162]/80" role="dialog" aria-modal="true">
+          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_20px_0_rgba(0,0,0,0.14)]">
             {/* Header */}
             <div className="flex items-start justify-between p-5 pb-0">
               <div>
@@ -496,8 +497,8 @@ export default function StaffManagementPage() {
 
       {/* ── Staff Credentials Generated Modal ── */}
       {credentials && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" role="dialog" aria-modal="true">
-          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#606162]/80" role="dialog" aria-modal="true">
+          <div className="w-[525px] rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_20px_0_rgba(0,0,0,0.14)]">
             <div className="flex items-start justify-between p-5 pb-0">
               <div>
                 <h2 className="font-montserrat text-[18px] font-semibold leading-none text-[#1D1D1D] mb-2">{t.staffManagement.credentialsTitle}</h2>

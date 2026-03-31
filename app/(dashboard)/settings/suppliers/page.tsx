@@ -106,7 +106,7 @@ export default function SupplierLimitsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Search by customer, destination, or ID..."
+                placeholder="Search by supplier code, provider name, or ACC code..."
                 className="w-full h-[41px] pl-9 pr-3 rounded-[14px] font-montserrat text-[14px] font-normal text-[#1D1D1D] placeholder:text-[#4A4A4A] focus:outline-none focus:border-sett-primary focus:ring-1 focus:ring-sett-primary"
                 style={{ border: '1px solid #E6EAF0', padding: 12, paddingLeft: 36 }}
               />
