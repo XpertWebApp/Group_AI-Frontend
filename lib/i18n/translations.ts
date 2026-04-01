@@ -681,7 +681,7 @@ export const translations = {
   de: {
     // ── Navigation ──
     nav: {
-      dashboard: 'Dashboard',
+      dashboard: 'Armaturenbrett',
       groupRequests: 'Gruppenanfragen',
       createRequest: 'Anfrage erstellen',
       settings: 'Einstellungen',
@@ -709,7 +709,7 @@ export const translations = {
 
     // ── Dashboard ──
     dashboard: {
-      title: 'Dashboard',
+      title: 'Armaturenbrett',
       totalRequests: 'ANFRAGEN GESAMT',
       pendingRequests: 'OFFENE ANFRAGEN',
       sentOffers: 'GESENDETE ANGEBOTE',
