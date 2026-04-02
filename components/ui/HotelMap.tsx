@@ -40,15 +40,14 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
     libraries: LIBRARIES,
   });
 
-  // Filter hotels with valid, non-NaN coordinates
+  // Filter hotels with strictly finite numeric coordinates
+  // Number.isFinite rejects null, undefined, NaN, "", strings — only real finite numbers pass
   const mappableHotels = useMemo(
     () =>
       hotels.filter(
         (h) =>
-          h.latitude != null &&
-          h.longitude != null &&
-          !isNaN(h.latitude) &&
-          !isNaN(h.longitude),
+          Number.isFinite(h.latitude as unknown as number) &&
+          Number.isFinite(h.longitude as unknown as number),
       ),
     [hotels],
   );
@@ -72,7 +71,11 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
       }
       const bounds = new google.maps.LatLngBounds();
       mappableHotels.forEach((h) => {
-        bounds.extend({ lat: h.latitude!, lng: h.longitude! });
+        const lat = h.latitude as unknown as number;
+        const lng = h.longitude as unknown as number;
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          bounds.extend({ lat, lng });
+        }
       });
       map.fitBounds(bounds, 40);
     },
@@ -88,8 +91,11 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
     markersRef.current = [];
 
     mappableHotels.forEach((hotel) => {
+      const lat = hotel.latitude as unknown as number;
+      const lng = hotel.longitude as unknown as number;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
       const marker = new google.maps.marker.AdvancedMarkerElement({
-        position: { lat: hotel.latitude!, lng: hotel.longitude! },
+        position: { lat, lng },
         map: mapRef.current!,
         title: hotel.hotelName || hotel.hotelCode,
       });
