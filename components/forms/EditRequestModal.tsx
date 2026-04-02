@@ -124,6 +124,13 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const handleSave = async () => {
+    const roomFields = ['single', 'double', 'triple', 'quadruple', 'standardDoubleBeds', 'twinBeds'] as const;
+    const totalRooms = roomFields.reduce((sum, f) => sum + (Number(form[f]) || 0), 0);
+    if (totalRooms === 0) {
+      toast.error(t.offer.editRoomsRequired);
+      return;
+    }
+
     setSaving(true);
     try {
       const updated = await requestsApi.update(request.id, {

@@ -293,8 +293,8 @@ export default function CreateBookingRequestPage() {
         contactPhone: formData.phone,
         customerNotes: formData.specialRequestsCustomer || undefined,
         // Step 4: Policies
-        termsAndConditions: formData.termsAndConditions || undefined,
-        cancellationConditions: formData.cancellationConditions || undefined,
+        termsAndConditions: formData.termsAndConditions?.replace(/<[^>]*>/g, '').trim() ? formData.termsAndConditions : undefined,
+        cancellationConditions: formData.cancellationConditions?.replace(/<[^>]*>/g, '').trim() ? formData.cancellationConditions : undefined,
         status: 'pending',
       });
       toast.success(t.toasts.requestCreated);

@@ -389,10 +389,10 @@ export default function RequestDetailPage() {
         </button>
         <span className="text-[#E6EAF0] hidden sm:inline">|</span>
         <span className="font-montserrat text-[18px] font-bold text-sett-text-primary">
-          Offer #{request.referenceNumber ?? id.slice(0, 4)}
+          {t.offer.offer} #{request.referenceNumber ?? id.slice(0, 4)}
         </span>
-        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.proposals?.[0]?.status ?? request.status)}>
-          {(proposal?.status ?? request.proposals?.[0]?.status ?? request.status)
+        <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
+          {(proposal?.status ?? request.status)
             .replace(/_/g, ' ')
             .replace(/\b\w/g, (c) => c.toUpperCase())}
         </Badge>
@@ -426,7 +426,7 @@ export default function RequestDetailPage() {
             size="sm"
             onClick={handleAddHotelsClick}
             isLoading={actionLoading}
-            disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+            disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
           >
             {t.offer.addHotels}
           </Button>
@@ -686,24 +686,28 @@ export default function RequestDetailPage() {
         {/* ── Policies ── */}
         <div>
           <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">{t.offer.policies}</h3>
-          {request.termsAndConditions && (
+          {request.termsAndConditions && request.termsAndConditions.replace(/<[^>]*>/g, '').trim() && (
             <div className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50">
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                 {t.offer.termsConditions}
               </p>
-              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D] whitespace-pre-line" style={{ lineHeight: '22px' }}>
-                {request.termsAndConditions}
-              </p>
+              <div
+                className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]"
+                style={{ lineHeight: '22px' }}
+                dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
+              />
             </div>
           )}
-          {request.cancellationConditions && (
+          {request.cancellationConditions && request.cancellationConditions.replace(/<[^>]*>/g, '').trim() && (
             <div className="bg-sett-fill rounded-card px-4 py-3 border border-sett-border/50">
               <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                 {t.offer.cancellationConditions}
               </p>
-              <p className="font-montserrat text-[14px] font-semibold text-[#1D1D1D] whitespace-pre-line" style={{ lineHeight: '22px' }}>
-                {request.cancellationConditions}
-              </p>
+              <div
+                className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]"
+                style={{ lineHeight: '22px' }}
+                dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
+              />
             </div>
           )}
         </div>
@@ -736,7 +740,7 @@ export default function RequestDetailPage() {
               size="sm" 
               onClick={handleAddHotelsClick}
                isLoading={actionLoading}
-               disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+               disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
                >
                 {t.offer.addHotel}
               </Button>
@@ -773,7 +777,7 @@ export default function RequestDetailPage() {
                 type="button"
                 onClick={() => setAddServiceOpen(true)}
                 className="px-4 py-1.5 border-2 border-sett-primary rounded-button text-body text-sett-primary font-bold uppercase tracking-[0.08em] hover:bg-sett-primary hover:text-sett-navy disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-sett-primary disabled:border-gray-300 transition-colors duration-200"
-                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
               >
                 {t.offer.addService}
               </button>
@@ -911,7 +915,7 @@ export default function RequestDetailPage() {
                 variant="primary"
                 size="sm"
                 onClick={() => setSendOpen(true)}
-                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
               >
                 <Send className="w-4 h-4" />
                 {t.offer.approveAndSend}
@@ -920,7 +924,7 @@ export default function RequestDetailPage() {
                 variant="destructive"
                 size="sm"
                 onClick={() => setDeclineOpen(true)}
-                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.proposals?.[0]?.status ?? '').toLowerCase())}
+                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
               >
                 <XCircle className="w-4 h-4" />
                 {t.offer.markDeclined}

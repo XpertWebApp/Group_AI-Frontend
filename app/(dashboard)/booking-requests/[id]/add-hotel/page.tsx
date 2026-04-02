@@ -78,6 +78,10 @@ function getAmenityIcon(name: string): LucideIcon | null {
   return AMENITY_ICON_MAP[name.toLowerCase().trim()] ?? null;
 }
 
+function getAmenityLabel(name: string, facilityNames: Record<string, string>): string {
+  return facilityNames[name.toLowerCase().trim()] ?? name;
+}
+
 export default function AddHotelPage() {
   const params = useParams();
   const router = useRouter();
@@ -329,13 +333,11 @@ export default function AddHotelPage() {
       const status = await requestsApi.getHotelSearchStatus(requestId);
       if (!mountedRef.current) return;
 
-      console.log('[AddHotel] Search status response:', JSON.stringify(status, null, 2));
-
       const completedHotels = status.jobs
         .filter((j: { status: string; resultJson?: unknown }) => j.status === 'COMPLETED' && j.resultJson)
         .map((j: { resultJson?: HotelSearchResult | null }) => j.resultJson as HotelSearchResult);
 
-      console.log('[AddHotel] Completed hotels extracted:', completedHotels.length, completedHotels);
+
 
       const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
       const stillRunning = status.summary.queued + status.summary.running;
@@ -483,7 +485,7 @@ export default function AddHotelPage() {
         </button>
         <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
         <span className="font-montserrat text-[14px] font-medium text-sett-text-accent">
-          Offer #{request?.referenceNumber ?? requestId.slice(0, 4)}
+          {t.addHotel.offer} #{request?.referenceNumber ?? requestId.slice(0, 4)}
         </span>
         <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
         <span className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.addHotel.title}</span>
@@ -598,37 +600,37 @@ export default function AddHotelPage() {
                 {request?.rooms && (
                   <div className="flex flex-col gap-[6px]">
                     <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                      Rooms Required
+                     {t.addHotel.roomsrequired}
                     </label>
                     <div className="space-y-2">
                       {[
-                        { label: 'Single', value: request.rooms.single },
-                        { label: 'Double', value: request.rooms.double },
-                        { label: 'Triple', value: request.rooms.triple },
-                        { label: 'Quadruple', value: request.rooms.quadruple },
+                        { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
+                        { key: 'roomDouble', label: t.addHotel.roomDouble, value: request.rooms.double },
+                        { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
+                        { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
                       ]
                         .filter((r) => r.value && r.value > 0)
                         .map((r) => (
-                          <div key={r.label}>
+                          <div key={r.key}>
                             <div className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
                               <span>{r.label}</span>
                               <span className="font-semibold text-sett-text-primary">{r.value}</span>
                             </div>
                             {/* Bed Configuration for Double rooms */}
-                            {r.label === 'Double' && (request.rooms?.standardDoubleBeds || request.rooms?.twinBeds) ? (
+                            {r.key === 'roomDouble' && (request.rooms?.standardDoubleBeds || request.rooms?.twinBeds) ? (
                               <div className="mt-2 px-3 py-3 rounded-[10px] border border-sett-border-light bg-[#F7F7F7]">
                                 <hr className="border-sett-border-light mb-3" />
-                                <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary mb-2">Bed Configuration</p>
+                                <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary mb-2">{t.addHotel.bedConfiguration}</p>
                                 <div className="space-y-1.5">
                                   {request.rooms?.standardDoubleBeds ? (
                                     <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
-                                      <span>Standard Double Bed</span>
+                                      <span>{t.addHotel.standardDoubleBed}</span>
                                       <span className="font-semibold text-sett-text-primary">{request.rooms.standardDoubleBeds}</span>
                                     </div>
                                   ) : null}
                                   {request.rooms?.twinBeds ? (
                                     <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
-                                      <span>Twin Bed</span>
+                                      <span>{t.addHotel.twinBed}</span>
                                       <span className="font-semibold text-sett-text-primary">{request.rooms.twinBeds}</span>
                                     </div>
                                   ) : null}
@@ -712,7 +714,7 @@ export default function AddHotelPage() {
                         className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
                         onClick={() => setShowAllAmenities((prev) => !prev)}
                       >
-                        {showAllAmenities ? 'Show Less' : t.addHotel.viewAll}
+                        {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
                       </button>
                     )}
                   </div>
@@ -733,7 +735,7 @@ export default function AddHotelPage() {
                             <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
                           )}
                           <span className="font-montserrat text-[14px] text-sett-text-secondary">
-                            {facility.name}
+                            {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
                             {facility.hotelCount !== undefined && (
                               <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
                             )}
@@ -924,7 +926,7 @@ function HotelResultCard({
                   key={facility.id}
                   className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20"
                 >
-                  {facility.name}
+                  {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
                 </span>
               ))}
             </div>

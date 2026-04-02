@@ -45,29 +45,29 @@ export function AppLayout({ children }: AppLayoutProps) {
           isMobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
         />
-      <div className="flex-1 flex flex-col lg:ml-sidebar h-screen">
-        <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-3 bg-sett-card border-b border-sett-border lg:hidden">
-          <button
-            type="button"
-            onClick={() => setMobileOpen(true)}
-            className="p-2 rounded-lg hover:bg-sett-border/50"
-            aria-label="Open menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+        <div className="flex-1 flex flex-col lg:ml-sidebar h-screen min-w-0">
+          <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-3 bg-sett-card border-b border-sett-border lg:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="p-2 rounded-lg hover:bg-sett-border/50"
+              aria-label="Open menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
+          <main className="flex-1 bg-sett-background overflow-auto min-h-0">
+            {children}
+          </main>
+          <footer className="w-full py-3 px-4 border-t border-sett-border-light bg-[#F7F7F7]">
+            <span className="font-montserrat text-[12px] font-medium leading-normal text-sett-text-accent">
+              2026 S-E-T-T &nbsp;|&nbsp; All Rights Reserved
+            </span>
+          </footer>
+          {/* Green Bottom Bar — Brand Guidelines §8.2 */}
+          <div className="w-full h-[8px] bg-sett-primary shrink-0" />
         </div>
-        <main className="flex-1 bg-sett-background overflow-auto min-h-0">
-          {children}
-        </main>
-        <footer className="w-full py-3 px-4 border-t border-sett-border-light bg-[#F7F7F7]">
-          <span className="font-montserrat text-[12px] font-medium leading-normal text-sett-text-accent">
-            2026 S-E-T-T &nbsp;|&nbsp; All Rights Reserved
-          </span>
-        </footer>
-        {/* Green Bottom Bar — Brand Guidelines §8.2 */}
-        <div className="w-full h-[8px] bg-sett-primary shrink-0" />
       </div>
-    </div>
       <LogoutModal
         open={logoutOpen}
         onClose={() => setLogoutOpen(false)}

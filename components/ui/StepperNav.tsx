@@ -71,7 +71,7 @@ export function StepperNav({ steps, currentStep }: StepperNavProps) {
             <span
               key={`label-${step.label}`}
               className={cn(
-                'text-body font-medium',
+                'text-[12px] sm:text-[14px] leading-tight font-medium break-words min-w-0 pr-1 sm:pr-0',
                 isActive
                   ? 'text-sett-text-secondary'
                   : isCompleted
