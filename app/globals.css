@@ -178,7 +178,7 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   z-index: 9999 !important;
 }
 
-.sett-datepicker .react-datepicker {
+.sett-datepicker-popper .react-datepicker {
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
   border: 1px solid var(--sett-border-light);
   border-radius: 14px;
@@ -186,36 +186,36 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   overflow: hidden;
 }
 
-.sett-datepicker .react-datepicker__header {
+.sett-datepicker-popper .react-datepicker__header {
   background-color: var(--sett-navy);
   border-bottom: none;
   padding: 12px 0 8px;
 }
 
-.sett-datepicker .react-datepicker__current-month {
+.sett-datepicker-popper .react-datepicker__current-month {
   color: #fff;
   font-weight: 600;
   font-size: 14px;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
 }
 
-.sett-datepicker .react-datepicker__day-name {
-  color: rgba(255,255,255,0.7);
+.sett-datepicker-popper .react-datepicker__day-name {
+  color: rgba(102, 127, 55, 0.7);
   font-size: 12px;
   font-weight: 500;
   width: 2rem;
   line-height: 2rem;
 }
 
-.sett-datepicker .react-datepicker__navigation-icon::before {
+.sett-datepicker-popper .react-datepicker__navigation-icon::before {
   border-color: rgba(255,255,255,0.8);
 }
 
-.sett-datepicker .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+.sett-datepicker-popper .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
   border-color: #fff;
 }
 
-.sett-datepicker .react-datepicker__day {
+.sett-datepicker-popper .react-datepicker__day {
   width: 2rem;
   line-height: 2rem;
   border-radius: 6px;
@@ -224,38 +224,38 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sett-datepicker .react-datepicker__day:hover {
+.sett-datepicker-popper .react-datepicker__day:hover {
   background-color: #f0f6d0;
   color: var(--sett-navy);
 }
 
-.sett-datepicker .react-datepicker__day--selected {
+.sett-datepicker-popper .react-datepicker__day--selected {
   background-color: var(--sett-primary) !important;
   color: var(--sett-navy) !important;
   font-weight: 700;
 }
 
-.sett-datepicker .react-datepicker__day--today {
+.sett-datepicker-popper .react-datepicker__day--today {
   font-weight: 700;
   border: 1px solid var(--sett-primary);
   background-color: transparent;
 }
 
-.sett-datepicker .react-datepicker__day--keyboard-selected {
+.sett-datepicker-popper .react-datepicker__day--keyboard-selected {
   background-color: #e8f2b0;
   color: var(--sett-navy);
 }
 
-.sett-datepicker .react-datepicker__day--disabled {
+.sett-datepicker-popper .react-datepicker__day--disabled {
   color: #ccc;
   cursor: not-allowed;
 }
 
-.sett-datepicker .react-datepicker__day--disabled:hover {
+.sett-datepicker-popper .react-datepicker__day--disabled:hover {
   background-color: transparent;
 }
 
-.sett-datepicker .react-datepicker__today-button {
+.sett-datepicker-popper .react-datepicker__today-button {
   background-color: var(--sett-primary);
   color: var(--sett-navy);
   font-weight: 700;
@@ -265,6 +265,6 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   padding: 8px;
 }
 
-.sett-datepicker .react-datepicker__triangle {
+.sett-datepicker-popper .react-datepicker__triangle {
   display: none;
 }
