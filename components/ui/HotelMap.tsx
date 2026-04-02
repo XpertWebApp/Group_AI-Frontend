@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from '@react-google-maps/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GoogleMap, useJsApiLoader, InfoWindowF } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 
 interface Hotel {
@@ -18,6 +18,7 @@ interface HotelMapProps {
 }
 
 const MAP_CONTAINER_STYLE = { width: '100%', height: '100%' };
+const LIBRARIES: ('marker')[] = ['marker'];
 
 const MAP_OPTIONS: google.maps.MapOptions = {
   disableDefaultUI: true,
@@ -25,23 +26,34 @@ const MAP_OPTIONS: google.maps.MapOptions = {
   mapTypeControl: false,
   streetViewControl: false,
   fullscreenControl: false,
+  mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || 'DEMO_MAP_ID',
 };
 
 export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
   const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
+    libraries: LIBRARIES,
   });
 
-  // Filter hotels that have valid coordinates
+  // Filter hotels with valid, non-NaN coordinates
   const mappableHotels = useMemo(
-    () => hotels.filter((h) => h.latitude != null && h.longitude != null),
-    [hotels]
+    () =>
+      hotels.filter(
+        (h) =>
+          h.latitude != null &&
+          h.longitude != null &&
+          !isNaN(h.latitude) &&
+          !isNaN(h.longitude),
+      ),
+    [hotels],
   );
 
-  // Calculate map center and bounds
+  // Calculate map center from average of valid coordinates
   const center = useMemo(() => {
     if (mappableHotels.length === 0) return { lat: 48.8566, lng: 2.3522 }; // Paris default
     const avgLat =
@@ -51,8 +63,9 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
     return { lat: avgLat, lng: avgLng };
   }, [mappableHotels]);
 
-  const onLoad = useCallback(
+  const onMapLoad = useCallback(
     (map: google.maps.Map) => {
+      mapRef.current = map;
       if (mappableHotels.length <= 1) {
         map.setZoom(14);
         return;
@@ -63,8 +76,34 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
       });
       map.fitBounds(bounds, 40);
     },
-    [mappableHotels]
+    [mappableHotels],
   );
+
+  // Create AdvancedMarkerElements imperatively once map is loaded
+  useEffect(() => {
+    if (!isLoaded || !mapRef.current) return;
+
+    // Clear previous markers
+    markersRef.current.forEach((m) => (m.map = null));
+    markersRef.current = [];
+
+    mappableHotels.forEach((hotel) => {
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        position: { lat: hotel.latitude!, lng: hotel.longitude! },
+        map: mapRef.current!,
+        title: hotel.hotelName || hotel.hotelCode,
+      });
+      marker.addListener('click', () => setSelectedHotel(hotel));
+      markersRef.current.push(marker);
+    });
+  }, [isLoaded, mappableHotels]);
+
+  // Cleanup markers on unmount
+  useEffect(() => {
+    return () => {
+      markersRef.current.forEach((m) => (m.map = null));
+    };
+  }, []);
 
   // No API key configured
   if (!apiKey || apiKey === 'YOUR_GOOGLE_MAPS_API_KEY_HERE') {
@@ -76,7 +115,7 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
     );
   }
 
-  // No hotels have coordinates
+  // No hotels have valid coordinates
   if (mappableHotels.length === 0) {
     return (
       <div className={`bg-sett-fill flex flex-col items-center justify-center rounded-lg ${className}`}>
@@ -111,18 +150,9 @@ export function HotelMap({ hotels, className = 'h-44' }: HotelMapProps) {
         mapContainerStyle={MAP_CONTAINER_STYLE}
         center={center}
         zoom={13}
-        onLoad={onLoad}
+        onLoad={onMapLoad}
         options={MAP_OPTIONS}
       >
-        {mappableHotels.map((hotel) => (
-          <MarkerF
-            key={hotel.id}
-            position={{ lat: hotel.latitude!, lng: hotel.longitude! }}
-            title={hotel.hotelName || hotel.hotelCode}
-            onClick={() => setSelectedHotel(hotel)}
-          />
-        ))}
-
         {selectedHotel && (
           <InfoWindowF
             position={{
