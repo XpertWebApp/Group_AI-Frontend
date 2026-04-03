@@ -13,6 +13,7 @@ import {
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { PageLoader, Spinner } from '@/components/ui/Loader';
+import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
@@ -108,6 +109,7 @@ export default function AddHotelPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string } | null>(null);
 
   // Load request data
   useEffect(() => {
@@ -282,7 +284,9 @@ export default function AddHotelPage() {
           .map((j) => j.resultJson!);
         setCompletedResults(results);
 
-        if (status.summary.queued + status.summary.running === 0) {
+        // Only stop when we know jobs have been created AND all are finished
+        // (total === 0 means the backend hasn't queued the jobs yet — keep polling)
+        if (status.summary.total > 0 && status.summary.queued + status.summary.running === 0) {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           setPhase('done');
         }
@@ -328,7 +332,7 @@ export default function AddHotelPage() {
     setCompletedResults([]);
     setSearchSummary(null);
 
-    // First try to load existing search results
+    // Check existing search status first
     try {
       const status = await requestsApi.getHotelSearchStatus(requestId);
       if (!mountedRef.current) return;
@@ -336,13 +340,11 @@ export default function AddHotelPage() {
       const completedHotels = status.jobs
         .filter((j: { status: string; resultJson?: unknown }) => j.status === 'COMPLETED' && j.resultJson)
         .map((j: { resultJson?: HotelSearchResult | null }) => j.resultJson as HotelSearchResult);
-
-
-
       const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
       const stillRunning = status.summary.queued + status.summary.running;
 
       if (completedHotels.length > 0 || checked > 0) {
+        // Previous search exists — show its results
         setCompletedResults(completedHotels);
         setSearchSummary({
           total: status.summary.total,
@@ -353,20 +355,22 @@ export default function AddHotelPage() {
         });
 
         if (stillRunning > 0) {
+          // Still running — resume polling
           setPhase('polling');
           startPollingFallback(requestId);
         } else {
+          // Already finished — show results as-is, do NOT restart
           setPhase('done');
         }
         return;
       }
-    } catch (err) {
-      // No existing search or status endpoint failed — that's OK, start a new one
-      console.log('[AddHotel] No existing search found, starting new one:', err);
+      // No results and nothing running — fall through to start a new search
+    } catch {
+      // Status endpoint failed or no search yet — start fresh
     }
 
     if (!mountedRef.current) return;
-    // No existing results — start a new search
+    // No prior search found — start a new one
     startNewSearch();
   }, [requestId, startPollingFallback, startNewSearch]);
 
@@ -473,329 +477,338 @@ export default function AddHotelPage() {
       <Header title={t.createForm.title} />
 
       <div className="p-4 md:p-6 space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <button
-          type="button"
-          onClick={() => router.push(`/booking-requests/${requestId}`)}
-          className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {t.common.back}
-        </button>
-        <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
-        <span className="font-montserrat text-[14px] font-medium text-sett-text-accent">
-          {t.addHotel.offer} #{request?.referenceNumber ?? requestId.slice(0, 4)}
-        </span>
-        <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
-        <span className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.addHotel.title}</span>
-      </div>
-
-      {/* Loading request data */}
-      {phase === 'idle' && !request && (
-        <PageLoader message={t.addHotel.loadingRequest} />
-      )}
-
-      {/* Searching / Polling phase */}
-      {(phase === 'searching' || phase === 'polling') && (
-        <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
-          <Spinner size="lg" className="mx-auto mb-4" />
-          <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
-            {t.addHotel.searchingHotels}
-          </h3>
-          {searchSummary ? (
-            <>
-              <p className="font-montserrat text-[14px] text-sett-text-secondary mb-4">
-                {t.addHotel.hotelsChecked.replace('{completed}', String(searchSummary.completed)).replace('{total}', String(searchSummary.total))}
-              </p>
-              <div className="w-full max-w-md mx-auto bg-sett-border-light rounded-full h-2.5">
-                <div
-                  className="bg-sett-primary h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${searchSummary.total > 0 ? Math.round((searchSummary.completed / searchSummary.total) * 100) : 0}%` }}
-                />
-              </div>
-              {searchSummary.hotelsFound > 0 && (
-                <p className="font-montserrat text-[13px] text-sett-primary font-medium mt-3">
-                  {t.addHotel.hotelsFoundSoFar.replace('{count}', String(searchSummary.hotelsFound))}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="font-montserrat text-[14px] text-sett-text-accent max-w-md mx-auto">
-              {t.addHotel.startingSearch}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Error phase */}
-      {phase === 'error' && (
-        <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
-          <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
-          <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">{t.addHotel.searchFailed}</h3>
-          <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">{errorMsg}</p>
-          <Button variant="primary" onClick={runSearch}>
-            {t.addHotel.retrySearch}
-          </Button>
-        </div>
-      )}
-
-      {/* Results — show when done, or progressively during polling if results exist */}
-      {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && (
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* ── Mobile filter toggle ── */}
+        {/* Breadcrumb */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => setFiltersOpen(!filtersOpen)}
-            className="lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+            onClick={() => router.push(`/booking-requests/${requestId}`)}
+            className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
           >
-            <SlidersHorizontal className="w-4 h-4" />
-            {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
-            {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
-              <span className="w-2 h-2 rounded-full bg-sett-primary" />
-            )}
+            <ArrowLeft className="w-4 h-4" />
+            {t.common.back}
           </button>
+          <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
+          <span className="font-montserrat text-[14px] font-medium text-sett-text-accent">
+            {t.addHotel.offer} #{request?.referenceNumber ?? requestId.slice(0, 4)}
+          </span>
+          <span className="text-sett-text-accent hidden sm:inline">&gt;</span>
+          <span className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.addHotel.title}</span>
+        </div>
 
-          {/* ── Left Sidebar: Filters ── */}
-          <aside className={cn(
-            'lg:w-[320px] shrink-0',
-            filtersOpen ? 'block' : 'hidden lg:block'
-          )}>
-            <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
-              <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
-              <hr className="border-sett-border-light mb-5" />
+        {/* Loading request data */}
+        {phase === 'idle' && !request && (
+          <PageLoader message={t.addHotel.loadingRequest} />
+        )}
 
-              <div className="space-y-5">
-                {/* Destination */}
-                <div className="flex flex-col gap-[6px]">
-                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                    {t.addHotel.destination}
-                  </label>
-                  <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
-                    {request?.destinationName || '—'}
-                  </div>
+        {/* Searching / Polling phase */}
+        {(phase === 'searching' || phase === 'polling') && (
+          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+            <Spinner size="lg" className="mx-auto mb-4" />
+            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
+              {t.addHotel.searchingHotels}
+            </h3>
+            {searchSummary ? (
+              <>
+                <p className="font-montserrat text-[14px] text-sett-text-secondary mb-4">
+                  {t.addHotel.hotelsChecked.replace('{completed}', String(searchSummary.completed)).replace('{total}', String(searchSummary.total))}
+                </p>
+                <div className="w-full max-w-md mx-auto bg-sett-border-light rounded-full h-2.5">
+                  <div
+                    className="bg-sett-primary h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${searchSummary.total > 0 ? Math.round((searchSummary.completed / searchSummary.total) * 100) : 0}%` }}
+                  />
                 </div>
+                {searchSummary.hotelsFound > 0 && (
+                  <p className="font-montserrat text-[13px] text-sett-primary font-medium mt-3">
+                    {t.addHotel.hotelsFoundSoFar.replace('{count}', String(searchSummary.hotelsFound))}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="font-montserrat text-[14px] text-sett-text-accent max-w-md mx-auto">
+                {t.addHotel.startingSearch}
+              </p>
+            )}
+          </div>
+        )}
 
-                <hr className="border-sett-border-light" />
+        {/* Error phase */}
+        {phase === 'error' && (
+          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+            <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
+            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">{t.addHotel.searchFailed}</h3>
+            <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">{errorMsg}</p>
+            <Button variant="primary" onClick={runSearch}>
+              {t.addHotel.retrySearch}
+            </Button>
+          </div>
+        )}
 
-                {/* Stay Dates */}
-                <div className="flex flex-col gap-[6px]">
-                  <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                    {t.addHotel.stayDates}
-                  </label>
-                  <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                    {request?.checkinDate
-                      ? new Date(request.checkinDate).toLocaleDateString('en-GB')
-                      : '—'}
-                    {' - '}
-                    {request?.checkoutDate
-                      ? new Date(request.checkoutDate).toLocaleDateString('en-GB')
-                      : '—'}
-                  </div>
-                </div>
+        {/* Results — show when done, or progressively during polling if results exist */}
+        {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && (
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* ── Mobile filter toggle ── */}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              className="lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
+              {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
+                <span className="w-2 h-2 rounded-full bg-sett-primary" />
+              )}
+            </button>
 
-                <hr className="border-sett-border-light" />
+            {/* ── Left Sidebar: Filters ── */}
+            <aside className={cn(
+              'lg:w-[320px] shrink-0',
+              filtersOpen ? 'block' : 'hidden lg:block'
+            )}>
+              <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+                <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
+                <hr className="border-sett-border-light mb-5" />
 
-                {/* Rooms Required */}
-                {request?.rooms && (
+                <div className="space-y-5">
+                  {/* Destination */}
                   <div className="flex flex-col gap-[6px]">
                     <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                     {t.addHotel.roomsrequired}
+                      {t.addHotel.destination}
                     </label>
-                    <div className="space-y-2">
-                      {[
-                        { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
-                        { key: 'roomDouble', label: t.addHotel.roomDouble, value: request.rooms.double },
-                        { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
-                        { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
-                      ]
-                        .filter((r) => r.value && r.value > 0)
-                        .map((r) => (
-                          <div key={r.key}>
-                            <div className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                              <span>{r.label}</span>
-                              <span className="font-semibold text-sett-text-primary">{r.value}</span>
-                            </div>
-                            {/* Bed Configuration for Double rooms */}
-                            {r.key === 'roomDouble' && (request.rooms?.standardDoubleBeds || request.rooms?.twinBeds) ? (
-                              <div className="mt-2 px-3 py-3 rounded-[10px] border border-sett-border-light bg-[#F7F7F7]">
-                                <hr className="border-sett-border-light mb-3" />
-                                <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary mb-2">{t.addHotel.bedConfiguration}</p>
-                                <div className="space-y-1.5">
-                                  {request.rooms?.standardDoubleBeds ? (
-                                    <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
-                                      <span>{t.addHotel.standardDoubleBed}</span>
-                                      <span className="font-semibold text-sett-text-primary">{request.rooms.standardDoubleBeds}</span>
-                                    </div>
-                                  ) : null}
-                                  {request.rooms?.twinBeds ? (
-                                    <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
-                                      <span>{t.addHotel.twinBed}</span>
-                                      <span className="font-semibold text-sett-text-primary">{request.rooms.twinBeds}</span>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
+                    <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
+                      {request?.destinationName || '—'}
                     </div>
                   </div>
-                )}
 
-                <hr className="border-sett-border-light" />
+                  <hr className="border-sett-border-light" />
 
-                {/* Star Rating */}
-                <div className="flex flex-col gap-3">
-                  <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                    {t.addHotel.starRating}
-                  </label>
-                  <div className="flex flex-col gap-3">
-                    {[5, 4, 3].map((star) => (
-                      <label
-                        key={star}
-                        className={cn(
-                          'flex items-center gap-3 cursor-pointer transition-opacity',
-                          starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
-                        )}
-                        onClick={() => toggleStar(star)}
-                      >
-                        <span className={cn(
-                          'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
-                          starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
-                        )}>
-                          {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
-                        </span>
-                        <div className="flex gap-0.5">
-                          {Array.from({ length: star }).map((_, i) => (
-                            <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
-                          ))}
-                        </div>
-                      </label>
-                    ))}
+                  {/* Stay Dates */}
+                  <div className="flex flex-col gap-[6px]">
+                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                      {t.addHotel.stayDates}
+                    </label>
+                    <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                      {request?.checkinDate
+                        ? new Date(request.checkinDate).toLocaleDateString('en-GB')
+                        : '—'}
+                      {' - '}
+                      {request?.checkoutDate
+                        ? new Date(request.checkoutDate).toLocaleDateString('en-GB')
+                        : '—'}
+                    </div>
                   </div>
-                </div>
 
-                <hr className="border-sett-border-light" />
+                  <hr className="border-sett-border-light" />
 
-                {/* Price Per Night */}
-                <div>
-                  <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary mb-2">
-                    {t.addHotel.pricePerNight}
-                  </label>
-                  <input
-                    type="range"
-                    min={0}
-                    max={3000}
-                    step={50}
-                    value={maxPrice}
-                    onChange={(e) => setMaxPrice(Number(e.target.value))}
-                    className="w-full h-[14px] rounded-full appearance-none cursor-pointer bg-sett-primary
+                  {/* Rooms Required */}
+                  {request?.rooms && (
+                    <div className="flex flex-col gap-[6px]">
+                      <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                        {t.addHotel.roomsrequired}
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
+                          { key: 'roomDouble', label: t.addHotel.roomDouble, value: request.rooms.double },
+                          { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
+                          { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
+                        ]
+                          .filter((r) => r.value && r.value > 0)
+                          .map((r) => (
+                            <div key={r.key}>
+                              <div className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                                <span>{r.label}</span>
+                                <span className="font-semibold text-sett-text-primary">{r.value}</span>
+                              </div>
+                              {/* Bed Configuration for Double rooms */}
+                              {r.key === 'roomDouble' && (request.rooms?.standardDoubleBeds || request.rooms?.twinBeds) ? (
+                                <div className="mt-2 px-3 py-3 rounded-[10px] border border-sett-border-light bg-[#F7F7F7]">
+                                  <hr className="border-sett-border-light mb-3" />
+                                  <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary mb-2">{t.addHotel.bedConfiguration}</p>
+                                  <div className="space-y-1.5">
+                                    {request.rooms?.standardDoubleBeds ? (
+                                      <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
+                                        <span>{t.addHotel.standardDoubleBed}</span>
+                                        <span className="font-semibold text-sett-text-primary">{request.rooms.standardDoubleBeds}</span>
+                                      </div>
+                                    ) : null}
+                                    {request.rooms?.twinBeds ? (
+                                      <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
+                                        <span>{t.addHotel.twinBed}</span>
+                                        <span className="font-semibold text-sett-text-primary">{request.rooms.twinBeds}</span>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <hr className="border-sett-border-light" />
+
+                  {/* Star Rating */}
+                  <div className="flex flex-col gap-3">
+                    <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                      {t.addHotel.starRating}
+                    </label>
+                    <div className="flex flex-col gap-3">
+                      {[5, 4, 3].map((star) => (
+                        <label
+                          key={star}
+                          className={cn(
+                            'flex items-center gap-3 cursor-pointer transition-opacity',
+                            starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
+                          )}
+                          onClick={() => toggleStar(star)}
+                        >
+                          <span className={cn(
+                            'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                            starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                          )}>
+                            {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
+                          </span>
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: star }).map((_, i) => (
+                              <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
+                            ))}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <hr className="border-sett-border-light" />
+
+                  {/* Price Per Night */}
+                  <div>
+                    <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary mb-2">
+                      {t.addHotel.pricePerNight}
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={3000}
+                      step={50}
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(Number(e.target.value))}
+                      className="w-full h-[14px] rounded-full appearance-none cursor-pointer bg-sett-primary
                       [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[14px] [&::-webkit-slider-thumb]:h-[14px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#F8F9FB] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-sett-border-light [&::-webkit-slider-thumb]:shadow-sm
                       [&::-moz-range-thumb]:w-[14px] [&::-moz-range-thumb]:h-[14px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F8F9FB] [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-sett-border-light [&::-moz-range-thumb]:shadow-sm"
-                  />
-                  <div className="flex justify-between font-montserrat text-[12px] text-sett-text-accent mt-1">
-                    <span>&euro;0</span>
-                    <span>&euro;{maxPrice.toLocaleString()}</span>
+                    />
+                    <div className="flex justify-between font-montserrat text-[12px] text-sett-text-accent mt-1">
+                      <span>&euro;0</span>
+                      <span>&euro;{maxPrice.toLocaleString()}</span>
+                    </div>
                   </div>
-                </div>
 
-                <hr className="border-sett-border-light" />
+                  <hr className="border-sett-border-light" />
 
-                {/* Amenities */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                      {t.addHotel.amenities}
-                    </label>
-                    {availableFacilities.length > 6 && (
-                      <button
-                        type="button"
-                        className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
-                        onClick={() => setShowAllAmenities((prev) => !prev)}
-                      >
-                        {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
-                      </button>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
-                      const AmenityIcon = getAmenityIcon(facility.name);
-                      return (
-                        <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
-                          <span className={cn(
-                            'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                            amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
-                          )}
-                            onClick={() => toggleAmenity(facility.id)}
-                          >
-                            {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
-                          </span>
-                          {AmenityIcon && (
-                            <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
-                          )}
-                          <span className="font-montserrat text-[14px] text-sett-text-secondary">
-                            {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
-                            {facility.hotelCount !== undefined && (
-                              <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
+                  {/* Amenities */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        {t.addHotel.amenities}
+                      </label>
+                      {availableFacilities.length > 6 && (
+                        <button
+                          type="button"
+                          className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                          onClick={() => setShowAllAmenities((prev) => !prev)}
+                        >
+                          {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
+                        const AmenityIcon = getAmenityIcon(facility.name);
+                        return (
+                          <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                            <span className={cn(
+                              'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                              amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
                             )}
-                          </span>
-                        </label>
-                      );
-                    })}
+                              onClick={() => toggleAmenity(facility.id)}
+                            >
+                              {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                            </span>
+                            {AmenityIcon && (
+                              <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
+                            )}
+                            <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                              {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                              {facility.hotelCount !== undefined && (
+                                <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Toggle alternatives */}
-              {altResults.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowAlternatives(!showAlternatives)}
-                  className={cn(
-                    'w-full mt-5 px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] font-semibold transition-colors',
-                    showAlternatives
-                      ? 'bg-sett-primary text-white border-sett-primary'
-                      : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-light-green-bg'
-                  )}
-                >
-                  {showAlternatives
-                    ? t.addHotel.showMainResults
-                    : `${t.addHotel.showAlternatives} (${altResults.length})`}
-                </button>
+                {/* Toggle alternatives */}
+                {altResults.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAlternatives(!showAlternatives)}
+                    className={cn(
+                      'w-full mt-5 px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] font-semibold transition-colors',
+                      showAlternatives
+                        ? 'bg-sett-primary text-white border-sett-primary'
+                        : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-light-green-bg'
+                    )}
+                  >
+                    {showAlternatives
+                      ? t.addHotel.showMainResults
+                      : `${t.addHotel.showAlternatives} (${altResults.length})`}
+                  </button>
+                )}
+              </div>
+            </aside>
+
+            {/* ── Right: Hotel Results ── */}
+            <div className="flex-1 min-w-0">
+              <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">
+                {t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))}
+              </p>
+
+              {filteredResults.length === 0 && (
+                <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+                  <p className="font-montserrat text-[14px] text-sett-text-accent">
+                    {t.addHotel.noHotelsMatch}
+                  </p>
+                </div>
               )}
-            </div>
-          </aside>
 
-          {/* ── Right: Hotel Results ── */}
-          <div className="flex-1 min-w-0">
-            <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">
-              {t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))}
-            </p>
-
-            {filteredResults.length === 0 && (
-              <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
-                <p className="font-montserrat text-[14px] text-sett-text-accent">
-                  {t.addHotel.noHotelsMatch}
-                </p>
+              <div className="space-y-5">
+                {filteredResults.map((hotel) => (
+                  <HotelResultCard
+                    key={hotel.hotelCode}
+                    hotel={hotel}
+                    isAdded={addedHotels.has(hotel.hotelCode)}
+                    isAdding={addingHotel === hotel.hotelCode}
+                    onAddToOffer={() => handleAddToOffer(hotel)}
+                    onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName })}
+                  />
+                ))}
               </div>
-            )}
-
-            <div className="space-y-5">
-              {filteredResults.map((hotel) => (
-                <HotelResultCard
-                  key={hotel.hotelCode}
-                  hotel={hotel}
-                  isAdded={addedHotels.has(hotel.hotelCode)}
-                  isAdding={addingHotel === hotel.hotelCode}
-                  onAddToOffer={() => handleAddToOffer(hotel)}
-                />
-              ))}
             </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
+
+      {detailHotel && (
+        <HotelDetailModal
+          hotelCode={detailHotel.hotelCode}
+          hotelName={detailHotel.hotelName}
+          onClose={() => setDetailHotel(null)}
+        />
+      )}
     </>
   );
 }
@@ -807,11 +820,13 @@ function HotelResultCard({
   isAdded,
   isAdding,
   onAddToOffer,
+  onViewDetails,
 }: {
   hotel: HotelSearchResult;
   isAdded: boolean;
   isAdding: boolean;
   onAddToOffer: () => void;
+  onViewDetails: () => void;
 }) {
   const { t } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
@@ -835,9 +850,9 @@ function HotelResultCard({
       )}
     >
       {/* ── Top section: Image + Hotel Details + Action ── */}
-      <div className="flex flex-col sm:flex-row gap-5">
+      <div className="flex flex-col md:flex-row lg:flex-col 2xl:flex-row gap-4 md:gap-5">
         {/* ── Hotel Image ── */}
-        <div className="w-full sm:w-[280px] h-[200px] sm:h-[256px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
+        <div className="w-full md:w-[220px] lg:w-full 2xl:w-[280px] h-[200px] sm:h-[240px] md:h-[220px] lg:h-[256px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
           <img
             src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
             alt={hotel.hotelName}
@@ -856,11 +871,24 @@ function HotelResultCard({
         {/* ── Hotel Details ── */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">
           {/* Top: Name, Address, Stars + Add to Offer */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex-1 min-w-0 flex flex-col gap-3">
               <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">
                 {hotel.hotelName}
               </h4>
+              {hotel.description && (
+                <p
+                  className="font-montserrat text-[13px] text-sett-text-secondary mt-0.5"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {hotel.description}
+                </p>
+              )}
 
               {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
                 <div className="flex items-center gap-1.5">
@@ -903,6 +931,13 @@ function HotelResultCard({
                   {t.addHotel.addToOffer}
                 </Button>
               )}
+              <button
+                type="button"
+                onClick={onViewDetails}
+                className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+              >
+                {t.addHotel.viewDetails}
+              </button>
               {hasCancellation && (
                 <div className="flex flex-col items-end gap-0.5">
                   <span className="flex items-center gap-1 font-montserrat text-[13px] text-sett-primary font-semibold whitespace-nowrap">
@@ -933,74 +968,80 @@ function HotelResultCard({
           )}
 
           {/* ── Room Table (desktop) ── */}
-          <div className="hidden sm:block mt-4 overflow-x-auto">
+          <div className="hidden xl:block mt-4 overflow-x-auto">
             <div className="border border-sett-border-light rounded-[14px] overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-sett-border-light bg-[#FAFAFA]">
-                <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                  {t.addHotel.roomType}
-                </th>
-                <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                  {t.addHotel.rooms}
-                </th>
-                <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                  Rate Basis
-                </th>
-                <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                  {t.addHotel.perNight}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {roomTypes.map((rt, i) => (
-                <tr key={i} className="border-t border-sett-border-light">
-                  <td className="py-2.5 px-4">
-                    <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
-                      {rt.roomType.replace(/_/g, ' ')}
-                    </span>
-                    {rt.supplierCode && (
-                      <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
-                        {rt.supplierCode}
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
-                    {rt.roomsAllocated}
-                  </td>
-                  <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
-                    {rt.mealName || rt.mealType || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                    &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-              </tbody>
-            </table>
-          </div>
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-sett-border-light bg-[#FAFAFA]">
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      {t.addHotel.roomType}
+                    </th>
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      {t.addHotel.rooms}
+                    </th>
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      Rate Basis
+                    </th>
+                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                      {t.addHotel.perNight}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {roomTypes.map((rt, i) => (
+                    <tr key={i} className="border-t border-sett-border-light">
+                      <td className="py-2.5 px-4">
+                        <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
+                          {rt.roomType.replace(/_/g, ' ')}
+                        </span>
+                        {rt.supplierCode && (
+                          <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
+                            {rt.supplierCode}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
+                        {rt.roomsAllocated}
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
+                        {rt.mealName || rt.mealType || '—'}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* ── Room cards (mobile) ── */}
-          <div className="sm:hidden mt-4 space-y-2">
+          <div className="xl:hidden mt-4 space-y-2">
             {roomTypes.map((rt, i) => (
-              <div key={i} className="border border-sett-border-light rounded-[10px] p-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize">
-                    {rt.roomType.replace(/_/g, ' ')}
-                  </p>
-                  {rt.supplierCode && (
-                    <span className="font-montserrat text-[11px] text-sett-text-accent">{rt.supplierCode}</span>
-                  )}
-                </div>
-                <div className="flex justify-between mt-2">
-                  <span className="font-montserrat text-[12px] text-sett-text-accent">
-                    {rt.roomsAllocated} room{rt.roomsAllocated !== 1 ? 's' : ''}
-                    {(rt.mealName || rt.mealType) && ` · ${rt.mealName || rt.mealType}`}
-                  </span>
-                  <span className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                    &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
-                  </span>
+              <div key={i} className="border border-sett-border-light rounded-[10px] p-4 bg-[#FAFAFA]/50">
+                <div className="grid grid-cols-2 gap-y-4 gap-x-2">
+                  <div>
+                    <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.roomType}</span>
+                    <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize leading-tight">
+                      {rt.roomType.replace(/_/g, ' ')}
+                      {rt.supplierCode && <span className="block text-[11px] text-sett-text-accent mt-0.5">{rt.supplierCode}</span>}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.perNight}</span>
+                    <span className="font-montserrat text-[15px] font-semibold text-sett-text-primary">
+                      &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.rooms}</span>
+                    <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium">{rt.roomsAllocated}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">Rate Basis</span>
+                    <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium capitalize">{rt.mealName || rt.mealType || '—'}</span>
+                  </div>
                 </div>
               </div>
             ))}

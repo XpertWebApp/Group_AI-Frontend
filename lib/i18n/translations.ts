@@ -399,9 +399,18 @@ export const translations = {
       rooms: 'Rooms',
       perNight: 'Per Night',
       cancelBefore: 'Cancel before',
+      viewDetails: 'View Details',
+      hotelDetails: 'Hotel Details',
+      hotelDescription: 'Description',
+      hotelFacilities: 'Facilities',
+      hotelContact: 'Contact',
+      hotelAddress: 'Address',
+      hotelImages: 'Photos',
+      loadingDetails: 'Loading hotel details...',
+      detailsError: 'Could not load hotel details.',
     },
 
-    
+
 
     // ── Notifications ──
     notifications: {
@@ -952,6 +961,15 @@ export const translations = {
       rooms: 'Zimmer',
       perNight: 'Pro Nacht',
       cancelBefore: 'Stornierung bis',
+      viewDetails: 'Details anzeigen',
+      hotelDetails: 'Hoteldetails',
+      hotelDescription: 'Beschreibung',
+      hotelFacilities: 'Ausstattung',
+      hotelContact: 'Kontakt',
+      hotelAddress: 'Adresse',
+      hotelImages: 'Fotos',
+      loadingDetails: 'Hoteldetails werden geladen...',
+      detailsError: 'Hoteldetails konnten nicht geladen werden.',
     },
 
     // ── Notifications ──

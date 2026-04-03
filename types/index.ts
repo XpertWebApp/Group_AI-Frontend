@@ -216,6 +216,7 @@ export interface HotelSearchResult {
   supplierSplit?: SupplierSplitItem[];
   perTypeAllocations?: PerTypeAllocation[];
   note?: string | null;
+  description?: string | null;
   facilities?: Facility[];
   // Legacy / backward compat fields
   sessionId?: string;
