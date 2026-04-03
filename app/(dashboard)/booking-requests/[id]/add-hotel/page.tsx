@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal,
+  ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
@@ -934,19 +934,22 @@ function HotelResultCard({
               <button
                 type="button"
                 onClick={onViewDetails}
-                className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                className="flex items-center gap-1.5 font-montserrat text-[13px] text-sett-primary font-semibold hover:text-sett-primary-hover transition-colors group"
               >
-                {t.addHotel.viewDetails}
+                <Info className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
+                <span>{t.addHotel.viewDetails}</span>
               </button>
               {hasCancellation && (
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="flex items-center gap-1 font-montserrat text-[13px] text-sett-primary font-semibold whitespace-nowrap">
-                    <Check className="w-3.5 h-3.5" /> {t.addHotel.freeCancellation}
-                  </span>
+                <div className="flex flex-col items-end gap-1 px-3 py-2 bg-[#F0F5E3]/50 rounded-[10px] border border-sett-primary/10 mt-1">
+                  <div className="flex items-center gap-1.5 font-montserrat text-[13px] text-sett-primary font-bold">
+                    <Check className="w-4 h-4" />
+                    <span>{t.addHotel.freeCancellation}</span>
+                  </div>
                   {hotel.cxlDeadline && (
-                    <span className="font-montserrat text-[11px] text-sett-text-accent whitespace-nowrap">
-                      {t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </span>
+                    <div className="flex items-center gap-1 font-montserrat text-[11px] text-sett-text-accent font-medium uppercase tracking-tight">
+                      <Clock className="w-3 h-3" />
+                      <span>{t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    </div>
                   )}
                 </div>
               )}
