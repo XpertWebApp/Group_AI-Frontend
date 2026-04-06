@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, forwardRef } from 'react';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
@@ -179,11 +180,13 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    const phoneDigits = data.phone.replace(/\D/g, '');
-    if (!data.phone.trim() || phoneDigits.length <= 3) {
+    if (!data.phone.trim() || data.phone.replace(/\D/g, '').length <= 3) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (phoneDigits.length < 11) {
-      errors.phone = t.createForm.invalidPhone;
+    } else {
+      const parsed = parsePhoneNumberFromString(data.phone);
+      if (!parsed?.isValid()) {
+        errors.phone = t.createForm.invalidPhone;
+      }
     }
   }
 

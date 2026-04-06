@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { usePhoneInput, defaultCountries, parseCountry, FlagImage } from 'react-international-phone';
 import type { CountryIso2 } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown } from 'lucide-react';
 
@@ -27,10 +28,8 @@ export function PhoneInput({
     value,
     onChange: (data) => {
       onChange(data.phone);
-      // Total E.164 digits (country code + national number) must be >= 10
-      // e.g. AU: 61 + 412345678 = 11 digits, US: 1 + 2125551234 = 11 digits
-      const totalDigits = data.phone.replace(/\D/g, '').length;
-      onValidChange?.(totalDigits >= 10);
+      const parsed = parsePhoneNumberFromString(data.phone);
+      onValidChange?.(parsed?.isValid() ?? false);
     },
     disableDialCodeAndPrefix: true,
   });
@@ -62,7 +61,11 @@ export function PhoneInput({
           ref={inputRef}
           type="tel"
           value={inputValue}
-          onChange={handlePhoneValueChange}
+          onChange={(e) => {
+            // Strip leading zeros — trunk prefix (0) is not valid in E.164 national numbers
+            e.target.value = e.target.value.replace(/^0+/, '');
+            handlePhoneValueChange(e);
+          }}
           placeholder="412 345 678"
           className="flex-1 px-3 py-3 font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent bg-transparent focus:outline-none"
         />
