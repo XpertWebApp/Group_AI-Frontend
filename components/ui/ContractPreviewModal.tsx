@@ -21,7 +21,7 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 export function ContractPreviewModal({ open, onClose, request, proposal }: ContractPreviewModalProps) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [downloading, setDownloading] = useState(false);
   const hotels = proposal.hotels ?? [];
   const services = proposal.services ?? [];
@@ -36,7 +36,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
   const handleDownloadPdf = async () => {
     setDownloading(true);
     try {
-      const blobUrl = await proposalsApi.previewPdf(proposal.id);
+      const blobUrl = await proposalsApi.previewPdf(proposal.id, locale);
       window.open(blobUrl, '_blank');
     } catch {
       window.print();
