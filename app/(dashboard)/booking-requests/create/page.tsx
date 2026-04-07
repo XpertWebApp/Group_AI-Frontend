@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, forwardRef } from 'react';
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
@@ -80,9 +79,9 @@ const defaultFormData: FormData = {
   phone: '',
   specialRequestsCustomer: '',
   termsAndConditions:
-    '1. All prices are per person unless otherwise stated\n2. Prices are subject to availability at time of booking\n3. Full payment required 30 days before arrival\n4. Cancellation policy applies as per individual hotel terms\n5. Group rates are valid for minimum 10 participants\n6. Final room list required 14 days before arrival',
+    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>All prices are per person unless otherwise stated</li><li>Prices are subject to availability at time of booking</li><li>Full payment required 30 days before arrival</li><li>Cancellation policy applies as per individual hotel terms</li><li>Group rates are valid for minimum 10 participants</li><li>Final room list required 14 days before arrival</li></ol>',
   cancellationConditions:
-    'Cancellations made 14 days or more in advance of the event date will receive a 100% refund. Cancellations made within 7 days will incur a 50% fee.',
+    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>Cancellations made 14 days or more in advance of the event date will receive a 100% refund.</li><li>Cancellations made within 7 days will incur a 50% fee.</li></ol>',
 };
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
@@ -169,6 +168,12 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
   if (step === 1) {
     const totalRooms = data.singleRooms + data.doubleRooms + data.tripleRooms + data.quadrupleRooms;
     if (totalRooms < 1) errors.rooms = t.createForm.selectAtLeastOneRoom;
+    if (data.doubleRooms > 0) {
+      const roomsCovered = data.standardDoubleBeds + Math.floor(data.twinBeds / 2);
+      if (roomsCovered !== data.doubleRooms) {
+        errors.bedConfig = t.createForm.bedConfigRequired.replace('{count}', String(data.doubleRooms));
+      }
+    }
   }
 
   if (step === 2) {
@@ -180,13 +185,11 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    if (!data.phone.trim() || data.phone.replace(/\D/g, '').length <= 3) {
+    const allDigits = data.phone.replace(/\D/g, '');
+    if (!data.phone.trim() || allDigits.length <= 3) {
       errors.phone = t.createForm.phoneRequired;
-    } else {
-      const parsed = parsePhoneNumberFromString(data.phone);
-      if (!parsed?.isValid()) {
-        errors.phone = t.createForm.invalidPhone;
-      }
+    } else if (allDigits.length < 7 || allDigits.length > 15) {
+      errors.phone = t.createForm.invalidPhone;
     }
   }
 
@@ -651,6 +654,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
               if (val === '' || Number(val) >= 0) updateField('groupSize', val);
             }}
             onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
+            onWheel={(e) => (e.target as HTMLInputElement).blur()}
             error={errors.groupSize}
           />
         </div>
@@ -719,6 +723,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
               max={(formData.doubleRooms - formData.standardDoubleBeds) * 2}
             />
           </div>
+          <FieldError message={errors.bedConfig} />
         </div>
       )}
       <div className="mb-4" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
@@ -12,6 +12,7 @@ import { Eye, Plus } from 'lucide-react';
 import { dashboardApi } from '@/lib/api/dashboard';
 import type { DashboardStatsResponse, RecentOffer } from '@/lib/api/dashboard';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
@@ -21,6 +22,7 @@ function formatDate(dateStr: string | null | undefined): string {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
   const [offers, setOffers] = useState<RecentOffer[]>([]);
@@ -50,6 +52,19 @@ export default function DashboardPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    const googleParam = searchParams.get('google');
+    if (!googleParam) return;
+    if (googleParam === 'connected') {
+      toast.success(t.dashboard.googleConnect.successToast);
+    } else if (googleParam === 'denied') {
+      toast.error(t.dashboard.googleConnect.deniedToast);
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('google');
+    window.history.replaceState({}, '', url.toString());
+  }, [searchParams]);
 
   return (
     <>

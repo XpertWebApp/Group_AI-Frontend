@@ -59,13 +59,14 @@ export function AppLayout({ children }: AppLayoutProps) {
           <main className="flex-1 bg-sett-background overflow-auto min-h-0">
             {children}
           </main>
-          <footer className="w-full py-3 px-4 border-t border-sett-border-light bg-[#F7F7F7]">
-            <span className="font-montserrat text-[12px] font-medium leading-normal text-sett-text-accent">
+          <footer
+            className="w-full h-[39px] flex items-center px-4 shrink-0"
+            style={{ background: '#0A0A0A', borderTop: '1px solid #E6EAF0' }}
+          >
+            <span className="font-montserrat text-[12px] font-medium leading-normal text-white/60">
               2026 S-E-T-T &nbsp;|&nbsp; All Rights Reserved
             </span>
           </footer>
-          {/* Green Bottom Bar — Brand Guidelines §8.2 */}
-          <div className="w-full h-[8px] bg-sett-primary shrink-0" />
         </div>
       </div>
       <LogoutModal

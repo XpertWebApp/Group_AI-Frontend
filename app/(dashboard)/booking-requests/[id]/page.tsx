@@ -83,6 +83,7 @@ export default function RequestDetailPage() {
   const [sendNotes, setSendNotes] = useState('');
   const [sendError, setSendError] = useState('');
   const [sendEmailError, setSendEmailError] = useState('');
+  const [approveStepDone, setApproveStepDone] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -287,38 +288,42 @@ export default function RequestDetailPage() {
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
-      setSendEmailError(t.offer.emailInvalid ?? 'Please enter a valid email address');
+      setSendEmailError(t.offer.emailInvalid);
       return;
     }
 
     setActionLoading(true);
-    try {
-      // Step 1: Approve — generates PDF, emails agent
-      await proposalsApi.approve(proposal.id, {
-        agentEmail: sendEmail.trim(),
-        adminNotes: sendNotes.trim() || undefined,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t.toasts.failedToApprove;
-      setSendError(msg);
-      setActionLoading(false);
-      return;
+
+    // Step 1: Approve — generates PDF, emails agent.
+    // Skipped if a previous attempt already completed this step successfully.
+    if (!approveStepDone) {
+      try {
+        await proposalsApi.approve(proposal.id, {
+          agentEmail: emailVal,
+          adminNotes: sendNotes.trim() || undefined,
+        });
+        setApproveStepDone(true);
+      } catch {
+        setSendError(t.toasts.failedToApprove);
+        setActionLoading(false);
+        return;
+      }
     }
 
+    // Step 2: Send — marks proposal as sent
     try {
-      // Step 2: Send — marks proposal as sent
       const updated = await proposalsApi.send(proposal.id, {
-        sendToEmail: sendEmail.trim(),
+        sendToEmail: emailVal,
       });
       setProposal(updated);
       setSendOpen(false);
       setSendEmail('');
       setSendNotes('');
+      setApproveStepDone(false);
       setSuccessOpen(true);
       toast.success(t.toasts.proposalSent);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t.toasts.failedToMarkSent;
-      setSendError(`${t.offer.approvedButNotSent}: ${msg}. ${t.offer.tryAgain}`);
+    } catch {
+      setSendError(`${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
     } finally {
       setActionLoading(false);
     }
@@ -1032,7 +1037,7 @@ export default function RequestDetailPage() {
                 <div className="flex gap-3 justify-end mt-6">
                   <Button
                     variant="secondary"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmail(''); setSendNotes(''); }}
+                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmail(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
                     {t.common.cancel}
@@ -1043,7 +1048,7 @@ export default function RequestDetailPage() {
                     isLoading={actionLoading}
                   >
                     <Send className="w-4 h-4" />
-                    {t.offer.approveAndSend}
+                    {approveStepDone ? t.offer.retrySend : t.offer.approveAndSend}
                   </Button>
                 </div>
               </div>

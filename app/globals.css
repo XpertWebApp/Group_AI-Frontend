@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  100% { transform: translateX(200%); }
+}
+
 /*
  * ═══════════════════════════════════════════════════════════
  *  SETT Hub Brand Theme — CSS Variables & Base Styles

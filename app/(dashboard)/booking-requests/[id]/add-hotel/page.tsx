@@ -326,11 +326,25 @@ export default function AddHotelPage() {
   }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, amenityFilters, startPollingFallback]);
 
   // Check existing search status first, only start new search if needed
-  const runSearch = useCallback(async () => {
+  const runSearch = useCallback(async (destinationId?: number) => {
     setPhase('searching');
     setErrorMsg('');
     setCompletedResults([]);
     setSearchSummary(null);
+
+    // If the destination changed since the last search, skip cached results entirely
+    const storedDestId = localStorage.getItem(`lastSearchDest_${requestId}`);
+    const destChanged = destinationId !== undefined &&
+      storedDestId !== null &&
+      String(destinationId) !== storedDestId;
+
+    if (destChanged) {
+      // Update stored destination and run a fresh search
+      localStorage.setItem(`lastSearchDest_${requestId}`, String(destinationId));
+      if (!mountedRef.current) return;
+      startNewSearch();
+      return;
+    }
 
     // Check existing search status first
     try {
@@ -344,7 +358,10 @@ export default function AddHotelPage() {
       const stillRunning = status.summary.queued + status.summary.running;
 
       if (completedHotels.length > 0 || checked > 0) {
-        // Previous search exists — show its results
+        // Previous search exists for same destination — show its results
+        if (destinationId !== undefined) {
+          localStorage.setItem(`lastSearchDest_${requestId}`, String(destinationId));
+        }
         setCompletedResults(completedHotels);
         setSearchSummary({
           total: status.summary.total,
@@ -371,12 +388,15 @@ export default function AddHotelPage() {
 
     if (!mountedRef.current) return;
     // No prior search found — start a new one
+    if (destinationId !== undefined) {
+      localStorage.setItem(`lastSearchDest_${requestId}`, String(destinationId));
+    }
     startNewSearch();
   }, [requestId, startPollingFallback, startNewSearch]);
 
   useEffect(() => {
     if (request) {
-      runSearch();
+      runSearch(request.destinationId);
     }
   }, [request, runSearch]);
 
@@ -538,7 +558,7 @@ export default function AddHotelPage() {
             <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
             <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">{t.addHotel.searchFailed}</h3>
             <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">{errorMsg}</p>
-            <Button variant="primary" onClick={runSearch}>
+            <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
               {t.addHotel.retrySearch}
             </Button>
           </div>
@@ -740,9 +760,6 @@ export default function AddHotelPage() {
                             )}
                             <span className="font-montserrat text-[14px] text-sett-text-secondary">
                               {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
-                              {facility.hotelCount !== undefined && (
-                                <span className="text-sett-text-accent text-[12px] ml-1">({facility.hotelCount})</span>
-                              )}
                             </span>
                           </label>
                         );
@@ -751,23 +768,6 @@ export default function AddHotelPage() {
                   </div>
                 </div>
 
-                {/* Toggle alternatives */}
-                {altResults.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAlternatives(!showAlternatives)}
-                    className={cn(
-                      'w-full mt-5 px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] font-semibold transition-colors',
-                      showAlternatives
-                        ? 'bg-sett-primary text-white border-sett-primary'
-                        : 'bg-white text-sett-primary border-sett-primary hover:bg-sett-light-green-bg'
-                    )}
-                  >
-                    {showAlternatives
-                      ? t.addHotel.showMainResults
-                      : `${t.addHotel.showAlternatives} (${altResults.length})`}
-                  </button>
-                )}
               </div>
             </aside>
 

@@ -42,8 +42,8 @@ export const authApi = {
     return data.data.url;
   },
 
-  async getGoogleStatus(): Promise<{ connected: boolean }> {
-    const { data } = await apiClient.get<ApiResponse<{ connected: boolean }>>('/auth/google/status');
+  async getGoogleStatus(): Promise<{ connected: boolean; email?: string }> {
+    const { data } = await apiClient.get<ApiResponse<{ connected: boolean; email?: string }>>('/auth/google/status');
     if (!data.success || !data.data) {
       return { connected: false };
     }

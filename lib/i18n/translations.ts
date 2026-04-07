@@ -43,6 +43,15 @@ export const translations = {
       viewAll: 'View All',
       createRequest: 'Create Request',
       noRecentOffers: 'No recent offers found.',
+      googleConnect: {
+        bannerTitle: 'Connect Google Account',
+        bannerDescription: 'Connect your Google account to enable email sending via Gmail.',
+        connectButton: 'Connect Google',
+        connectedAs: 'Connected as {email}',
+        connecting: 'Connecting...',
+        successToast: 'Google account connected successfully!',
+        deniedToast: 'Google connection was cancelled or denied.',
+      },
     },
 
     // ── Booking Request List ──
@@ -182,6 +191,7 @@ export const translations = {
       groupSizeRequired: 'Group size is required',
       groupSizePositive: 'Group size must be a positive number',
       selectAtLeastOneRoom: 'Select at least one room',
+      bedConfigRequired: 'Please allocate all {count} double rooms in the bed configuration (Standard Double Bed + Twin Bed must cover all rooms)',
       companyNameRequired: 'Company name is required',
       firstNameRequired: 'First name is required',
       lastNameRequired: 'Last name is required',
@@ -268,6 +278,7 @@ export const translations = {
       emailRequired: 'Please enter the agent/client email address.',
       approvedButNotSent: 'Approved successfully, but failed to mark as sent',
       tryAgain: 'Please try again.',
+      retrySend: 'Retry Send',
       declineTitle: 'Mark Offer as Declined?',
       declineMsg: 'This will mark the offer as declined. You can still access it later from the archive.',
       declineConfirm: 'Mark Declined',
@@ -605,6 +616,15 @@ export const translations = {
       viewAll: 'Alle anzeigen',
       createRequest: 'Anfrage erstellen',
       noRecentOffers: 'Keine aktuellen Angebote gefunden.',
+      googleConnect: {
+        bannerTitle: 'Google-Konto verbinden',
+        bannerDescription: 'Verbinden Sie Ihr Google-Konto, um E-Mails über Gmail zu senden.',
+        connectButton: 'Google verbinden',
+        connectedAs: 'Verbunden als {email}',
+        connecting: 'Verbinde...',
+        successToast: 'Google-Konto erfolgreich verbunden!',
+        deniedToast: 'Google-Verbindung wurde abgebrochen oder verweigert.',
+      },
     },
 
     // ── Booking Request List ──
@@ -744,6 +764,7 @@ export const translations = {
       groupSizeRequired: 'Gruppengröße ist erforderlich',
       groupSizePositive: 'Gruppengröße muss eine positive Zahl sein',
       selectAtLeastOneRoom: 'Mindestens ein Zimmer auswählen',
+      bedConfigRequired: 'Bitte weisen Sie alle {count} Doppelzimmer in der Bettkonfiguration zu (Standard-Doppelbett + Zweibettzimmer müssen alle Zimmer abdecken)',
       companyNameRequired: 'Firmenname ist erforderlich',
       firstNameRequired: 'Vorname ist erforderlich',
       lastNameRequired: 'Nachname ist erforderlich',
@@ -830,6 +851,7 @@ export const translations = {
       emailRequired: 'Bitte geben Sie die E-Mail-Adresse des Agenten/Kunden ein.',
       approvedButNotSent: 'Genehmigt, aber konnte nicht als gesendet markiert werden',
       tryAgain: 'Bitte versuchen Sie es erneut.',
+      retrySend: 'Erneut senden',
       declineTitle: 'Angebot als abgelehnt markieren?',
       declineMsg: 'Das Angebot wird als abgelehnt markiert. Sie können es später noch im Archiv einsehen.',
       declineConfirm: 'Als abgelehnt markieren',

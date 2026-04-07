@@ -5,6 +5,7 @@ import { X, MapPin, Mail, Phone, ChevronLeft, ChevronRight, Star } from 'lucide-
 import { hotelsApi } from '@/lib/api/hotels';
 import type { HotelDetail } from '@/lib/api/hotels';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { cn } from '@/lib/utils/cn';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
@@ -12,16 +13,60 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 const detailCache = new Map<string, HotelDetail>();
 
 function imageUrl(keyOrUrl: string): string {
-  // Already a full URL — use directly
-  if (keyOrUrl.startsWith('http') || keyOrUrl.startsWith('/api/')) {
-    return keyOrUrl;
-  }
-  // Keys from the detail endpoint are already URL-encoded (contain %3d etc.)
-  // Do NOT call encodeURIComponent — that would double-encode % → %25
+  if (keyOrUrl.startsWith('http') || keyOrUrl.startsWith('/api/')) return keyOrUrl;
   return `${API_BASE}/hotels/image?key=${keyOrUrl}`;
 }
 
 const PLACEHOLDER = '/icons/placeholder-hotel.svg';
+
+/* ─── Skeleton shimmer ─── */
+function ImageSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn('relative overflow-hidden bg-gray-200', className)}>
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+    </div>
+  );
+}
+
+/* ─── Lazy image with shimmer + fade-in ─── */
+function LazyImage({
+  src,
+  alt,
+  className,
+  eager = false,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  eager?: boolean;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  // Reset whenever the URL changes (e.g. navigating between hero images)
+  useEffect(() => { setLoaded(false); }, [src]);
+
+  return (
+    <div className="relative w-full h-full">
+      {!loaded && <ImageSkeleton className="absolute inset-0 rounded-inherit" />}
+      <img
+        src={src}
+        alt={alt}
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        className={cn(
+          className,
+          'transition-opacity duration-500',
+          loaded ? 'opacity-100' : 'opacity-0',
+        )}
+        onLoad={() => setLoaded(true)}
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = PLACEHOLDER;
+          setLoaded(true);
+        }}
+      />
+    </div>
+  );
+}
 
 interface HotelDetailModalProps {
   hotelCode: string;
@@ -132,11 +177,11 @@ export function HotelDetailModal({ hotelCode, hotelName, onClose }: HotelDetailM
                 <div className="space-y-2">
                   {/* Hero image */}
                   <div className="relative w-full h-[220px] sm:h-[300px] rounded-[14px] overflow-hidden bg-[#F7F7F7]">
-                    <img
+                    <LazyImage
                       src={heroSrc}
                       alt={detail.name}
+                      eager
                       className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
                     />
                     {images.length > 1 && (
                       <>
@@ -169,15 +214,15 @@ export function HotelDetailModal({ hotelCode, hotelName, onClose }: HotelDetailM
                           key={i}
                           type="button"
                           onClick={() => setActiveImage(i)}
-                          className={`shrink-0 w-16 h-16 rounded-[8px] overflow-hidden border-2 transition-colors ${
-                            i === activeImage ? 'border-sett-primary' : 'border-transparent'
-                          }`}
+                          className={cn(
+                            'shrink-0 w-16 h-16 rounded-[8px] overflow-hidden border-2 transition-colors',
+                            i === activeImage ? 'border-sett-primary' : 'border-transparent hover:border-sett-border-light'
+                          )}
                         >
-                          <img
+                          <LazyImage
                             src={imageUrl(key)}
                             alt=""
                             className="w-full h-full object-cover"
-                            onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
                           />
                         </button>
                       ))}
