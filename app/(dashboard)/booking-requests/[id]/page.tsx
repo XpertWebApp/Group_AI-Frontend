@@ -312,16 +312,20 @@ export default function RequestDetailPage() {
 
     // Step 2: Send — marks proposal as sent
     try {
-      const updated = await proposalsApi.send(proposal.id, {
+      const result = await proposalsApi.send(proposal.id, {
         sendToEmail: emailVal,
       });
-      setProposal(updated);
+      setProposal(result.proposal);
       setSendOpen(false);
       setSendEmail('');
       setSendNotes('');
       setApproveStepDone(false);
       setSuccessOpen(true);
-      toast.success(t.toasts.proposalSent);
+      if (result.emailSent) {
+        toast.success(t.toasts.proposalSent);
+      } else {
+        toast.error(t.toasts.proposalSentNoEmail, { duration: 6000 });
+      }
     } catch {
       setSendError(`${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
     } finally {

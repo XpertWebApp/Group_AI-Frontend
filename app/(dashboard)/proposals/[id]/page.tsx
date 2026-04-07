@@ -147,9 +147,13 @@ export default function ProposalPage() {
   const handleSend = async () => {
     setActionLoading(true);
     try {
-      const updated = await proposalsApi.send(id);
-      setProposal(updated);
-      toast.success(t.toasts.proposalSent);
+      const result = await proposalsApi.send(id);
+      setProposal(result.proposal);
+      if (result.emailSent) {
+        toast.success(t.toasts.proposalSent);
+      } else {
+        toast.error(t.toasts.proposalSentNoEmail, { duration: 6000 });
+      }
     } finally {
       setActionLoading(false);
     }
