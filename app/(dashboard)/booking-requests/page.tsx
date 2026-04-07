@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
@@ -97,6 +98,7 @@ function matchesDateRange(r: BookingRequest, range: string): boolean {
 
 export default function BookingRequestsPage() {
   const { t } = useLanguage();
+  const router = useRouter();
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -232,6 +234,7 @@ export default function BookingRequestsPage() {
                       <tr
                         key={row.id}
                         className="border-b border-sett-border last:border-0 hover:bg-sett-fill/50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/booking-requests/${row.id}`)}
                       >
                         <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary">
                           <Link href={`/booking-requests/${row.id}`} className="hover:text-sett-primary">

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock,
+  ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
@@ -564,8 +564,24 @@ export default function AddHotelPage() {
           </div>
         )}
 
+        {/* No hotels found for this destination */}
+        {phase === 'done' && completedResults.length === 0 && (
+          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+            <Hotel className="w-10 h-10 text-sett-text-accent mx-auto mb-3" />
+            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
+              {t.addHotel.noHotelsFoundTitle}
+            </h3>
+            <p className="font-montserrat text-[14px] text-sett-text-accent mb-5 max-w-md mx-auto">
+              {t.addHotel.noHotelsFoundMsg}
+            </p>
+            <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
+              {t.addHotel.searchAgain}
+            </Button>
+          </div>
+        )}
+
         {/* Results — show when done, or progressively during polling if results exist */}
-        {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && (
+        {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && completedResults.length > 0 && (
           <div className="flex flex-col lg:flex-row gap-6">
             {/* ── Mobile filter toggle ── */}
             <button
