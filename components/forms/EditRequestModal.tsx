@@ -213,6 +213,7 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
       setDestResults([]);
       setDestOpen(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, request]);
 
   // Close dropdown on outside click

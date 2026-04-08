@@ -64,6 +64,7 @@ export default function DashboardPage() {
     const url = new URL(window.location.href);
     url.searchParams.delete('google');
     window.history.replaceState({}, '', url.toString());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   return (

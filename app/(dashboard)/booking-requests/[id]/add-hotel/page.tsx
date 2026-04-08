@@ -260,6 +260,7 @@ export default function AddHotelPage() {
       // EventSource not supported or failed — fall back to polling
       startPollingFallback(reqId);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchFinalResults]);
 
   // Polling fallback (if SSE fails)

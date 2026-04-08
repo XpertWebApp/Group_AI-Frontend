@@ -264,7 +264,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
                         }}
                         className="w-full font-montserrat text-[12px] font-semibold text-sett-primary hover:underline text-center py-0.5"
                       >
-                        View all results for "{searchQuery.trim()}"
+                        View all results for &ldquo;{searchQuery.trim()}&rdquo;
                       </button>
                     </div>
                   </>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { authApi } from '@/lib/api/auth';
 import toast from 'react-hot-toast';
@@ -17,21 +18,44 @@ function GoogleLogo({ size = 40 }: { size?: number }) {
 }
 
 export default function ConnectAccountPage() {
+  const searchParams = useSearchParams();
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [connectUrl, setConnectUrl] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
 
-  useEffect(() => {
-    // Check connection status
+  function fetchStatus() {
     authApi.getGoogleStatus().then((s) => {
       setConnected(s.connected);
       setEmail(s.email ?? null);
     }).catch(() => {});
+  }
 
-    // Pre-fetch OAuth URL so Connect click is instant
-    authApi.getGoogleConnectUrl().then(setConnectUrl).catch(() => {});
+  function fetchConnectUrl() {
+    authApi.getGoogleConnectUrl('/connect-account').then(setConnectUrl).catch(() => {});
+  }
+
+  useEffect(() => {
+    fetchStatus();
+    fetchConnectUrl();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle Google OAuth callback: ?google=connected or ?google=denied
+  useEffect(() => {
+    const googleParam = searchParams.get('google');
+    if (!googleParam) return;
+    if (googleParam === 'connected') {
+      toast.success('Google account connected successfully!');
+      fetchStatus();
+    } else if (googleParam === 'denied') {
+      toast.error('Google connection was denied.');
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('google');
+    window.history.replaceState({}, '', url.toString());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   async function handleDisconnect() {
     setDisconnecting(true);
@@ -41,7 +65,7 @@ export default function ConnectAccountPage() {
       setEmail(null);
       toast.success('Google account disconnected.');
       // Re-fetch connect URL for re-connecting
-      authApi.getGoogleConnectUrl().then(setConnectUrl).catch(() => {});
+      fetchConnectUrl();
     } catch {
       toast.error('Failed to disconnect. Please try again.');
     } finally {
