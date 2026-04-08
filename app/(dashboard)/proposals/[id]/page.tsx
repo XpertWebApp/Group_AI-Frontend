@@ -149,8 +149,28 @@ export default function ProposalPage() {
     try {
       const result = await proposalsApi.send(id);
       setProposal(result.proposal);
-      if (result.emailSent) {
-        toast.success(t.toasts.proposalSent);
+      toast.success(t.toasts.proposalSent);
+    } catch (err: unknown) {
+      const ax = await import('axios');
+      if (ax.isAxiosError(err)) {
+        const errorCode = err.response?.data?.error as string | undefined;
+        const emailError = err.response?.data?.data?.emailError as string | undefined;
+        const proposalData = err.response?.data?.data?.proposal;
+        if (proposalData) setProposal(proposalData);
+
+        if (errorCode === 'EMAIL_SEND_FAILED') {
+          toast.error(emailError || t.toasts.emailSendFailed, { duration: 8000 });
+        } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
+          toast.error(t.toasts.noRecipientEmail);
+        } else if (errorCode === 'PDF_GENERATION_FAILED') {
+          toast.error(t.toasts.pdfGenerationFailed);
+        } else if (errorCode === 'PROPOSAL_ALREADY_SENT') {
+          toast.success(t.toasts.proposalAlreadySent);
+        } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE') {
+          toast.error(t.toasts.proposalNotModifiable);
+        } else {
+          toast.error(err.response?.data?.message || t.toasts.proposalSentNoEmail, { duration: 6000 });
+        }
       } else {
         toast.error(t.toasts.proposalSentNoEmail, { duration: 6000 });
       }

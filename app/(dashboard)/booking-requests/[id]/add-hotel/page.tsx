@@ -131,6 +131,7 @@ export default function AddHotelPage() {
   const checkedCountRef = useRef(0);
   const totalCountRef = useRef(0);
   const foundCountRef = useRef(0);
+  const zeroPollCountRef = useRef(0);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -264,6 +265,7 @@ export default function AddHotelPage() {
   // Polling fallback (if SSE fails)
   const startPollingFallback = useCallback((reqId: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    zeroPollCountRef.current = 0;
 
     const poll = async () => {
       try {
@@ -284,11 +286,23 @@ export default function AddHotelPage() {
           .map((j) => j.resultJson!);
         setCompletedResults(results);
 
-        // Only stop when we know jobs have been created AND all are finished
-        // (total === 0 means the backend hasn't queued the jobs yet — keep polling)
+        // Stop when all jobs are finished
         if (status.summary.total > 0 && status.summary.queued + status.summary.running === 0) {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          zeroPollCountRef.current = 0;
           setPhase('done');
+        } else if (status.summary.total === 0) {
+          // total=0 can mean jobs haven't been queued yet OR the destination has no
+          // candidate hotels at all. After 3 consecutive zero-total polls (~9s) we
+          // treat it as "no hotels found" and stop.
+          zeroPollCountRef.current += 1;
+          if (zeroPollCountRef.current >= 3) {
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            zeroPollCountRef.current = 0;
+            setPhase('done');
+          }
+        } else {
+          zeroPollCountRef.current = 0;
         }
       } catch (err) {
         if (!mountedRef.current) return;

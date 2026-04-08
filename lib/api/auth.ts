@@ -34,8 +34,10 @@ export const authApi = {
   },
 
   // Google OAuth / Gmail integration
-  async getGoogleConnectUrl(): Promise<string> {
-    const { data } = await apiClient.get<ApiResponse<{ url: string }>>('/auth/google/connect');
+  async getGoogleConnectUrl(returnTo?: string): Promise<string> {
+    const { data } = await apiClient.get<ApiResponse<{ url: string }>>('/auth/google/connect', {
+      params: returnTo ? { returnTo } : undefined,
+    });
     if (!data.success || !data.data?.url) {
       throw new Error(data.message || 'Failed to get Google connect URL');
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   ArrowLeft,
   MapPin,
@@ -83,6 +84,7 @@ export default function RequestDetailPage() {
   const [sendNotes, setSendNotes] = useState('');
   const [sendError, setSendError] = useState('');
   const [sendEmailError, setSendEmailError] = useState('');
+  const [sendEmailFailed, setSendEmailFailed] = useState(false);
   const [approveStepDone, setApproveStepDone] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -319,15 +321,37 @@ export default function RequestDetailPage() {
       setSendOpen(false);
       setSendEmail('');
       setSendNotes('');
+      setSendError('');
+      setSendEmailFailed(false);
       setApproveStepDone(false);
       setSuccessOpen(true);
-      if (result.emailSent) {
-        toast.success(t.toasts.proposalSent);
+      toast.success(t.toasts.proposalSent);
+    } catch (err: unknown) {
+      const ax = await import('axios');
+      if (ax.isAxiosError(err)) {
+        const errorCode = err.response?.data?.error as string | undefined;
+        const emailError = err.response?.data?.data?.emailError as string | undefined;
+        const proposalData = err.response?.data?.data?.proposal;
+        if (proposalData) setProposal((p) => p ? { ...p, ...proposalData } : p);
+
+        if (errorCode === 'EMAIL_SEND_FAILED') {
+          setSendEmailFailed(true);
+          setSendError(emailError || t.toasts.emailSendFailed);
+        } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
+          setSendError(t.toasts.noRecipientEmail);
+        } else if (errorCode === 'PDF_GENERATION_FAILED') {
+          setSendError(t.toasts.pdfGenerationFailed);
+        } else if (errorCode === 'PROPOSAL_ALREADY_SENT') {
+          setSendOpen(false);
+          toast.success(t.toasts.proposalAlreadySent);
+        } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE') {
+          setSendError(t.toasts.proposalNotModifiable);
+        } else {
+          setSendError(err.response?.data?.message || `${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
+        }
       } else {
-        toast.error(t.toasts.proposalSentNoEmail, { duration: 6000 });
+        setSendError(`${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
       }
-    } catch {
-      setSendError(`${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
     } finally {
       setActionLoading(false);
     }
@@ -921,11 +945,15 @@ export default function RequestDetailPage() {
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => setSendOpen(true)}
-                    disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
+                    onClick={() => {
+                      const status = (proposal?.status ?? request.status).toLowerCase();
+                      if (status === 'approved') setApproveStepDone(true);
+                      setSendOpen(true);
+                    }}
+                    disabled={['sent', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
                   >
                     <Send className="w-4 h-4" />
-                    {t.offer.approveAndSend}
+                    {(proposal?.status ?? request.status).toLowerCase() === 'approved' ? t.offer.retrySend : t.offer.approveAndSend}
                   </Button>
                   <Button
                     variant="destructive"
@@ -992,16 +1020,27 @@ export default function RequestDetailPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="bg-white rounded-[14px] border border-sett-border-light w-full max-w-md mx-4 p-6">
                 <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-1">
-                  {t.offer.approveTitle}
+                  {approveStepDone ? t.offer.retrySend : t.offer.approveTitle}
                 </h3>
                 <p className="font-montserrat text-[14px] text-sett-text-secondary mb-5">
-                  {t.offer.approveMsg}
+                  {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
                 </p>
 
                 {sendError && (
-                  <div className="flex items-start gap-2 mb-4 p-3 rounded-[10px] bg-red-50 border border-red-200">
-                    <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-                    <p className="font-montserrat text-[13px] text-red-700">{sendError}</p>
+                  <div className="flex flex-col gap-2 mb-4 p-3 rounded-[10px] bg-red-50 border border-red-200">
+                    <div className="flex items-start gap-2">
+                      <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                      <p className="font-montserrat text-[13px] text-red-700">{sendError}</p>
+                    </div>
+                    {sendEmailFailed && (
+                      <Link
+                        href="/connect-account"
+                        className="ml-6 font-montserrat text-[13px] font-semibold text-sett-primary underline"
+                        onClick={() => setSendOpen(false)}
+                      >
+                        Connect Google Account →
+                      </Link>
+                    )}
                   </div>
                 )}
 
@@ -1041,7 +1080,7 @@ export default function RequestDetailPage() {
                 <div className="flex gap-3 justify-end mt-6">
                   <Button
                     variant="secondary"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmail(''); setSendNotes(''); setApproveStepDone(false); }}
+                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmail(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
                     {t.common.cancel}
