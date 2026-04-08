@@ -346,6 +346,18 @@ export default function AddHotelPage() {
     setCompletedResults([]);
     setSearchSummary(null);
 
+    // If the request was recently edited, always start fresh regardless of destination
+    const needsNewSearch = localStorage.getItem(`requestNeedsNewSearch_${requestId}`);
+    if (needsNewSearch) {
+      localStorage.removeItem(`requestNeedsNewSearch_${requestId}`);
+      if (destinationId !== undefined) {
+        localStorage.setItem(`lastSearchDest_${requestId}`, String(destinationId));
+      }
+      if (!mountedRef.current) return;
+      startNewSearch();
+      return;
+    }
+
     // If the destination changed since the last search, skip cached results entirely
     const storedDestId = localStorage.getItem(`lastSearchDest_${requestId}`);
     const destChanged = destinationId !== undefined &&
@@ -478,12 +490,13 @@ export default function AddHotelPage() {
   };
 
   // Client-side filter — separate main vs alternative by star rating match
-  const requestedStars = request?.starRating ?? 0;
+  // Coerce starRating to number — live API may return it as a string inside resultJson
+  const requestedStars = Number(request?.starRating ?? 0);
   const mainResults = completedResults.filter(
-    (h) => !requestedStars || h.starRating === requestedStars
+    (h) => !requestedStars || Number(h.starRating) === requestedStars
   );
   const altResults = completedResults.filter(
-    (h) => requestedStars && h.starRating !== requestedStars
+    (h) => requestedStars && Number(h.starRating) !== requestedStars
   );
   // If no main results match the requested star rating, show all hotels
   const hasMainResults = mainResults.length > 0;
@@ -494,7 +507,7 @@ export default function AddHotelPage() {
       : mainResults;
 
   const filteredResults = displayResults.filter((h) => {
-    if (starFilters.length > 0 && !starFilters.includes(h.starRating)) return false;
+    if (starFilters.length > 0 && !starFilters.includes(Number(h.starRating))) return false;
     if (h.sellingPricePerRoomPerNight > maxPrice) return false;
     // AND logic: hotel must have ALL selected facilities
     if (amenityFilters.length > 0 && h.facilities) {
@@ -507,12 +520,12 @@ export default function AddHotelPage() {
   });
 
   return (
-    <>
+    <div className="flex flex-col lg:h-full lg:overflow-hidden">
       <Header title={t.createForm.title} />
 
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="p-4 md:p-6 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:gap-6">
         {/* Breadcrumb */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:shrink-0">
           <button
             type="button"
             onClick={() => router.push(`/booking-requests/${requestId}`)}
@@ -596,7 +609,7 @@ export default function AddHotelPage() {
 
         {/* Results — show when done, or progressively during polling if results exist */}
         {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && completedResults.length > 0 && (
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col lg:flex-row gap-6 lg:flex-1 lg:min-h-0">
             {/* ── Mobile filter toggle ── */}
             <button
               type="button"
@@ -612,7 +625,7 @@ export default function AddHotelPage() {
 
             {/* ── Left Sidebar: Filters ── */}
             <aside className={cn(
-              'lg:w-[320px] shrink-0',
+              'lg:w-[320px] shrink-0 lg:overflow-y-auto',
               filtersOpen ? 'block' : 'hidden lg:block'
             )}>
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
@@ -802,8 +815,8 @@ export default function AddHotelPage() {
             </aside>
 
             {/* ── Right: Hotel Results ── */}
-            <div className="flex-1 min-w-0">
-              <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">
+            <div className="flex-1 min-w-0 lg:flex lg:flex-col lg:min-h-0">
+              <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 lg:shrink-0">
                 {t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))}
               </p>
 
@@ -815,7 +828,7 @@ export default function AddHotelPage() {
                 </div>
               )}
 
-              <div className="space-y-5">
+              <div className="space-y-5 lg:overflow-y-auto lg:pr-1 pb-6">
                 {filteredResults.map((hotel) => (
                   <HotelResultCard
                     key={hotel.hotelCode}
@@ -839,7 +852,7 @@ export default function AddHotelPage() {
           onClose={() => setDetailHotel(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 

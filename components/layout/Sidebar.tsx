@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import {
   LayoutDashboard,
@@ -9,12 +9,19 @@ import {
   PlusCircle,
   Settings,
   Search,
+  MapPin,
+  User,
+  Building2,
+  Loader2,
 } from 'lucide-react';
 import { useAppSelector } from '@/hooks/useAppSelector';
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { requestsApi } from '@/lib/api/requests';
+import type { BookingRequest } from '@/types';
+import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 
 function GoogleIconWhite() {
   return (
@@ -27,6 +34,10 @@ function GoogleIconWhite() {
   );
 }
 
+function formatStatus(s: string) {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 interface SidebarProps {
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -35,9 +46,19 @@ interface SidebarProps {
 
 export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
-  const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<BookingRequest[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+
+  const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const navItems = [
     { href: '/dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
@@ -51,9 +72,87 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
       ? [user.firstName, user.lastName].filter(Boolean).join(' ')
       : user?.email ?? 'User';
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+        setActiveIndex(-1);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const result = await requestsApi.list({ search: q, limit: 7 });
+        setSearchResults(result.requests);
+        setSearchOpen(true);
+        setActiveIndex(-1);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery]);
+
+  const handleSelect = useCallback((request: BookingRequest) => {
+    router.push(`/booking-requests/${request.id}`);
+    setSearchQuery('');
+    setSearchOpen(false);
+    setSearchResults([]);
+    setActiveIndex(-1);
+    onMobileClose?.();
+  }, [router, onMobileClose]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!searchOpen || searchResults.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, searchResults.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      handleSelect(searchResults[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setSearchOpen(false);
+      setActiveIndex(-1);
+      inputRef.current?.blur();
+    }
+  };
+
+  const customerName = (r: BookingRequest) => {
+    if (r.firstName || r.lastName) return [r.firstName, r.lastName].filter(Boolean).join(' ');
+    if (r.contactName) return r.contactName;
+    if (r.companyName) return r.companyName;
+    return null;
+  };
+
   const content = (
     <>
       <div className="flex flex-col h-full">
+        {/* Logo */}
         <div className="h-[68px] flex items-center px-6 border-b border-sett-sidebar-border">
           <Link href="/dashboard" className="block" onClick={onMobileClose}>
             <Image
@@ -65,18 +164,117 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             />
           </Link>
         </div>
+
+        {/* Search */}
         <div className="p-3 border-b border-sett-sidebar-border">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
+          <div ref={searchWrapperRef} className="relative">
+            {searchLoading ? (
+              <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 animate-spin" />
+            ) : (
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
+            )}
             <input
+              ref={inputRef}
               type="search"
               placeholder={t.nav.searchAnything}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
               className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-sett-primary"
+              autoComplete="off"
             />
+
+            {/* Results dropdown */}
+            {searchOpen && (
+              <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[9999] bg-white rounded-[14px] shadow-[0_8px_32px_0_rgba(0,0,0,0.18)] border border-sett-border-light overflow-hidden">
+                {searchResults.length === 0 ? (
+                  <div className="px-4 py-5 text-center">
+                    <p className="font-montserrat text-[13px] text-sett-text-secondary">No requests found</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-3 pt-2.5 pb-1">
+                      <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wider text-sett-text-accent">
+                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <ul>
+                      {searchResults.map((r, i) => {
+                        const name = customerName(r);
+                        return (
+                          <li key={r.id}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => { e.preventDefault(); handleSelect(r); }}
+                              onMouseEnter={() => setActiveIndex(i)}
+                              className={cn(
+                                'w-full text-left px-3 py-2.5 flex items-start gap-3 transition-colors',
+                                i === activeIndex ? 'bg-sett-fill' : 'hover:bg-sett-fill/60'
+                              )}
+                            >
+                              {/* Reference badge */}
+                              <span className="shrink-0 mt-0.5 font-montserrat text-[12px] font-semibold text-sett-primary bg-sett-light-green-bg px-1.5 py-0.5 rounded-[6px]">
+                                #{r.referenceNumber ?? r.id.slice(0, 4)}
+                              </span>
+
+                              {/* Details */}
+                              <div className="flex-1 min-w-0">
+                                {name && (
+                                  <div className="flex items-center gap-1 mb-0.5">
+                                    <User className="w-3 h-3 text-sett-text-accent shrink-0" />
+                                    <span className="font-montserrat text-[13px] font-semibold text-sett-text-primary truncate">{name}</span>
+                                  </div>
+                                )}
+                                {r.companyName && name !== r.companyName && (
+                                  <div className="flex items-center gap-1 mb-0.5">
+                                    <Building2 className="w-3 h-3 text-sett-text-accent shrink-0" />
+                                    <span className="font-montserrat text-[12px] text-sett-text-secondary truncate">{r.companyName}</span>
+                                  </div>
+                                )}
+                                {r.destinationName && (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-sett-text-accent shrink-0" />
+                                    <span className="font-montserrat text-[12px] text-sett-text-secondary truncate">{r.destinationName}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Status */}
+                              <Badge variant={getStatusBadgeVariant(r.status)} className="shrink-0 text-[11px] px-2 py-0.5">
+                                {formatStatus(r.status)}
+                              </Badge>
+                            </button>
+                            {i < searchResults.length - 1 && (
+                              <div className="mx-3 h-px bg-sett-border-light" />
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div className="px-3 py-2 border-t border-sett-border-light">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          router.push(`/booking-requests?search=${encodeURIComponent(searchQuery.trim())}`);
+                          setSearchQuery('');
+                          setSearchOpen(false);
+                          onMobileClose?.();
+                        }}
+                        className="w-full font-montserrat text-[12px] font-semibold text-sett-primary hover:underline text-center py-0.5"
+                      >
+                        View all results for "{searchQuery.trim()}"
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Nav */}
         <nav className="flex-1 px-3 py-2 space-y-0.5">
           {navItems.map(({ href, label, icon: Icon }) => {
             const matchingHref = navItems
@@ -102,7 +300,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
                   {label}
                 </Link>
 
-                {/* Connect Account — same style as other nav items */}
+                {/* Connect Account */}
                 {href === '/booking-requests/create' && (
                   <Link
                     href="/connect-account"
@@ -122,6 +320,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* User card */}
         <div className="px-5 pb-4 pt-4 border-t border-b border-sett-sidebar-border">
           <div className="rounded-[17px] bg-sett-sidebar-border px-[14px] py-[12px]">
             <div className="flex items-center gap-[10px]">

@@ -46,6 +46,10 @@ function formatDate(dateStr: string | null | undefined): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function formatRoomType(type: string): string {
+  return type.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim();
+}
+
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
@@ -368,6 +372,19 @@ export default function RequestDetailPage() {
       setDeclineOpen(false);
       toast.success(t.toasts.proposalDeclined);
       router.push('/booking-requests');
+    } catch (err: unknown) {
+      const ax = await import('axios');
+      if (ax.isAxiosError(err)) {
+        const errorCode = err.response?.data?.error as string | undefined;
+        if (errorCode === 'PROPOSAL_NOT_DECLINABLE' || errorCode === 'PROPOSAL_NOT_APPROVABLE') {
+          toast.error(t.toasts.proposalNotDeclinable);
+        } else {
+          toast.error(err.response?.data?.message || t.toasts.proposalNotDeclinable);
+        }
+      } else {
+        toast.error(t.toasts.proposalNotDeclinable);
+      }
+      setDeclineOpen(false);
     } finally {
       setActionLoading(false);
     }
@@ -499,12 +516,12 @@ export default function RequestDetailPage() {
                     {/* Right: Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 xl:flex xl:items-center gap-5 xl:gap-5 w-full xl:w-auto">
                       {/* Hotel Category */}
-                      <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center xl:w-[155px]">
+                      <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                           {t.offer.hotelCategory}
                         </p>
                         {/* value row */}
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 flex-nowrap">
                           <span className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D] whitespace-nowrap">
                             ({request.starRating}-Star)
                           </span>
@@ -581,13 +598,13 @@ export default function RequestDetailPage() {
                   {/* Bed Configuration for Double Room — outer: 14px radius, border #68686866, h:166 */}
                   <div className="w-full rounded-[14px] border border-[#686868]/40 bg-white p-5">
                     <h4 className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D] mb-5">
-                      Bed Configuration for Double Room
+                      {t.offer.bedConfiguration}
                     </h4>
                     {/* Inner cards grid — gap:20px, responsive */}
                     <div className="grid grid-cols-2 w-full gap-3 sm:gap-5">
                       {[
-                        { label: 'Standard Double Bed', value: rooms?.standardDoubleBeds },
-                        { label: 'Twin Bed', value: rooms?.twinBeds },
+                        { label: t.offer.standardDoubleBed, value: rooms?.standardDoubleBeds },
+                        { label: t.offer.twinBed, value: rooms?.twinBeds },
                       ].map((bed) => (
                         <div
                           key={bed.label}
@@ -975,6 +992,8 @@ export default function RequestDetailPage() {
             onClose={() => setAddServiceOpen(false)}
             onAdd={handleAddService}
             isLoading={actionLoading}
+            bookingStartDate={request.checkinDate}
+            bookingEndDate={request.checkoutDate}
           />
 
           <AddServiceModal
@@ -983,6 +1002,8 @@ export default function RequestDetailPage() {
             onAdd={handleEditService}
             isLoading={actionLoading}
             initialData={editingService ?? undefined}
+            bookingStartDate={request.checkinDate}
+            bookingEndDate={request.checkoutDate}
           />
 
           <ConfirmModal
@@ -1454,7 +1475,7 @@ function HotelCard({
                   const total = sell * qty * nights;
                   return (
                     <tr key={type} className="border-b border-sett-border last:border-0">
-                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{type}</td>
+                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{formatRoomType(type)}</td>
                       <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
                         {net.toFixed(2)}
                       </td>
@@ -1500,7 +1521,7 @@ function HotelCard({
               const total = sell * qty * nights;
               return (
                 <div key={type} className="p-3 space-y-2">
-                  <p className="text-body font-medium text-sett-text-primary">{type}</p>
+                  <p className="text-body font-medium text-sett-text-primary">{formatRoomType(type)}</p>
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>

@@ -34,6 +34,7 @@ export function BookingRequestFilters({
     { value: 'sent', label: t.requests.sent },
     { value: 'completed', label: t.requests.completed },
     { value: 'cancelled', label: t.requests.cancelled },
+    { value: 'declined', label: t.requests.declined },
   ];
 
   const dateOptions = [

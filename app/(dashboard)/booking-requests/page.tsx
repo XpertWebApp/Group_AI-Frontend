@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
@@ -99,9 +99,10 @@ function matchesDateRange(r: BookingRequest, range: string): boolean {
 export default function BookingRequestsPage() {
   const { t } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
   const [statusFilter, setStatusFilter] = useState('');
   const [dateRange, setDateRange] = useState('');
   const [page, setPage] = useState(1);
@@ -175,9 +176,9 @@ export default function BookingRequestsPage() {
 
       <div className="p-4 md:p-6 space-y-6">
         {/* Card with filters + table */}
-        <div className="bg-white rounded-[14px] border border-sett-border overflow-hidden">
-          {/* Filter bar */}
-          <div className="p-3 sm:p-5">
+        <div className="bg-white rounded-[14px] border border-sett-border">
+          {/* Filter bar — no overflow-hidden here so Select dropdowns are never clipped */}
+          <div className="relative z-10 p-3 sm:p-5">
             <BookingRequestFilters
               search={search}
               onSearchChange={setSearch}
@@ -191,10 +192,10 @@ export default function BookingRequestsPage() {
           {/* Loading skeleton */}
           {loading && (
             <>
-              <div className="hidden xl:block border-t border-sett-border">
+              <div className="hidden xl:block border-t border-sett-border overflow-hidden">
                 <TableSkeleton rows={PAGE_SIZE} columns={10} />
               </div>
-              <div className="xl:hidden border-t border-sett-border">
+              <div className="xl:hidden border-t border-sett-border overflow-hidden">
                 <CardSkeleton cards={PAGE_SIZE} />
               </div>
             </>
@@ -209,7 +210,7 @@ export default function BookingRequestsPage() {
 
           {/* ── Desktop Table (xl and up) ── */}
           {!loading && rows.length > 0 && (
-            <div className="hidden xl:block overflow-x-auto">
+            <div className="hidden xl:block overflow-x-auto overflow-hidden">
               <table className="w-full min-w-[950px] 2xl:min-w-[1100px]">
                 <thead>
                   <tr className="border-y border-sett-border">
@@ -283,7 +284,7 @@ export default function BookingRequestsPage() {
 
           {/* ── Mobile/Tablet Card View (below xl) ── */}
           {!loading && rows.length > 0 && (
-            <div className="xl:hidden divide-y divide-sett-border border-t border-sett-border">
+            <div className="xl:hidden divide-y divide-sett-border border-t border-sett-border overflow-hidden">
               {rows.map((row) => {
                 const rooms = totalRooms(row.rooms);
                 const { totalSell, margin } = getProposalTotals(row);
