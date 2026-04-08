@@ -959,7 +959,7 @@ export default function RequestDetailPage() {
                     variant="destructive"
                     size="sm"
                     onClick={() => setDeclineOpen(true)}
-                    disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
+                    disabled={['declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
                   >
                     <XCircle className="w-4 h-4" />
                     {t.offer.markDeclined}
