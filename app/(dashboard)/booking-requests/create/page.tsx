@@ -10,11 +10,11 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { StepperNav } from '@/components/ui/StepperNav';
 import { RoomCounter } from '@/components/ui/RoomCounter';
-import { PhoneInput } from '@/components/ui/PhoneInput';
+import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
 import { Spinner } from '@/components/ui/Loader';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { cn } from '@/lib/utils/cn';
-import { destinationsApi } from '@/lib/api/destinations';
+import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
@@ -45,6 +45,7 @@ interface FormData {
   firstName: string;
   lastName: string;
   email: string;
+  phoneCountryCode: string;
   phone: string;
   specialRequestsCustomer: string;
   // Step 4: Policies
@@ -76,6 +77,7 @@ const defaultFormData: FormData = {
   firstName: '',
   lastName: '',
   email: '',
+  phoneCountryCode: '+1',
   phone: '',
   specialRequestsCustomer: '',
   termsAndConditions:
@@ -185,10 +187,9 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    const allDigits = data.phone.replace(/\D/g, '');
-    if (!data.phone.trim() || allDigits.length <= 3) {
+    if (!data.phone.trim() || data.phone.length < 5) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (allDigits.length < 7 || allDigits.length > 15) {
+    } else if (data.phone.length > 15) {
       errors.phone = t.createForm.invalidPhone;
     }
   }
@@ -297,6 +298,7 @@ export default function CreateBookingRequestPage() {
         lastName: formData.lastName,
         contactEmail: formData.email,
         contactPhone: formData.phone,
+        contactPhoneCountryCode: formData.phoneCountryCode || undefined,
         customerNotes: formData.specialRequestsCustomer || undefined,
         // Step 4: Policies
         termsAndConditions: formData.termsAndConditions?.replace(/<[^>]*>/g, '').trim() ? formData.termsAndConditions : undefined,
@@ -555,7 +557,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                   onClick={() => handleDestinationSelect(dest)}
                   className="px-3 py-2 text-body cursor-pointer hover:bg-sett-fill"
                 >
-                  {dest.name} ({dest.countryCode})
+                  {dest.name} ({getCountryName(dest.countryCode)})
                 </li>
               ))}
             </ul>
@@ -907,9 +909,11 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             />
             <FieldError message={emailError} />
           </div>
-          <PhoneInput
-            value={formData.phone}
-            onChange={(phone) => updateField('phone', phone)}
+          <PhoneInputSplit
+            countryCode={formData.phoneCountryCode}
+            number={formData.phone}
+            onCountryCodeChange={(code) => updateField('phoneCountryCode', code)}
+            onNumberChange={(num) => updateField('phone', num)}
             error={errors.phone}
           />
         </div>

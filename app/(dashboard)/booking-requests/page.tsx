@@ -46,11 +46,6 @@ function customerName(r: BookingRequest): string {
   return '—';
 }
 
-function formatStatus(status: string): string {
-  return status
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 
 function getProposalTotals(r: BookingRequest): { totalSell: number | null; margin: number | null } {
@@ -99,6 +94,21 @@ function matchesDateRange(r: BookingRequest, range: string): boolean {
 export default function BookingRequestsPage() {
   const { t } = useLanguage();
   const router = useRouter();
+
+  const statusLabel = (status: string): string => {
+    const map: Record<string, string> = {
+      pending: t.requests.pending,
+      draft: t.requests.draft,
+      sent: t.requests.sent,
+      declined: t.requests.declined,
+      processing: t.requests.processing,
+      ai_generated: t.requests.aiGenerated,
+      completed: t.requests.completed,
+      cancelled: t.requests.cancelled,
+      approved: t.requests.approved,
+    };
+    return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
   const searchParams = useSearchParams();
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,7 +275,7 @@ export default function BookingRequestsPage() {
                         </td>
                         <td className="px-3 2xl:px-5 py-4">
                           <Badge variant={getStatusBadgeVariant(row.status)}>
-                            {formatStatus(row.status)}
+                            {statusLabel(row.status)}
                           </Badge>
                         </td>
                         <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-secondary">
@@ -301,7 +311,7 @@ export default function BookingRequestsPage() {
                         #{row.referenceNumber ?? row.id.slice(0, 4)}
                       </span>
                       <Badge variant={getStatusBadgeVariant(row.status)}>
-                        {formatStatus(row.status)}
+                        {statusLabel(row.status)}
                       </Badge>
                     </div>
 

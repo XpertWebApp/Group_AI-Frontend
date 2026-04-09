@@ -24,6 +24,22 @@ export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
+
+  const statusLabel = (status: string): string => {
+    const map: Record<string, string> = {
+      pending: t.requests.pending,
+      draft: t.requests.draft,
+      sent: t.requests.sent,
+      declined: t.requests.declined,
+      processing: t.requests.processing,
+      ai_generated: t.requests.aiGenerated,
+      completed: t.requests.completed,
+      cancelled: t.requests.cancelled,
+      approved: t.requests.approved,
+    };
+    return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
   const [offers, setOffers] = useState<RecentOffer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -191,7 +207,7 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={getStatusBadgeVariant(row.status)}>
-                            {row.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                            {statusLabel(row.status)}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-body text-sett-text-secondary whitespace-nowrap">
@@ -218,7 +234,7 @@ export default function DashboardPage() {
                         #{row.referenceNumber}
                       </span>
                       <Badge variant={getStatusBadgeVariant(row.status)}>
-                        {row.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                        {statusLabel(row.status)}
                       </Badge>
                     </div>
                     <p className="text-body font-medium text-sett-text-primary truncate">{row.customer || row.companyName || row.contactName || '—'}</p>

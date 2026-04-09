@@ -61,7 +61,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
       aria-modal="true"
     >
       <div
-        className="bg-[#F7F7F7] flex flex-col max-h-[90vh] overflow-hidden"
+        className="bg-white flex flex-col max-h-[90vh] overflow-hidden"
         style={{ width: 790, borderRadius: 14, boxShadow: '0px 4px 20px 0px #00000014' }}
       >
         {/* ── Top Section ── */}
@@ -119,14 +119,21 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
             style={{ borderRadius: 14, border: '1px solid #68686866' }}
           >
             {/* ── Logo + TAX ID ── */}
-            <div className="flex items-start justify-between px-5 pt-5 pb-5" style={{ borderBottom: '1px solid #68686866' }}>
-              <div>
-                <h2 className="font-bold text-[24px] tracking-wide" style={{ color: '#071C42' }}>SETT</h2>
-                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: '#AAC737' }}>Sport &amp; Events Tours &amp; Travel</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-[12px] uppercase text-[#686868]">{t.contract.taxId}</p>
-                <p className="font-bold text-[16px] text-[#1D1D1D]">DE123456789</p>
+            <div className="flex items-center justify-between px-5 pt-5 pb-5" style={{ borderBottom: '1px solid #68686866' }}>
+              <img src="/icons/sett_logo.svg" alt="SETT" style={{ height: 40 }} />
+              <div className="flex flex-col items-end" style={{ gap: 8 }}>
+                <span
+                  className="font-montserrat uppercase text-center"
+                  style={{ fontWeight: 400, fontSize: 12, lineHeight: '100%', letterSpacing: 0, color: '#4A4A4A' }}
+                >
+                  {t.contract.taxId}
+                </span>
+                <span
+                  className="font-montserrat"
+                  style={{ fontWeight: 500, fontSize: 14, lineHeight: '100%', letterSpacing: 0, color: '#071C42' }}
+                >
+                  DE123456789
+                </span>
               </div>
             </div>
 
@@ -401,7 +408,10 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                 <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
                 <div className="px-5 py-5">
                   <h3 className="font-semibold text-[16px] leading-none uppercase mb-4" style={{ color: '#071C42' }}>{t.contract.cancellationConditions}</h3>
-                  <p className="font-normal text-[13px] text-[#686868] whitespace-pre-line leading-relaxed">{request.cancellationConditions}</p>
+                  <div
+                    className="font-normal text-[13px] text-[#686868] leading-relaxed contract-html-content"
+                    dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
+                  />
                 </div>
               </>
             )}
@@ -414,16 +424,12 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                   {t.contract.termsConditions}
                 </h3>
 
-                {/* T&C bullet list */}
+                {/* T&C content */}
                 {request.termsAndConditions && (
-                  <ul className="flex flex-col gap-3 mb-5">
-                    {request.termsAndConditions.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => (
-                      <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
-                        <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
-                        <span>{line.replace(/^[\s·•\-–]+/, '').trim()}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div
+                    className="font-normal text-[13px] text-[#1D1D1D] leading-relaxed mb-5 contract-html-content"
+                    dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
+                  />
                 )}
 
                 {/* Payment notice */}

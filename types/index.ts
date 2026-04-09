@@ -76,6 +76,7 @@ export interface BookingRequest {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  contactPhoneCountryCode?: string | null;
   guestListFileKey?: string | null;
   customerNotes?: string | null;
 

@@ -28,6 +28,7 @@ export interface CreateBookingRequestPayload {
   lastName: string;
   contactEmail: string;
   contactPhone: string;
+  contactPhoneCountryCode?: string;
   guestListFileKey?: string;
   customerNotes?: string | null;
 

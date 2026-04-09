@@ -491,13 +491,15 @@ export default function AddHotelPage() {
   };
 
   // Client-side filter — separate main vs alternative by star rating match
-  // Coerce starRating to number — live API may return it as a string inside resultJson
-  const requestedStars = Number(request?.starRating ?? 0);
+  // Coerce starRating to number — live API may return it as a string or decimal (e.g. "4.5")
+  // Use Math.round so that 4.5 → 5, 3.5 → 4, matching whole-number filter options
+  const hotelStars = (h: { starRating: number }) => Math.round(Number(h.starRating));
+  const requestedStars = Math.round(Number(request?.starRating ?? 0));
   const mainResults = completedResults.filter(
-    (h) => !requestedStars || Number(h.starRating) === requestedStars
+    (h) => !requestedStars || hotelStars(h) === requestedStars
   );
   const altResults = completedResults.filter(
-    (h) => requestedStars && Number(h.starRating) !== requestedStars
+    (h) => requestedStars && hotelStars(h) !== requestedStars
   );
   // If no main results match the requested star rating, show all hotels
   const hasMainResults = mainResults.length > 0;
@@ -508,7 +510,7 @@ export default function AddHotelPage() {
       : mainResults;
 
   const filteredResults = displayResults.filter((h) => {
-    if (starFilters.length > 0 && !starFilters.includes(Number(h.starRating))) return false;
+    if (starFilters.length > 0 && !starFilters.includes(hotelStars(h))) return false;
     if (h.sellingPricePerRoomPerNight > maxPrice) return false;
     // AND logic: hotel must have ALL selected facilities
     if (amenityFilters.length > 0 && h.facilities) {

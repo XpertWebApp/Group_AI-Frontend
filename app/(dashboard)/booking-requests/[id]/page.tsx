@@ -50,16 +50,35 @@ function formatRoomType(type: string): string {
   return type.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim();
 }
 
+function formatPhone(code: string | null | undefined, num: string | null | undefined): string {
+  if (!num) return '—';
+  if (code) return `${code} ${num}`;
+  return num;
+}
+
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
-          key={i}
-          style={{ width: 16, height: 16 }}
-          className={i < rating ? 'fill-[#AAC737] text-[#AAC737]' : 'fill-none text-[#D1D1D1]'}
-        />
-      ))}
+      {Array.from({ length: 5 }).map((_, i) => {
+        const full = i < Math.floor(rating);
+        const half = !full && i < rating;
+        return (
+          <span key={i} className="relative inline-block" style={{ width: 16, height: 16 }}>
+            {/* Empty star base */}
+            <Star style={{ width: 16, height: 16 }} className="fill-none text-[#D1D1D1]" />
+            {/* Full fill */}
+            {full && (
+              <Star style={{ width: 16, height: 16 }} className="absolute inset-0 fill-[#AAC737] text-[#AAC737]" />
+            )}
+            {/* Half fill — clip left 50% */}
+            {half && (
+              <span className="absolute inset-0 overflow-hidden" style={{ width: '50%' }}>
+                <Star style={{ width: 16, height: 16 }} className="fill-[#AAC737] text-[#AAC737]" />
+              </span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -715,9 +734,7 @@ export default function RequestDetailPage() {
                         </span>
                       </div>
                       <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
-                        {request.contactPhone
-                          ? request.contactPhone.replace(/[^\d+]/g, '').replace(/(\+?\d{3})(?=\d)/g, '$1 ').trim()
-                          : '—'}
+                        {formatPhone(request.contactPhoneCountryCode, request.contactPhone)}
                       </p>
                     </div>
                   </div>

@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { requestsApi } from '@/lib/api/requests';
-import { destinationsApi } from '@/lib/api/destinations';
+import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import type { BookingRequest } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
@@ -14,6 +14,8 @@ import { Select } from '@/components/ui/Select';
 import { RoomCounter } from '@/components/ui/RoomCounter';
 import { Spinner } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils/cn';
+import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
+import { detectCountryCode } from '@/lib/constants/countryCodes';
 import toast from 'react-hot-toast';
 
 interface EditRequestModalProps {
@@ -47,6 +49,7 @@ interface FormState {
   lastName: string;
   contactEmail: string;
   contactPhone: string;
+  contactPhoneCountryCode: string;
   customerNotes: string;
 }
 
@@ -167,6 +170,7 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
     lastName: '',
     contactEmail: '',
     contactPhone: '',
+    contactPhoneCountryCode: '',
     customerNotes: '',
   });
 
@@ -206,7 +210,16 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
         firstName: request.firstName ?? '',
         lastName: request.lastName ?? '',
         contactEmail: request.contactEmail ?? '',
-        contactPhone: request.contactPhone ?? '',
+        ...(() => {
+          const raw = request.contactPhone ?? '';
+          const saved = request.contactPhoneCountryCode;
+          if (saved) return { contactPhoneCountryCode: saved, contactPhone: raw };
+          if (raw.startsWith('+')) {
+            const detected = detectCountryCode(raw);
+            if (detected) return { contactPhoneCountryCode: detected.code, contactPhone: detected.number };
+          }
+          return { contactPhoneCountryCode: '+1', contactPhone: raw };
+        })(),
         customerNotes: request.customerNotes ?? '',
       });
       setDestQuery(request.destinationName ?? '');
@@ -299,6 +312,7 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
         lastName: form.lastName,
         contactEmail: form.contactEmail,
         contactPhone: form.contactPhone,
+        contactPhoneCountryCode: form.contactPhoneCountryCode || undefined,
         customerNotes: form.customerNotes || undefined,
       });
       onSaved(updated);
@@ -410,7 +424,7 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
                       onMouseDown={(e) => { e.preventDefault(); handleDestinationSelect(dest); }}
                       className="px-3 py-2 font-montserrat text-[14px] text-sett-text-primary cursor-pointer hover:bg-[#F7F7F7]"
                     >
-                      {dest.name} ({dest.countryCode})
+                      {dest.name} ({getCountryName(dest.countryCode)})
                     </li>
                   ))}
                 </ul>
@@ -675,12 +689,13 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
                 />
               </div>
               <div>
-                <label className={labelCls}>{t.offer.editPhone}</label>
-                <input
-                  className={inputCls}
-                  value={form.contactPhone}
-                  onChange={(e) => setField('contactPhone', e.target.value)}
-                  placeholder="+1 234 567 890"
+                <PhoneInputSplit
+                  countryCode={form.contactPhoneCountryCode}
+                  number={form.contactPhone}
+                  onCountryCodeChange={(code) => setField('contactPhoneCountryCode', code)}
+                  onNumberChange={(num) => setField('contactPhone', num)}
+                  label={t.offer.editPhone}
+                  required={false}
                 />
               </div>
             </div>
