@@ -1557,7 +1557,8 @@ function HotelCard({
                   const sell = Number(detail.sell ?? 0);
                   const qty = detail.qty ?? 1;
                   const nights = detail.nights ?? 1;
-                  const markup = net > 0 ? ((sell - net) / net) * 100 : 0;
+                  // Only compute markup when net is meaningful (≥ 0.10) to avoid huge % from near-zero net prices
+                  const markup = net >= 0.10 ? ((sell - net) / net) * 100 : 0;
                   const total = sell * qty * nights;
                   return (
                     <tr key={type} className="border-b border-sett-border last:border-0">
@@ -1603,7 +1604,7 @@ function HotelCard({
               const sell = Number(detail.sell ?? 0);
               const qty = detail.qty ?? 1;
               const nights = detail.nights ?? 1;
-              const markup = net > 0 ? ((sell - net) / net) * 100 : 0;
+              const markup = net >= 0.10 ? ((sell - net) / net) * 100 : 0;
               const total = sell * qty * nights;
               return (
                 <div key={type} className="p-3 space-y-2">
