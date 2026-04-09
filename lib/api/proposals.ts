@@ -50,6 +50,19 @@ export const proposalsApi = {
     return data.data;
   },
 
+  async toggleHotelIncluded(
+    proposalId: string,
+    hotelId: string,
+    includedInTotal: boolean
+  ): Promise<{ hotel: ProposalHotel; proposal: Proposal }> {
+    const { data } = await apiClient.patch<ApiResponse<{ hotel: ProposalHotel; proposal: Proposal }>>(
+      `/proposals/${proposalId}/hotels/${hotelId}`,
+      { includedInTotal }
+    );
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to update hotel inclusion');
+    return data.data;
+  },
+
   async adjustHotelPricing(
     proposalId: string,
     hotelId: string,

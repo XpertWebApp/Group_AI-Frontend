@@ -284,6 +284,23 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
       return;
     }
 
+    // Validate bed config if double rooms are set
+    if (form.double > 0 && form.standardDoubleBeds + form.twinBeds !== form.double) {
+      toast.error(t.createForm.bedConfigRequired.replace(/{count}/g, String(form.double)));
+      return;
+    }
+
+    // Validate guest capacity vs group size
+    const guestCapacity = form.single * 1 + form.standardDoubleBeds * 2 + form.twinBeds * 2
+      + form.triple * 3 + form.quadruple * 4;
+    const groupSize = Number(form.groupSize);
+    if (groupSize > 0 && guestCapacity > 0 && guestCapacity < groupSize) {
+      toast.error(t.createForm.capacityTooSmall
+        .replace('{capacity}', String(guestCapacity))
+        .replace('{groupSize}', String(groupSize)));
+      return;
+    }
+
     setSaving(true);
     try {
       const updated = await requestsApi.update(request.id, {
@@ -296,12 +313,14 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
         groupType: form.groupType || undefined,
         groupSize: form.groupSize ? Number(form.groupSize) : undefined,
         rooms: {
-          single: form.single || undefined,
-          double: form.double || undefined,
-          triple: form.triple || undefined,
-          quadruple: form.quadruple || undefined,
-          standardDoubleBeds: form.standardDoubleBeds || undefined,
-          twinBeds: form.twinBeds || undefined,
+          single: form.single,
+          double: 0,
+          twin: 0,
+          standardDoubleBeds: form.standardDoubleBeds,
+          twinBeds: form.twinBeds,
+          triple: form.triple,
+          quadruple: form.quadruple,
+          suites: 0,
           extraRoomsNote: form.extraRoomsNote || undefined,
         },
         breakfastPreference: form.breakfastPreference as 'BB' | 'RO',
@@ -566,13 +585,13 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
                     label={t.offer.standardDoubleBed}
                     value={form.standardDoubleBeds}
                     onChange={(v) => setField('standardDoubleBeds', v)}
-                    max={form.double - Math.floor(form.twinBeds / 2)}
+                    max={form.double - form.twinBeds}
                   />
                   <RoomCounter
                     label={t.offer.twinBed}
                     value={form.twinBeds}
                     onChange={(v) => setField('twinBeds', v)}
-                    max={(form.double - form.standardDoubleBeds) * 2}
+                    max={form.double - form.standardDoubleBeds}
                   />
                 </div>
               </div>

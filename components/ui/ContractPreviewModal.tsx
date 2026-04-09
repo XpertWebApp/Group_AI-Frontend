@@ -20,11 +20,33 @@ function formatDate(dateStr: string | null | undefined): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+const ROOM_TYPE_LABELS: Record<string, string> = {
+  twinbeds: 'Twin Rooms',
+  standarddoublebeds: 'Standard Double Rooms',
+  single: 'Single',
+  double: 'Double',
+  twin: 'Twin',
+  triple: 'Triple',
+  quadruple: 'Quadruple',
+  suite: 'Suite',
+  suites: 'Suites',
+};
+
+function formatRoomType(raw: string): string {
+  const known = ROOM_TYPE_LABELS[raw.toLowerCase().replace(/[_\s]/g, '')];
+  if (known) return known;
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function ContractPreviewModal({ open, onClose, request, proposal }: ContractPreviewModalProps) {
   const { t } = useLanguage();
   const [downloading, setDownloading] = useState(false);
-  const hotels = proposal.hotels ?? [];
-  const services = proposal.services ?? [];
+  // Only show hotels/services that are included in the total
+  const hotels = (proposal.hotels ?? []).filter((h) => h.includedInTotal !== false);
+  const services = (proposal.services ?? []).filter((sv) => sv.includedInTotal !== false);
   const rooms = request.rooms as RoomsConfig | null | undefined;
   const contactName = [request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—';
 
@@ -318,8 +340,8 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                               const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
                               return (
                                 <div key={type} className="flex items-center px-[13px] py-3" style={{ borderBottom: '1px solid #E6EAF0' }}>
-                                  <span className="flex-1 font-normal text-[13px] text-[#1D1D1D] capitalize">
-                                    {type.replace(/_/g, ' ')}
+                                  <span className="flex-1 font-normal text-[13px] text-[#1D1D1D]">
+                                    {formatRoomType(type)}
                                   </span>
                                   <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 80 }}>
                                     €{Number(detail.sell ?? 0).toFixed(2)}

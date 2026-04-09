@@ -142,10 +142,10 @@ export default function RequestDetailPage() {
   const services = useMemo(() => proposal?.services ?? [], [proposal?.services]);
 
   const totals = useMemo(() => {
-    // Calculate hotel buy (net) and sell totals separately from room breakdown
+    // Only include hotels/services where includedInTotal is not explicitly false
     let hotelBuyTotal = 0;
     let hotelSellTotal = 0;
-    hotels.forEach((h) => {
+    hotels.filter((h) => h.includedInTotal !== false).forEach((h) => {
       const roomData = h.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
       if (roomData && Object.keys(roomData).length > 0) {
         Object.values(roomData).forEach((detail) => {
@@ -157,17 +157,17 @@ export default function RequestDetailPage() {
           hotelSellTotal += sell * qty * nights;
         });
       } else {
-        // No room breakdown — use totalPrice for both
         const tp = Number(h.totalPrice ?? 0);
         hotelBuyTotal += tp;
         hotelSellTotal += tp;
       }
     });
-    const serviceBuyTotal = services.reduce(
+    const includedServices = services.filter((sv) => sv.includedInTotal !== false);
+    const serviceBuyTotal = includedServices.reduce(
       (s, sv) => s + Number(sv.buyPrice ?? 0) * (sv.quantity ?? 1),
       0
     );
-    const serviceSellTotal = services.reduce(
+    const serviceSellTotal = includedServices.reduce(
       (s, sv) => s + Number(sv.sellPrice ?? 0) * (sv.quantity ?? 1),
       0
     );
@@ -183,6 +183,46 @@ export default function RequestDetailPage() {
       p ? { ...p, hotels: (p.hotels ?? []).map((h) => (h.id === hotelId ? updatedHotel : h)) } : null
     );
   }, []);
+
+  const handleToggleHotelIncluded = useCallback(async (hotelId: string, includedInTotal: boolean) => {
+    if (!proposal) return;
+    // Optimistic update
+    setProposal((p) =>
+      p ? { ...p, hotels: (p.hotels ?? []).map((h) => h.id === hotelId ? { ...h, includedInTotal } : h) } : null
+    );
+    try {
+      const { hotel: updatedHotel } = await proposalsApi.toggleHotelIncluded(proposal.id, hotelId, includedInTotal);
+      setProposal((p) =>
+        p ? { ...p, hotels: (p.hotels ?? []).map((h) => h.id === hotelId ? updatedHotel : h) } : null
+      );
+    } catch {
+      // Revert on failure
+      setProposal((p) =>
+        p ? { ...p, hotels: (p.hotels ?? []).map((h) => h.id === hotelId ? { ...h, includedInTotal: !includedInTotal } : h) } : null
+      );
+      toast.error('Failed to update hotel inclusion. Please try again.');
+    }
+  }, [proposal]);
+
+  const handleToggleServiceIncluded = useCallback(async (serviceId: string, includedInTotal: boolean) => {
+    if (!proposal) return;
+    // Optimistic update
+    setProposal((p) =>
+      p ? { ...p, services: (p.services ?? []).map((s) => s.id === serviceId ? { ...s, includedInTotal } : s) } : null
+    );
+    try {
+      const { service: updatedService } = await proposalsApi.updateService(proposal.id, serviceId, { includedInTotal });
+      setProposal((p) =>
+        p ? { ...p, services: (p.services ?? []).map((s) => s.id === serviceId ? updatedService : s) } : null
+      );
+    } catch {
+      // Revert on failure
+      setProposal((p) =>
+        p ? { ...p, services: (p.services ?? []).map((s) => s.id === serviceId ? { ...s, includedInTotal: !includedInTotal } : s) } : null
+      );
+      toast.error('Failed to update service inclusion. Please try again.');
+    }
+  }, [proposal]);
 
   const handleAddHotelsClick = async () => {
     if (!proposal) {
@@ -826,6 +866,8 @@ export default function RequestDetailPage() {
                         proposalId={proposal!.id}
                         onPricingUpdate={handlePricingUpdate}
                         onRemove={() => setRemoveHotelTarget(hotel.id)}
+                        onToggleIncluded={(v) => handleToggleHotelIncluded(hotel.id, v)}
+                        proposalStatus={proposal!.status}
                       />
                     ))}
                   </div>
@@ -883,6 +925,8 @@ export default function RequestDetailPage() {
                               service={service}
                               onEdit={() => setEditingService(service)}
                               onDelete={() => setRemoveServiceTarget(service.id)}
+                              onToggleIncluded={(v) => handleToggleServiceIncluded(service.id, v)}
+                              proposalStatus={proposal!.status}
                             />
                           ))}
                         </tbody>
@@ -896,6 +940,8 @@ export default function RequestDetailPage() {
                           service={service}
                           onEdit={() => setEditingService(service)}
                           onDelete={() => setRemoveServiceTarget(service.id)}
+                          onToggleIncluded={(v) => handleToggleServiceIncluded(service.id, v)}
+                          proposalStatus={proposal!.status}
                         />
                       ))}
                     </div>
@@ -1337,11 +1383,15 @@ function HotelCard({
   proposalId,
   onPricingUpdate,
   onRemove,
+  onToggleIncluded,
+  proposalStatus,
 }: {
   hotel: ProposalHotel;
   proposalId: string;
   onPricingUpdate: (hotelId: string, updatedHotel: ProposalHotel) => void;
   onRemove: () => void;
+  onToggleIncluded: (included: boolean) => void;
+  proposalStatus: string;
 }) {
   const { t } = useLanguage();
   const [localRooms, setLocalRooms] = useState<RoomData>(
@@ -1425,11 +1475,27 @@ function HotelCard({
     [persistPricing]
   );
 
+  const isIncluded = hotel.includedInTotal !== false;
+  const canToggle = ['draft'].includes(proposalStatus.toLowerCase());
+
   return (
-    <div className="bg-sett-card rounded-card border border-sett-border">
+    <div className={`bg-sett-card rounded-card border transition-opacity ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
       {/* Hotel header — dark navy */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-[#1B2B44] rounded-t-card">
         <div className="flex items-center gap-2 min-w-0">
+          {/* Include in total checkbox */}
+          <label
+            className={`flex items-center shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+            title={canToggle ? (isIncluded ? 'Exclude from total' : 'Include in total') : 'Cannot change on sent/approved proposal'}
+          >
+            <input
+              type="checkbox"
+              checked={isIncluded}
+              disabled={!canToggle}
+              onChange={(e) => onToggleIncluded(e.target.checked)}
+              className="w-4 h-4 accent-sett-primary rounded"
+            />
+          </label>
           <h4 className="text-body font-bold text-white truncate">
             {hotel.hotelName || hotel.hotelCode}
           </h4>
@@ -1440,6 +1506,9 @@ function HotelCard({
           </div>
           {saving && (
             <span className="text-caption text-white/70 ml-2 animate-pulse shrink-0">{t.common.loading}</span>
+          )}
+          {!isIncluded && (
+            <span className="text-caption text-white/50 ml-1 shrink-0 hidden sm:inline">excluded from total</span>
           )}
         </div>
         <button
@@ -1615,27 +1684,47 @@ function ServiceRow({
   service,
   onEdit,
   onDelete,
+  onToggleIncluded,
+  proposalStatus,
 }: {
   service: ProposalService;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleIncluded: (included: boolean) => void;
+  proposalStatus: string;
 }) {
   const buy = Number(service.buyPrice ?? 0);
   const sell = Number(service.sellPrice ?? 0);
   const qty = service.quantity ?? 1;
   const markup = buy > 0 ? ((sell - buy) / buy) * 100 : 0;
   const total = sell * qty;
+  const isIncluded = service.includedInTotal !== false;
+  const canToggle = ['draft'].includes(proposalStatus.toLowerCase());
 
   return (
-    <tr className="border-b border-sett-border last:border-0">
+    <tr className={`border-b border-sett-border last:border-0 transition-opacity ${isIncluded ? 'opacity-100' : 'opacity-50'}`}>
       <td className="px-4 py-2.5 text-body text-sett-text-primary">
-        {service.serviceName ?? '—'}
+        <div className="flex items-center gap-2">
+          <label
+            className={`flex items-center ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+            title={canToggle ? (isIncluded ? 'Exclude from total' : 'Include in total') : 'Cannot change on sent/approved proposal'}
+          >
+            <input
+              type="checkbox"
+              checked={isIncluded}
+              disabled={!canToggle}
+              onChange={(e) => onToggleIncluded(e.target.checked)}
+              className="w-4 h-4 accent-sett-primary rounded"
+            />
+          </label>
+          <span>{service.serviceName ?? '—'}</span>
+        </div>
       </td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary">{buy.toFixed(2)}</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary">{markup.toFixed(0)}%</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary">{sell.toFixed(2)}</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary">{qty}</td>
-      <td className="px-4 py-2.5 text-body text-sett-primary text-right font-semibold">
+      <td className={`px-4 py-2.5 text-body text-right font-semibold ${isIncluded ? 'text-sett-primary' : 'text-sett-text-accent line-through'}`}>
         {total.toLocaleString('en', { minimumFractionDigits: 2 })}
       </td>
       <td className="px-4 py-2.5 text-right">
@@ -1666,22 +1755,42 @@ function ServiceCard({
   service,
   onEdit,
   onDelete,
+  onToggleIncluded,
+  proposalStatus,
 }: {
   service: ProposalService;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleIncluded: (included: boolean) => void;
+  proposalStatus: string;
 }) {
   const buy = Number(service.buyPrice ?? 0);
   const sell = Number(service.sellPrice ?? 0);
   const qty = service.quantity ?? 1;
   const markup = buy > 0 ? ((sell - buy) / buy) * 100 : 0;
   const total = sell * qty;
+  const isIncluded = service.includedInTotal !== false;
+  const canToggle = ['draft'].includes(proposalStatus.toLowerCase());
 
   return (
-    <div className="p-3 space-y-2">
+    <div className={`p-3 space-y-2 transition-opacity ${isIncluded ? 'opacity-100' : 'opacity-50'}`}>
       <div className="flex items-center justify-between">
-        <p className="text-body font-medium text-sett-text-primary">{service.serviceName ?? '—'}</p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <label
+            className={`flex items-center shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+            title={canToggle ? (isIncluded ? 'Exclude from total' : 'Include in total') : 'Cannot change on sent/approved proposal'}
+          >
+            <input
+              type="checkbox"
+              checked={isIncluded}
+              disabled={!canToggle}
+              onChange={(e) => onToggleIncluded(e.target.checked)}
+              className="w-4 h-4 accent-sett-primary rounded"
+            />
+          </label>
+          <p className="text-body font-medium text-sett-text-primary truncate">{service.serviceName ?? '—'}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button type="button" onClick={onEdit} className="text-sett-text-accent hover:text-sett-primary transition-colors">
             <SquarePen className="w-4 h-4" />
           </button>

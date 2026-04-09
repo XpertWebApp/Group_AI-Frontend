@@ -171,10 +171,17 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     const totalRooms = data.singleRooms + data.doubleRooms + data.tripleRooms + data.quadrupleRooms;
     if (totalRooms < 1) errors.rooms = t.createForm.selectAtLeastOneRoom;
     if (data.doubleRooms > 0) {
-      const roomsCovered = data.standardDoubleBeds + Math.floor(data.twinBeds / 2);
-      if (roomsCovered !== data.doubleRooms) {
-        errors.bedConfig = t.createForm.bedConfigRequired.replace('{count}', String(data.doubleRooms));
+      if (data.standardDoubleBeds + data.twinBeds !== data.doubleRooms) {
+        errors.bedConfig = t.createForm.bedConfigRequired.replace(/{count}/g, String(data.doubleRooms));
       }
+    }
+    const guestCapacity = data.singleRooms * 1 + data.standardDoubleBeds * 2 + data.twinBeds * 2
+      + data.tripleRooms * 3 + data.quadrupleRooms * 4;
+    const groupSize = Number(data.groupSize);
+    if (groupSize > 0 && guestCapacity > 0 && guestCapacity < groupSize) {
+      errors.rooms = t.createForm.capacityTooSmall
+        .replace('{capacity}', String(guestCapacity))
+        .replace('{groupSize}', String(groupSize));
     }
   }
 
@@ -282,11 +289,13 @@ export default function CreateBookingRequestPage() {
         // Step 2: Room & Accommodations
         rooms: {
           single: formData.singleRooms,
-          double: formData.doubleRooms,
+          double: 0,
+          twin: 0,
+          standardDoubleBeds: formData.standardDoubleBeds,
+          twinBeds: formData.twinBeds,
           triple: formData.tripleRooms,
           quadruple: formData.quadrupleRooms,
-          standardDoubleBeds: formData.standardDoubleBeds || undefined,
-          twinBeds: formData.twinBeds || undefined,
+          suites: 0,
           extraRoomsNote: formData.extraRooms || undefined,
         },
         breakfastPreference: formData.breakfastPreference === 'with' ? 'BB' : 'RO',
@@ -713,16 +722,16 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RoomCounter
-              label="Standard Double Bed"
+              label={t.offer.standardDoubleBed}
               value={formData.standardDoubleBeds}
               onChange={(v) => updateField('standardDoubleBeds', v)}
-              max={formData.doubleRooms - Math.floor(formData.twinBeds / 2)}
+              max={formData.doubleRooms - formData.twinBeds}
             />
             <RoomCounter
-              label="Twin Bed"
+              label={t.offer.twinBed}
               value={formData.twinBeds}
               onChange={(v) => updateField('twinBeds', v)}
-              max={(formData.doubleRooms - formData.standardDoubleBeds) * 2}
+              max={formData.doubleRooms - formData.standardDoubleBeds}
             />
           </div>
           <FieldError message={errors.bedConfig} />

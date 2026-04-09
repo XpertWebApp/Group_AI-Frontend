@@ -83,6 +83,30 @@ function getAmenityLabel(name: string, facilityNames: Record<string, string>): s
   return facilityNames[name.toLowerCase().trim()] ?? name;
 }
 
+// Known API room type names → human-readable labels
+const ROOM_TYPE_LABELS: Record<string, string> = {
+  twinbeds: 'Twin Rooms',
+  standarddoublebeds: 'Standard Double Rooms',
+  single: 'Single',
+  double: 'Double',
+  twin: 'Twin',
+  triple: 'Triple',
+  quadruple: 'Quadruple',
+  suite: 'Suite',
+  suites: 'Suites',
+};
+
+function formatRoomType(raw: string): string {
+  // Check known map first (case-insensitive)
+  const known = ROOM_TYPE_LABELS[raw.toLowerCase().replace(/[_\s]/g, '')];
+  if (known) return known;
+  // Split camelCase: "TwinBeds" → "Twin Beds", "StandardDoubleBeds" → "Standard Double Beds"
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export default function AddHotelPage() {
   const params = useParams();
   const router = useRouter();
@@ -675,38 +699,16 @@ export default function AddHotelPage() {
                       <div className="space-y-2">
                         {[
                           { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
-                          { key: 'roomDouble', label: t.addHotel.roomDouble, value: request.rooms.double },
+                          { key: 'roomStandardDouble', label: t.addHotel.standardDoubleBed, value: request.rooms.standardDoubleBeds },
+                          { key: 'roomTwin', label: t.addHotel.twinBed, value: request.rooms.twinBeds },
                           { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
                           { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
                         ]
                           .filter((r) => r.value && r.value > 0)
                           .map((r) => (
-                            <div key={r.key}>
-                              <div className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                                <span>{r.label}</span>
-                                <span className="font-semibold text-sett-text-primary">{r.value}</span>
-                              </div>
-                              {/* Bed Configuration for Double rooms */}
-                              {r.key === 'roomDouble' && (request.rooms?.standardDoubleBeds || request.rooms?.twinBeds) ? (
-                                <div className="mt-2 px-3 py-3 rounded-[10px] border border-sett-border-light bg-[#F7F7F7]">
-                                  <hr className="border-sett-border-light mb-3" />
-                                  <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary mb-2">{t.addHotel.bedConfiguration}</p>
-                                  <div className="space-y-1.5">
-                                    {request.rooms?.standardDoubleBeds ? (
-                                      <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
-                                        <span>{t.addHotel.standardDoubleBed}</span>
-                                        <span className="font-semibold text-sett-text-primary">{request.rooms.standardDoubleBeds}</span>
-                                      </div>
-                                    ) : null}
-                                    {request.rooms?.twinBeds ? (
-                                      <div className="flex items-center justify-between font-montserrat text-[13px] text-sett-text-secondary">
-                                        <span>{t.addHotel.twinBed}</span>
-                                        <span className="font-semibold text-sett-text-primary">{request.rooms.twinBeds}</span>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ) : null}
+                            <div key={r.key} className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                              <span>{r.label}</span>
+                              <span className="font-semibold text-sett-text-primary">{r.value}</span>
                             </div>
                           ))}
                       </div>
@@ -1041,7 +1043,7 @@ function HotelResultCard({
                     <tr key={i} className="border-t border-sett-border-light">
                       <td className="py-2.5 px-4">
                         <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
-                          {rt.roomType.replace(/_/g, ' ')}
+                          {formatRoomType(rt.roomType)}
                         </span>
                         {rt.supplierCode && (
                           <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
@@ -1073,7 +1075,7 @@ function HotelResultCard({
                   <div>
                     <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.roomType}</span>
                     <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize leading-tight">
-                      {rt.roomType.replace(/_/g, ' ')}
+                      {formatRoomType(rt.roomType)}
                       {rt.supplierCode && <span className="block text-[11px] text-sett-text-accent mt-0.5">{rt.supplierCode}</span>}
                     </p>
                   </div>

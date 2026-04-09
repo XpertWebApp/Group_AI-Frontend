@@ -145,6 +145,7 @@ export interface ProposalHotel {
   latitude?: number | null;
   longitude?: number | null;
   createdAt: string;
+  includedInTotal?: boolean;
 }
 
 export interface ProposalService {
@@ -156,6 +157,7 @@ export interface ProposalService {
   quantity?: number | null;
   notes?: string | null;
   createdAt: string;
+  includedInTotal?: boolean;
 }
 
 // ──── Facility Types ────

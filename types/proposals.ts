@@ -45,6 +45,7 @@ export interface AddProposalServicePayload {
   quantity?: number;
   days?: number;
   notes?: string;
+  includedInTotal?: boolean;
 }
 
 export interface SendProposalPayload {
