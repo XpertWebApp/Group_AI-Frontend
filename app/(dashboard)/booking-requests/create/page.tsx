@@ -81,7 +81,7 @@ const defaultFormData: FormData = {
   phone: '',
   specialRequestsCustomer: '',
   termsAndConditions:
-    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>All prices are per person unless otherwise stated</li><li>Prices are subject to availability at time of booking</li><li>Full payment required 30 days before arrival</li><li>Cancellation policy applies as per individual hotel terms</li><li>Group rates are valid for minimum 10 participants</li><li>Final room list required 14 days before arrival</li></ol>',
+    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>All prices are per room per night unless otherwise stated</li><li>Prices are subject to availability at time of booking</li><li>Full payment required 30 days before arrival</li><li>Cancellation policy applies as per individual hotel terms</li><li>Group rates are valid for minimum 10 participants</li><li>Final room list required 14 days before arrival</li></ol>',
   cancellationConditions:
     '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>Cancellations made 14 days or more in advance of the event date will receive a 100% refund.</li><li>Cancellations made within 7 days will incur a 50% fee.</li></ol>',
 };
