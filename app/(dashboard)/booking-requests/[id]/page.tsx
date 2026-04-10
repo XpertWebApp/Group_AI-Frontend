@@ -1322,8 +1322,9 @@ function MarkupDropdown({
       setOpen(false);
       setIsCustom(false);
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    // Use capture phase so this fires before other dropdowns' handlers
+    document.addEventListener('mousedown', handleClick, true);
+    return () => document.removeEventListener('mousedown', handleClick, true);
   }, [open]);
 
   // Close on scroll so it doesn't float detached
@@ -1360,6 +1361,7 @@ function MarkupDropdown({
       <button
         ref={triggerRef}
         type="button"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 px-2 py-1 rounded border border-sett-border hover:border-sett-primary text-body text-sett-text-primary bg-white transition-colors min-w-[72px] justify-between"
       >
@@ -1373,6 +1375,7 @@ function MarkupDropdown({
         ReactDOM.createPortal(
           <div
             ref={panelRef}
+            onMouseDown={(e) => e.stopPropagation()}
             className="fixed z-[9999] bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1"
             style={{ top: pos.top, left: pos.left }}
           >
@@ -1460,11 +1463,16 @@ function HotelCard({
   );
   const [saving, setSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRoomsRef = useRef<RoomData>((hotel.rooms as RoomData) ?? {});
 
-  // Sync local rooms when hotel prop changes (e.g. after API refresh)
+  // Sync local rooms only when the hotel identity changes (not on every price update)
+  const hotelIdRef = useRef(hotel.id);
   useEffect(() => {
-    setLocalRooms((hotel.rooms as RoomData) ?? {});
-  }, [hotel.rooms]);
+    if (hotelIdRef.current !== hotel.id) {
+      hotelIdRef.current = hotel.id;
+      setLocalRooms((hotel.rooms as RoomData) ?? {});
+    }
+  }, [hotel.id, hotel.rooms]);
 
   const roomEntries = Object.entries(localRooms);
 
@@ -1490,16 +1498,17 @@ function HotelCard({
             totalPrice,
             currency: hotel.currency,
           });
+          lastSavedRoomsRef.current = updatedRooms;
           onPricingUpdate(hotel.id, updatedHotel);
         } catch {
           // Revert on failure
-          setLocalRooms((hotel.rooms as RoomData) ?? {});
+          setLocalRooms(lastSavedRoomsRef.current);
         } finally {
           setSaving(false);
         }
       }, 800);
     },
-    [proposalId, hotel.id, hotel.currency, hotel.rooms, computeTotalPrice, onPricingUpdate]
+    [proposalId, hotel.id, hotel.currency, computeTotalPrice, onPricingUpdate]
   );
 
   const handleMarkupChange = useCallback(
