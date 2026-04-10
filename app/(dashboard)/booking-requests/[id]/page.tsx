@@ -22,7 +22,6 @@ import {
   SquarePen,
   Send,
   XCircle,
-  FileDown,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -1067,37 +1066,6 @@ export default function RequestDetailPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Sent Offer PDF — only visible once offer is sent and PDF URL exists */}
-                {proposal.pdfUrl && ['sent', 'approved', 'accepted', 'completed'].includes(proposal.status.toLowerCase()) && (
-                  <a
-                    href={proposal.pdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center gap-4 bg-white rounded-[14px] border border-sett-primary/30 px-5 py-4 hover:border-sett-primary transition-all duration-200 hover:shadow-[0_4px_16px_rgba(170,199,55,0.18)]"
-                  >
-                    {/* PDF icon badge */}
-                    <div className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0"
-                      style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
-                      <FileDown className="w-5 h-5 text-white" strokeWidth={2} />
-                    </div>
-                    {/* Text */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-montserrat text-[13px] font-semibold text-sett-text-primary leading-tight">
-                        {t.offer.sentOfferPdf}
-                      </p>
-                      {proposal.sentAt && (
-                        <p className="font-montserrat text-[11px] text-sett-text-accent mt-0.5">
-                          {t.offer.sentOn} {formatDate(proposal.sentAt)}
-                        </p>
-                      )}
-                    </div>
-                    {/* Arrow */}
-                    <svg className="w-4 h-4 text-sett-text-accent group-hover:text-sett-primary transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                )}
 
                 {/* Action Buttons */}
                 <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
