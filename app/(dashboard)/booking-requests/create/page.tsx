@@ -354,6 +354,14 @@ export default function CreateBookingRequestPage() {
         toast.success(t.toasts.requestCreated);
       }
 
+      if (formData.nameListFile) {
+        try {
+          await requestsApi.uploadAttachments(requestId, [formData.nameListFile]);
+        } catch {
+          toast.error(t.toasts.fileUploadFailed);
+        }
+      }
+
       router.push(`/booking-requests/${requestId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
@@ -938,7 +946,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
                 <input
                   type="file"
                   className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp"
                   onChange={(e) => updateField('nameListFile', e.target.files?.[0] || null)}
                 />
               </label>

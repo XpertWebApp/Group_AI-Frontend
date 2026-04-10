@@ -256,6 +256,8 @@ export const translations = {
       marginEur: 'Margin EUR',
       marginPct: 'Margin %',
       previewPdf: 'Preview PDF',
+      sentOfferPdf: 'Sent Offer PDF',
+      sentOn: 'Sent on',
       saveDraft: 'Save Draft',
       approveAndSend: 'Approve & Send',
       markDeclined: 'Mark as Declined',
@@ -498,6 +500,7 @@ export const translations = {
       failedToApprove: 'Failed to approve proposal',
       failedToMarkSent: 'Failed to mark as sent',
       requestCreated: 'Booking request created successfully!',
+      fileUploadFailed: 'File upload failed. The request was saved — please try uploading again.',
     },
 
     // ── Modals ──
@@ -862,6 +865,8 @@ export const translations = {
       marginEur: 'Marge EUR',
       marginPct: 'Marge %',
       previewPdf: 'PDF-Vorschau',
+      sentOfferPdf: 'Gesendetes Angebots-PDF',
+      sentOn: 'Gesendet am',
       saveDraft: 'Entwurf speichern',
       approveAndSend: 'Genehmigen & Senden',
       markDeclined: 'Als abgelehnt markieren',
@@ -1102,6 +1107,7 @@ export const translations = {
       failedToApprove: 'Genehmigung des Angebots fehlgeschlagen',
       failedToMarkSent: 'Konnte nicht als gesendet markiert werden',
       requestCreated: 'Buchungsanfrage erfolgreich erstellt!',
+      fileUploadFailed: 'Datei-Upload fehlgeschlagen. Die Anfrage wurde gespeichert – bitte erneut versuchen.',
     },
 
     // ── Modals ──

@@ -32,6 +32,16 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
+export interface Attachment {
+  id: string;
+  fileKey: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url?: string;
+  createdAt: string;
+}
+
 export interface RoomsConfig {
   single?: number;
   double?: number;
@@ -79,6 +89,7 @@ export interface BookingRequest {
   contactPhoneCountryCode?: string | null;
   guestListFileKey?: string | null;
   customerNotes?: string | null;
+  attachments?: Attachment[];
 
   // Step 4: Policies
   termsAndConditions?: string | null;
@@ -124,6 +135,8 @@ export interface Proposal {
   lockedBy?: string | null;
   lockedAt?: string | null;
   lockedByUser?: { firstName?: string; lastName?: string } | null;
+  pdfUrl?: string | null;
+  sentAt?: string | null;
   createdAt: string;
   updatedAt?: string | null;
   hotels?: ProposalHotel[];
