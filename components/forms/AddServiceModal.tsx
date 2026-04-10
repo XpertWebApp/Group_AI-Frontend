@@ -101,6 +101,11 @@ interface FormErrors {
 /* Prevent scroll / zoom from changing number input values */
 const blurOnWheel = (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur();
 
+/* Prevent typing '-' in number inputs */
+const blockMinus = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === '-') e.preventDefault();
+};
+
 export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, bookingStartDate, bookingEndDate }: AddServiceModalProps) {
   const { t } = useLanguage();
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -440,6 +445,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 placeholder="0"
                 value={buyPrice}
                 onChange={(e) => { handleBuyChange(e.target.value); if (errors.buyPrice) setErrors((err) => ({ ...err, buyPrice: undefined })); }}
+                onKeyDown={blockMinus}
                 onWheel={blurOnWheel}
                 className={errors.buyPrice ? errorInputCls : inputCls}
               />
@@ -458,6 +464,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 placeholder="0"
                 value={sellPrice}
                 onChange={(e) => { setSellPrice(e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value)))); if (errors.sellPrice) setErrors((err) => ({ ...err, sellPrice: undefined })); }}
+                onKeyDown={blockMinus}
                 onWheel={blurOnWheel}
                 className={errors.sellPrice ? errorInputCls : inputCls}
               />
@@ -480,6 +487,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 placeholder="0"
                 value={markup}
                 onChange={(e) => { handleMarkupChange(e.target.value); if (errors.markup) setErrors((err) => ({ ...err, markup: undefined })); }}
+                onKeyDown={blockMinus}
                 onWheel={blurOnWheel}
                 className={errors.markup ? errorInputCls : inputCls}
               />
@@ -497,6 +505,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 placeholder="0"
                 value={quantity}
                 onChange={(e) => { setQuantity(e.target.value === '' ? '' : String(Math.max(1, Number(e.target.value)))); if (errors.quantity) setErrors((err) => ({ ...err, quantity: undefined })); }}
+                onKeyDown={blockMinus}
                 onWheel={blurOnWheel}
                 className={errors.quantity ? errorInputCls : inputCls}
               />
@@ -518,6 +527,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 placeholder="0"
                 value={day}
                 onChange={(e) => { setDay(e.target.value); if (errors.day) setErrors((err) => ({ ...err, day: undefined })); }}
+                onKeyDown={blockMinus}
                 onWheel={blurOnWheel}
                 className={errors.day ? errorInputCls : inputCls}
               />
@@ -535,6 +545,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 placeholder="0"
                 value={night}
                 onChange={(e) => { setNight(e.target.value); if (errors.night) setErrors((err) => ({ ...err, night: undefined })); }}
+                onKeyDown={blockMinus}
                 onWheel={blurOnWheel}
                 className={errors.night ? errorInputCls : inputCls}
               />

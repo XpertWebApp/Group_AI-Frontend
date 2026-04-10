@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, forwardRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -206,6 +206,7 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
 
 export default function CreateBookingRequestPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -220,6 +221,23 @@ export default function CreateBookingRequestPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [attempted, setAttempted] = useState(false);
+  // When returning from summary page to edit a just-created request
+  const [draftRequestId, setDraftRequestId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const draft = searchParams.get('draft');
+    if (!draft) return;
+    try {
+      const saved = sessionStorage.getItem(`createFormDraft_${draft}`);
+      if (saved) {
+        const parsed = JSON.parse(saved) as FormData;
+        setFormData({ ...defaultFormData, ...parsed, nameListFile: null });
+        setDraftRequestId(draft);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [searchParams]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => {
@@ -275,7 +293,7 @@ export default function CreateBookingRequestPage() {
     setSubmitError(null);
     try {
       const { requestsApi } = await import('@/lib/api/requests');
-      const created = await requestsApi.create({
+      const payload = {
         // Step 1: Trip Details
         destinationId: formData.destinationId,
         destinationName: formData.destination,
@@ -298,8 +316,8 @@ export default function CreateBookingRequestPage() {
           suites: 0,
           extraRoomsNote: formData.extraRooms || undefined,
         },
-        breakfastPreference: formData.breakfastPreference === 'with' ? 'BB' : 'RO',
-        hotelLocation: formData.hotelLocation === 'central' ? 'central' : 'outside_city_center',
+        breakfastPreference: (formData.breakfastPreference === 'with' ? 'BB' : 'RO') as 'BB' | 'RO',
+        hotelLocation: (formData.hotelLocation === 'central' ? 'central' : 'outside_city_center') as 'central' | 'outside_city_center',
         specialRequirements: formData.specialRequestsRooms || undefined,
         // Step 3: Customer Details
         companyName: formData.companyName,
@@ -312,10 +330,31 @@ export default function CreateBookingRequestPage() {
         // Step 4: Policies
         termsAndConditions: formData.termsAndConditions?.replace(/<[^>]*>/g, '').trim() ? formData.termsAndConditions : undefined,
         cancellationConditions: formData.cancellationConditions?.replace(/<[^>]*>/g, '').trim() ? formData.cancellationConditions : undefined,
-        status: 'pending',
-      });
-      toast.success(t.toasts.requestCreated);
-      router.push(`/booking-requests/${created.id}`);
+        status: 'pending' as const,
+      };
+
+      let requestId: string;
+      if (draftRequestId) {
+        // Returning from summary to edit — update the existing request
+        await requestsApi.update(draftRequestId, payload);
+        // Keep the draft key so the user can go back again from the summary page
+        try {
+          sessionStorage.setItem(`createFormDraft_${draftRequestId}`, JSON.stringify(formData));
+        } catch { /* storage full — not critical */ }
+        requestId = draftRequestId;
+        toast.success(t.toasts.requestCreated);
+      } else {
+        // Fresh create
+        const created = await requestsApi.create(payload);
+        // Save form data so Back button on summary page can restore it
+        try {
+          sessionStorage.setItem(`createFormDraft_${created.id}`, JSON.stringify(formData));
+        } catch { /* storage full — not critical */ }
+        requestId = created.id;
+        toast.success(t.toasts.requestCreated);
+      }
+
+      router.push(`/booking-requests/${requestId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
       setSubmitError(message);
@@ -418,6 +457,32 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-caption text-red-500">{message}</p>;
 }
 
+function StarDisplay({ rating, label }: { rating: number; label: string }) {
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  const total = Math.ceil(rating);
+  const empty = total - full - (half ? 1 : 0);
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-0.5">
+        {Array.from({ length: full }).map((_, i) => (
+          <svg key={`f${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#AAC737" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ))}
+        {half && (
+          <svg key="h" width="14" height="14" viewBox="0 0 24 24" className="shrink-0">
+            <defs><linearGradient id="half-grad-sc"><stop offset="50%" stopColor="#AAC737"/><stop offset="50%" stopColor="#D1D1D1"/></linearGradient></defs>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#half-grad-sc)"/>
+          </svg>
+        )}
+        {Array.from({ length: empty }).map((_, i) => (
+          <svg key={`e${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ))}
+      </span>
+      <span className="text-sett-text-primary">{label}</span>
+    </span>
+  );
+}
+
 interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hasError?: boolean;
 }
@@ -457,17 +522,17 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const userTypingRef = useRef(false);
 
   const hotelCategoryOptions = [
-    { value: '1',   label: t.createForm.star1 },
-    { value: '1.5', label: t.createForm.star1_5 },
-    { value: '2',   label: t.createForm.star2 },
-    { value: '2.5', label: t.createForm.star2_5 },
-    { value: '3',   label: t.createForm.star3 },
-    { value: '3.5', label: t.createForm.star3_5 },
-    { value: '4',   label: t.createForm.star4 },
-    { value: '4.5', label: t.createForm.star4_5 },
-    { value: '5',   label: t.createForm.star5 },
-    { value: '5.5', label: t.createForm.star5_5 },
-    { value: '6',   label: t.createForm.star6 },
+    { value: '1',   label: t.createForm.star1,   node: <StarDisplay rating={1}   label="1 Star" /> },
+    { value: '1.5', label: t.createForm.star1_5, node: <StarDisplay rating={1.5} label="1.5 Stars" /> },
+    { value: '2',   label: t.createForm.star2,   node: <StarDisplay rating={2}   label="2 Stars" /> },
+    { value: '2.5', label: t.createForm.star2_5, node: <StarDisplay rating={2.5} label="2.5 Stars" /> },
+    { value: '3',   label: t.createForm.star3,   node: <StarDisplay rating={3}   label="3 Stars" /> },
+    { value: '3.5', label: t.createForm.star3_5, node: <StarDisplay rating={3.5} label="3.5 Stars" /> },
+    { value: '4',   label: t.createForm.star4,   node: <StarDisplay rating={4}   label="4 Stars" /> },
+    { value: '4.5', label: t.createForm.star4_5, node: <StarDisplay rating={4.5} label="4.5 Stars" /> },
+    { value: '5',   label: t.createForm.star5,   node: <StarDisplay rating={5}   label="5 Stars" /> },
+    { value: '5.5', label: t.createForm.star5_5, node: <StarDisplay rating={5.5} label="5.5 Stars" /> },
+    { value: '6',   label: t.createForm.star6,   node: <StarDisplay rating={6}   label="6 Stars" /> },
   ];
   const budgetRangeOptions = [
     { value: 'economy', label: t.createForm.economy },
@@ -696,9 +761,16 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
           value={formData.doubleRooms}
           onChange={(v) => {
             updateField('doubleRooms', v);
-            // Reset bed configuration when double rooms change
-            updateField('standardDoubleBeds', 0);
-            updateField('twinBeds', 0);
+            // If reducing double rooms, clamp sub-fields so they don't exceed the new total
+            const currentSdb = formData.standardDoubleBeds;
+            const currentTwin = formData.twinBeds;
+            if (currentSdb + currentTwin > v) {
+              // Preserve ratio as much as possible; reduce twin first, then standard
+              const newTwin = Math.min(currentTwin, v);
+              const newSdb = Math.min(currentSdb, v - newTwin);
+              updateField('twinBeds', newTwin);
+              updateField('standardDoubleBeds', newSdb);
+            }
           }}
         />
         <RoomCounter

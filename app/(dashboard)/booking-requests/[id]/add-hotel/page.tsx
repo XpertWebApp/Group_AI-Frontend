@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel,
+  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
-import { PageLoader, Spinner } from '@/components/ui/Loader';
+import { PageLoader } from '@/components/ui/Loader';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -141,6 +141,15 @@ export default function AddHotelPage() {
       if (r) setRequest(r);
     });
   }, [requestId]);
+
+  // Pre-populate addedHotels from the proposal so page refresh doesn't lose "Added" state
+  useEffect(() => {
+    if (!proposalId) return;
+    proposalsApi.get(proposalId).then((proposal) => {
+      if (!proposal?.hotels?.length) return;
+      setAddedHotels(new Set(proposal.hotels.map((h) => h.hotelCode)));
+    }).catch(() => { /* ignore — addedHotels stays empty */ });
+  }, [proposalId]);
 
   // Load dynamic facilities for the destination
   useEffect(() => {
@@ -547,12 +556,12 @@ export default function AddHotelPage() {
   });
 
   return (
-    <div className="flex flex-col lg:h-full lg:overflow-hidden">
+    <div className="flex flex-col xl:h-full xl:overflow-hidden">
       <Header title={t.createForm.title} />
 
-      <div className="p-4 md:p-6 lg:flex-1 lg:min-h-0 lg:flex lg:flex-col lg:gap-6">
+      <div className="p-4 md:p-6 xl:flex-1 xl:min-h-0 xl:flex xl:flex-col xl:gap-6">
         {/* Breadcrumb */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:shrink-0">
           <button
             type="button"
             onClick={() => router.push(`/booking-requests/${requestId}`)}
@@ -575,36 +584,109 @@ export default function AddHotelPage() {
         )}
 
         {/* Searching / Polling phase */}
-        {(phase === 'searching' || phase === 'polling') && (
-          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
-            <Spinner size="lg" className="mx-auto mb-4" />
-            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
-              {t.addHotel.searchingHotels}
-            </h3>
-            {searchSummary ? (
-              <>
-                <p className="font-montserrat text-[14px] text-sett-text-secondary mb-4">
-                  {t.addHotel.hotelsChecked.replace('{completed}', String(searchSummary.completed)).replace('{total}', String(searchSummary.total))}
-                </p>
-                <div className="w-full max-w-md mx-auto bg-sett-border-light rounded-full h-2.5">
-                  <div
-                    className="bg-sett-primary h-2.5 rounded-full transition-all duration-500"
-                    style={{ width: `${searchSummary.total > 0 ? Math.round((searchSummary.completed / searchSummary.total) * 100) : 0}%` }}
-                  />
+        {(phase === 'searching' || phase === 'polling') && (() => {
+          const pct = searchSummary && searchSummary.total > 0
+            ? Math.round((searchSummary.completed / searchSummary.total) * 100)
+            : 0;
+          const remaining = searchSummary ? Math.max(0, searchSummary.total - searchSummary.completed) : 0;
+          return (
+            <div className="bg-white rounded-[14px] border border-sett-border-light px-5 py-4 relative overflow-hidden">
+              {/* Subtle left-side glow */}
+              <div
+                className="absolute inset-y-0 left-0 w-32 pointer-events-none"
+                style={{ background: 'radial-gradient(ellipse 100% 80% at 0% 50%, rgba(170,199,55,0.07) 0%, transparent 100%)' }}
+              />
+
+              {/* ── Main horizontal layout ── */}
+              <div className="flex items-center gap-5">
+
+                {/* Left: icon + title */}
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* Animated icon */}
+                  <div className="relative inline-flex items-center justify-center shrink-0">
+                    <span className="absolute w-12 h-12 rounded-full border border-sett-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
+                    <span className="absolute rounded-full border border-sett-primary/30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s', width: 40, height: 40 }} />
+                    <div className="relative z-10 w-9 h-9 rounded-full bg-sett-primary/10 border border-sett-primary/25 flex items-center justify-center">
+                      <Hotel className="w-4.5 h-4.5 text-sett-primary" style={{ width: 18, height: 18 }} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-montserrat text-[16px] font-bold text-sett-text-primary leading-tight">
+                      {t.addHotel.searchingHotels}
+                    </p>
+                    {!searchSummary && (
+                      <div className="flex items-center gap-1 mt-1">
+                        {[0, 1, 2].map((i) => (
+                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-sett-primary/50 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
+                        ))}
+                      </div>
+                    )}
+                    {searchSummary && (
+                      <p className="font-montserrat text-[13px] text-sett-text-accent leading-tight mt-0.5">
+                        {t.addHotel.hotelsChecked
+                          .replace('{completed}', String(searchSummary.completed))
+                          .replace('{total}', String(searchSummary.total))}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {searchSummary.hotelsFound > 0 && (
-                  <p className="font-montserrat text-[13px] text-sett-primary font-medium mt-3">
-                    {t.addHotel.hotelsFoundSoFar.replace('{count}', String(searchSummary.hotelsFound))}
-                  </p>
+
+                {/* Divider */}
+                <div className="hidden sm:block w-px self-stretch bg-sett-border-light shrink-0" />
+
+                {/* Centre: progress bar */}
+                {searchSummary && (
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-montserrat text-[13px] text-sett-text-accent">{t.addHotel.searchProgress}</span>
+                      <span className="font-montserrat text-[14px] font-bold text-sett-primary tabular-nums">{pct}%</span>
+                    </div>
+                    <div className="w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'rgba(170,199,55,0.15)' }}>
+                      <div
+                        className="h-2 rounded-full transition-all duration-700 ease-out"
+                        style={{
+                          width: `${pct}%`,
+                          background: 'linear-gradient(90deg, #8FA82B 0%, #AAC737 100%)',
+                          boxShadow: '0 0 6px rgba(170,199,55,0.5)',
+                        }}
+                      />
+                    </div>
+                  </div>
                 )}
-              </>
-            ) : (
-              <p className="font-montserrat text-[14px] text-sett-text-accent max-w-md mx-auto">
-                {t.addHotel.startingSearch}
-              </p>
-            )}
-          </div>
-        )}
+
+                {/* Divider */}
+                {searchSummary && <div className="hidden sm:block w-px self-stretch bg-sett-border-light shrink-0" />}
+
+                {/* Right: stat pills */}
+                {searchSummary && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Remaining */}
+                    <div className="flex flex-col items-center px-3 py-2 rounded-[10px] border border-[#E8EDF0] min-w-[52px]" style={{ background: '#F7F9FB' }}>
+                      <span className="font-montserrat text-[18px] font-bold text-sett-text-primary leading-none">{remaining}</span>
+                      <span className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent mt-0.5">{t.addHotel.searchRemaining}</span>
+                    </div>
+
+                    {/* Scroll hint badge */}
+                    {searchSummary.hotelsFound > 0 && (
+                      <div className="hidden md:flex items-center gap-1 pl-1 text-sett-primary shrink-0">
+                        <ChevronDown className="w-4 h-4 animate-bounce" />
+                        <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile: scroll hint below on small screens */}
+              {searchSummary && searchSummary.hotelsFound > 0 && (
+                <div className="flex md:hidden items-center justify-center gap-1 mt-3 text-sett-primary">
+                  <ChevronDown className="w-4 h-4 animate-bounce" />
+                  <span className="font-montserrat text-[13px] font-medium">{t.addHotel.scrollToPreview}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Error phase */}
         {phase === 'error' && (
@@ -628,20 +710,25 @@ export default function AddHotelPage() {
             <p className="font-montserrat text-[14px] text-sett-text-accent mb-5 max-w-md mx-auto">
               {t.addHotel.noHotelsFoundMsg}
             </p>
-            <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
-              {t.addHotel.searchAgain}
-            </Button>
+            <div className="flex items-center justify-center gap-3">
+              <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
+                {t.addHotel.searchAgain}
+              </Button>
+              <Button variant="secondary" onClick={() => router.push(`/booking-requests/${requestId}`)}>
+                {t.addHotel.backToOffer}
+              </Button>
+            </div>
           </div>
         )}
 
         {/* Results — show when done, or progressively during polling if results exist */}
         {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && completedResults.length > 0 && (
-          <div className="flex flex-col lg:flex-row gap-6 lg:flex-1 lg:min-h-0">
-            {/* ── Mobile filter toggle ── */}
+          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
+            {/* ── Mobile/tablet filter toggle ── */}
             <button
               type="button"
               onClick={() => setFiltersOpen(!filtersOpen)}
-              className="lg:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+              className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
             >
               <SlidersHorizontal className="w-4 h-4" />
               {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
@@ -650,10 +737,10 @@ export default function AddHotelPage() {
               )}
             </button>
 
-            {/* ── Left Sidebar: Filters ── */}
+            {/* ── Left Sidebar: Trip Details + Filters ── */}
             <aside className={cn(
-              'lg:w-[320px] shrink-0 lg:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden lg:block'
+              'xl:w-[300px] shrink-0 xl:overflow-y-auto',
+              filtersOpen ? 'block' : 'hidden xl:block'
             )}>
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
@@ -820,9 +907,16 @@ export default function AddHotelPage() {
             </aside>
 
             {/* ── Right: Hotel Results ── */}
-            <div className="flex-1 min-w-0 lg:flex lg:flex-col lg:min-h-0">
-              <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 lg:shrink-0">
-                {t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))}
+            <div className="flex-1 min-w-0 xl:flex xl:flex-col xl:min-h-0">
+              <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0">
+                {filteredResults.length < displayResults.length
+                  ? t.addHotel.hotelsShowing
+                      .replace('{shown}', String(filteredResults.length))
+                      .replace('{total}', String(displayResults.length))
+                  : phase === 'polling'
+                    ? t.addHotel.hotelsFoundSoFar.replace('{count}', String(filteredResults.length))
+                    : t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))
+                }
               </p>
 
               {filteredResults.length === 0 && (
@@ -833,7 +927,7 @@ export default function AddHotelPage() {
                 </div>
               )}
 
-              <div className="space-y-5 lg:overflow-y-auto lg:pr-1 pb-6">
+              <div className="space-y-5 xl:overflow-y-auto xl:pr-1 pb-6">
                 {filteredResults.map((hotel) => (
                   <HotelResultCard
                     key={hotel.hotelCode}
@@ -857,6 +951,53 @@ export default function AddHotelPage() {
           onClose={() => setDetailHotel(null)}
         />
       )}
+
+      {/* ── Sticky "View Offer" bar — slides up once first hotel is added ── */}
+      <div
+        className={cn(
+          'fixed bottom-0 left-0 right-0 z-40 transition-transform duration-300 ease-out',
+          addedHotels.size > 0 ? 'translate-y-0' : 'translate-y-full'
+        )}
+      >
+        {/* Backdrop blur strip */}
+        <div
+          className="max-w-5xl mx-4 md:mx-6 xl:mx-auto mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
+          style={{
+            background: 'rgba(255,255,255,0.97)',
+            boxShadow: '0 -4px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(170,199,55,0.15)',
+          }}
+        >
+          {/* Left: check badge + count label */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-sett-primary flex items-center justify-center shrink-0"
+              style={{ boxShadow: '0 4px 12px rgba(170,199,55,0.4)' }}>
+              <Check className="w-4 h-4 text-white" strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary leading-tight truncate">
+                {t.addHotel.hotelsAddedToOffer.replace('{count}', String(addedHotels.size))}
+              </p>
+              <p className="font-montserrat text-[11px] text-sett-text-accent leading-tight mt-0.5">
+                {t.addHotel.offer} #{request?.referenceNumber ?? requestId.slice(0, 4)}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: CTA button */}
+          <button
+            type="button"
+            onClick={() => router.push(`/booking-requests/${requestId}`)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-[10px] font-montserrat text-[14px] font-semibold text-white shrink-0 transition-all duration-150 hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[2px] active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)',
+              boxShadow: '0 4px 14px rgba(170,199,55,0.45), inset 0 1px 0 rgba(255,255,255,0.2)',
+            }}
+          >
+            {t.addHotel.viewOffer}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -898,9 +1039,9 @@ function HotelResultCard({
       )}
     >
       {/* ── Top section: Image + Hotel Details + Action ── */}
-      <div className="flex flex-col md:flex-row lg:flex-col 2xl:flex-row gap-4 md:gap-5">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
         {/* ── Hotel Image ── */}
-        <div className="w-full md:w-[220px] lg:w-full 2xl:w-[280px] h-[200px] sm:h-[240px] md:h-[220px] lg:h-[256px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
+        <div className="w-full sm:w-[200px] md:w-[220px] xl:w-[240px] h-[200px] sm:h-[180px] md:h-[200px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
           <img
             src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
             alt={hotel.hotelName}

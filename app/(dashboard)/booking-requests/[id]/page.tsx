@@ -93,6 +93,14 @@ export default function RequestDetailPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [fromCreate, setFromCreate] = useState(false);
+
+  useEffect(() => {
+    try {
+      const draft = sessionStorage.getItem(`createFormDraft_${id}`);
+      setFromCreate(!!draft);
+    } catch { /* ignore */ }
+  }, [id]);
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
@@ -368,8 +376,29 @@ export default function RequestDetailPage() {
           adminNotes: sendNotes.trim() || undefined,
         });
         setApproveStepDone(true);
-      } catch {
-        setSendError(t.toasts.failedToApprove);
+      } catch (err: unknown) {
+        const ax = await import('axios');
+        if (ax.isAxiosError(err)) {
+          const errorCode = err.response?.data?.error as string | undefined;
+          const backendMessage = err.response?.data?.message as string | undefined;
+          const status = err.response?.status;
+
+          if (errorCode === 'PROPOSAL_NOT_APPROVABLE' || status === 412) {
+            setSendError('This offer cannot be approved in its current state. Please refresh the page and try again.');
+          } else if (errorCode === 'PDF_GENERATION_FAILED') {
+            setSendError(t.toasts.pdfGenerationFailed);
+          } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
+            setSendError(t.toasts.noRecipientEmail);
+          } else if (status === 403) {
+            setSendError('You do not have permission to approve this offer.');
+          } else if (status && status >= 500) {
+            setSendError('A server error occurred while approving the offer. Please try again.');
+          } else {
+            setSendError(backendMessage || t.toasts.failedToApprove);
+          }
+        } else {
+          setSendError(t.toasts.failedToApprove);
+        }
         setActionLoading(false);
         return;
       }
@@ -393,8 +422,10 @@ export default function RequestDetailPage() {
       const ax = await import('axios');
       if (ax.isAxiosError(err)) {
         const errorCode = err.response?.data?.error as string | undefined;
+        const backendMessage = err.response?.data?.message as string | undefined;
         const emailError = err.response?.data?.data?.emailError as string | undefined;
         const proposalData = err.response?.data?.data?.proposal;
+        const status = err.response?.status;
         if (proposalData) setProposal((p) => p ? { ...p, ...proposalData } : p);
 
         if (errorCode === 'EMAIL_SEND_FAILED') {
@@ -407,10 +438,16 @@ export default function RequestDetailPage() {
         } else if (errorCode === 'PROPOSAL_ALREADY_SENT') {
           setSendOpen(false);
           toast.success(t.toasts.proposalAlreadySent);
-        } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE') {
-          setSendError(t.toasts.proposalNotModifiable);
+        } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE' || status === 412) {
+          setSendError('This offer cannot be sent in its current state. Please refresh and try again.');
+        } else if (status === 403) {
+          setSendError('You do not have permission to send this offer.');
+        } else if (status === 409) {
+          setSendError('A conflict occurred — the offer may have already been updated. Please refresh and try again.');
+        } else if (status && status >= 500) {
+          setSendError('A server error occurred while sending the offer. Please try again or contact support.');
         } else {
-          setSendError(err.response?.data?.message || `${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
+          setSendError(backendMessage || `${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
         }
       } else {
         setSendError(`${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
@@ -490,7 +527,7 @@ export default function RequestDetailPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => router.push('/booking-requests')}
+            onClick={() => router.push(fromCreate ? `/booking-requests/create?draft=${id}` : '/booking-requests')}
             className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -521,9 +558,11 @@ export default function RequestDetailPage() {
                     <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
                       {t.offer.requestSummary}
                     </h2>
-                    <button type="button" onClick={() => setEditRequestOpen(true)} className="p-0.5 rounded hover:opacity-70 transition-opacity">
-                      <SquarePen className="w-4 h-4 text-sett-primary" />
-                    </button>
+                    {!['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase()) && (
+                      <button type="button" onClick={() => setEditRequestOpen(true)} className="p-0.5 rounded hover:opacity-70 transition-opacity">
+                        <SquarePen className="w-4 h-4 text-sett-primary" />
+                      </button>
+                    )}
                   </div>
                   <p className="font-montserrat text-[14px] font-normal leading-none text-[#4A4A4A] mt-0.5">
                     {t.offer.bookingDetails}
@@ -636,7 +675,13 @@ export default function RequestDetailPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 w-full gap-3 sm:gap-5">
                     {[
                       { label: t.offer.single, value: rooms?.single },
-                      { label: t.offer.double, value: rooms?.double },
+                      {
+                        label: t.offer.double,
+                        // Backend always stores double:0; derive the real count from sub-fields
+                        value: (rooms?.standardDoubleBeds || rooms?.twinBeds)
+                          ? (rooms?.standardDoubleBeds ?? 0) + (rooms?.twinBeds ?? 0)
+                          : rooms?.double,
+                      },
                       { label: t.offer.triple, value: rooms?.triple },
                       { label: t.offer.quadruple, value: rooms?.quadruple },
                     ].map((room) => (
@@ -1196,8 +1241,9 @@ export default function RequestDetailPage() {
             <EditRequestModal
               open={editRequestOpen}
               request={request}
+              proposal={proposal}
               onClose={() => setEditRequestOpen(false)}
-              onSaved={(updated) => setRequest(updated)}
+              onSaved={(updated) => { setRequest(updated); loadData(); }}
             />
           )}
 
@@ -1340,8 +1386,13 @@ function MarkupDropdown({
                   max="100"
                   step="0.1"
                   value={customValue}
-                  onChange={(e) => setCustomValue(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    // Prevent negative values from being entered
+                    if (v === '' || parseFloat(v) >= 0) setCustomValue(v);
+                  }}
                   onKeyDown={(e) => {
+                    if (e.key === '-') e.preventDefault();
                     if (e.key === 'Enter') handleCustomSubmit();
                     if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
                   }}
@@ -1572,12 +1623,12 @@ function HotelCard({
                       <td className="px-4 py-2.5 text-right">
                         <input
                           type="number"
-                          min="0"
+                          min={net.toFixed(2)}
                           step="0.01"
                           value={sell.toFixed(2)}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value);
-                            if (!isNaN(val) && val >= 0) handleSellChange(type, val);
+                            if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
                         />
@@ -1625,12 +1676,12 @@ function HotelCard({
                       <div className="mt-0.5">
                         <input
                           type="number"
-                          min="0"
+                          min={net.toFixed(2)}
                           step="0.01"
                           value={sell.toFixed(2)}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value);
-                            if (!isNaN(val) && val >= 0) handleSellChange(type, val);
+                            if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-full max-w-[80px] px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
                         />

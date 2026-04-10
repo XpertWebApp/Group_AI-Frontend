@@ -3,10 +3,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown, Check } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SelectOption {
   value: string;
   label: string;
+  /** Optional custom content rendered inside the dropdown item and trigger */
+  node?: ReactNode;
 }
 
 interface SelectProps {
@@ -35,7 +39,9 @@ export function Select({
   name,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const isFilter = variant === 'filter';
 
@@ -43,13 +49,14 @@ export function Select({
   const displayLabel = selectedOption?.label || placeholder || '';
   const isPlaceholder = !selectedOption;
 
-  // Close on outside click
+  // Close on outside click (exclude both trigger container and portal dropdown)
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inContainer = containerRef.current?.contains(target);
+      const inDropdown = listRef.current?.contains(target);
+      if (!inContainer && !inDropdown) setOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -63,6 +70,36 @@ export function Select({
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
+  }, [open]);
+
+  // Compute dropdown position (flip up if not enough space below)
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const dropdownHeight = 260; // max-h-[240px] + padding
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+      // Open upward
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.top - dropdownHeight + 'px',
+        left: rect.left + 'px',
+        width: rect.width + 'px',
+        zIndex: 9999,
+      });
+    } else {
+      // Open downward
+      setDropdownStyle({
+        position: 'fixed',
+        top: rect.bottom + 6 + 'px',
+        left: rect.left + 'px',
+        width: rect.width + 'px',
+        zIndex: 9999,
+      });
+    }
   }, [open]);
 
   // Scroll selected item into view when opening
@@ -98,6 +135,7 @@ export function Select({
 
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
@@ -116,7 +154,10 @@ export function Select({
                 : 'border-sett-border-light hover:border-sett-primary/40',
         )}
       >
-        <span className="truncate">{displayLabel}</span>
+        {selectedOption?.node
+          ? <span className="flex items-center gap-2 truncate">{selectedOption.node}</span>
+          : <span className="truncate">{displayLabel}</span>
+        }
         <ChevronDown
           className={cn(
             'shrink-0 transition-transform duration-200',
@@ -126,11 +167,12 @@ export function Select({
         />
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
+      {/* Dropdown panel — rendered in a portal to escape overflow:hidden parents */}
+      {open && typeof document !== 'undefined' && createPortal(
         <div
           ref={listRef}
-          className="absolute z-50 mt-1.5 w-full rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
+          style={dropdownStyle}
+          className="rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
         >
           <div className="max-h-[240px] overflow-y-auto py-1.5">
             {placeholder && (
@@ -161,13 +203,17 @@ export function Select({
                       : 'text-sett-text-primary hover:bg-[#F7F7F7]'
                   )}
                 >
-                  <span className="truncate">{opt.label}</span>
+                  {opt.node
+                    ? <span className="flex items-center gap-2">{opt.node}</span>
+                    : <span className="truncate">{opt.label}</span>
+                  }
                   {isSelected && <Check className="w-4 h-4 text-sett-primary shrink-0 ml-2" />}
                 </button>
               );
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {error && <p className="mt-1 text-caption text-red-500">{error}</p>}

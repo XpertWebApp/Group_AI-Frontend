@@ -5,9 +5,10 @@ import { X } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { requestsApi } from '@/lib/api/requests';
+import { proposalsApi } from '@/lib/api/proposals';
 import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
-import type { BookingRequest } from '@/types';
+import type { BookingRequest, Proposal } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { Select } from '@/components/ui/Select';
@@ -21,6 +22,7 @@ import toast from 'react-hot-toast';
 interface EditRequestModalProps {
   open: boolean;
   request: BookingRequest;
+  proposal?: Proposal | null;
   onClose: () => void;
   onSaved: (updated: BookingRequest) => void;
 }
@@ -66,6 +68,32 @@ const textareaCls =
   'w-full px-3 py-2.5 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary transition-colors resize-none min-h-[80px]';
 
 /* ── Section header matching create form ── */
+function StarDisplay({ rating, label }: { rating: number; label: string }) {
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  const total = Math.ceil(rating);
+  const empty = total - full - (half ? 1 : 0);
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-0.5">
+        {Array.from({ length: full }).map((_, i) => (
+          <svg key={`f${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#AAC737" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ))}
+        {half && (
+          <svg key="h" width="14" height="14" viewBox="0 0 24 24" className="shrink-0">
+            <defs><linearGradient id="half-grad-em"><stop offset="50%" stopColor="#AAC737"/><stop offset="50%" stopColor="#D1D1D1"/></linearGradient></defs>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#half-grad-em)"/>
+          </svg>
+        )}
+        {Array.from({ length: Math.max(0, empty) }).map((_, i) => (
+          <svg key={`e${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ))}
+      </span>
+      <span className="text-sett-text-primary">{label}</span>
+    </span>
+  );
+}
+
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="flex items-start gap-3 mb-5">
@@ -142,7 +170,7 @@ const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
 );
 DateInput.displayName = 'DateInput';
 
-export function EditRequestModal({ open, request, onClose, onSaved }: EditRequestModalProps) {
+export function EditRequestModal({ open, request, proposal, onClose, onSaved }: EditRequestModalProps) {
   const { t } = useLanguage();
   const rooms = request.rooms as RoomsConfig | null | undefined;
 
@@ -301,8 +329,20 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
       return;
     }
 
+    const destinationChanged =
+      form.destinationId !== (request.destinationId ?? 0) ||
+      form.destinationName !== (request.destinationName ?? '');
+
     setSaving(true);
     try {
+      // If destination changed, remove all hotels and services from the proposal
+      if (destinationChanged && proposal) {
+        await Promise.all([
+          ...(proposal.hotels ?? []).map((h) => proposalsApi.removeHotel(proposal.id, h.id)),
+          ...(proposal.services ?? []).map((s) => proposalsApi.removeService(proposal.id, s.id)),
+        ]);
+      }
+
       const updated = await requestsApi.update(request.id, {
         destinationId: form.destinationId || undefined,
         destinationName: form.destinationName,
@@ -348,17 +388,17 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
   };
 
   const hotelCategoryOptions = [
-    { value: '1',   label: t.createForm.star1 },
-    { value: '1.5', label: t.createForm.star1_5 },
-    { value: '2',   label: t.createForm.star2 },
-    { value: '2.5', label: t.createForm.star2_5 },
-    { value: '3',   label: t.createForm.star3 },
-    { value: '3.5', label: t.createForm.star3_5 },
-    { value: '4',   label: t.createForm.star4 },
-    { value: '4.5', label: t.createForm.star4_5 },
-    { value: '5',   label: t.createForm.star5 },
-    { value: '5.5', label: t.createForm.star5_5 },
-    { value: '6',   label: t.createForm.star6 },
+    { value: '1',   label: t.createForm.star1,   node: <StarDisplay rating={1}   label={t.createForm.star1} /> },
+    { value: '1.5', label: t.createForm.star1_5, node: <StarDisplay rating={1.5} label={t.createForm.star1_5} /> },
+    { value: '2',   label: t.createForm.star2,   node: <StarDisplay rating={2}   label={t.createForm.star2} /> },
+    { value: '2.5', label: t.createForm.star2_5, node: <StarDisplay rating={2.5} label={t.createForm.star2_5} /> },
+    { value: '3',   label: t.createForm.star3,   node: <StarDisplay rating={3}   label={t.createForm.star3} /> },
+    { value: '3.5', label: t.createForm.star3_5, node: <StarDisplay rating={3.5} label={t.createForm.star3_5} /> },
+    { value: '4',   label: t.createForm.star4,   node: <StarDisplay rating={4}   label={t.createForm.star4} /> },
+    { value: '4.5', label: t.createForm.star4_5, node: <StarDisplay rating={4.5} label={t.createForm.star4_5} /> },
+    { value: '5',   label: t.createForm.star5,   node: <StarDisplay rating={5}   label={t.createForm.star5} /> },
+    { value: '5.5', label: t.createForm.star5_5, node: <StarDisplay rating={5.5} label={t.createForm.star5_5} /> },
+    { value: '6',   label: t.createForm.star6,   node: <StarDisplay rating={6}   label={t.createForm.star6} /> },
   ];
 
   const budgetRangeOptions = [
@@ -558,8 +598,14 @@ export function EditRequestModal({ open, request, onClose, onSaved }: EditReques
                 value={form.double}
                 onChange={(v) => {
                   setField('double', v);
-                  setField('standardDoubleBeds', 0);
-                  setField('twinBeds', 0);
+                  const currentSdb = form.standardDoubleBeds;
+                  const currentTwin = form.twinBeds;
+                  if (currentSdb + currentTwin > v) {
+                    const newTwin = Math.min(currentTwin, v);
+                    const newSdb = Math.min(currentSdb, v - newTwin);
+                    setField('twinBeds', newTwin);
+                    setField('standardDoubleBeds', newSdb);
+                  }
                 }}
               />
               <RoomCounter
