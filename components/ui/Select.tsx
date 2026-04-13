@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown, Check } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -39,7 +39,7 @@ export function Select({
   name,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'fixed', visibility: 'hidden' });
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -73,7 +73,9 @@ export function Select({
   }, [open]);
 
   // Compute dropdown position (flip up if not enough space below)
-  useEffect(() => {
+  // useLayoutEffect runs before the browser paints, so the dropdown is
+  // never visible in an unpositioned state — prevents the right-side layout shift.
+  useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
@@ -85,6 +87,7 @@ export function Select({
       // Open upward
       setDropdownStyle({
         position: 'fixed',
+        visibility: 'visible',
         top: rect.top - dropdownHeight + 'px',
         left: rect.left + 'px',
         width: rect.width + 'px',
@@ -94,6 +97,7 @@ export function Select({
       // Open downward
       setDropdownStyle({
         position: 'fixed',
+        visibility: 'visible',
         top: rect.bottom + 6 + 'px',
         left: rect.left + 'px',
         width: rect.width + 'px',
@@ -113,6 +117,7 @@ export function Select({
   const handleSelect = useCallback((optValue: string) => {
     onChange?.({ target: { value: optValue } });
     setOpen(false);
+    setDropdownStyle({ position: 'fixed', visibility: 'hidden' });
   }, [onChange]);
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
@@ -205,6 +205,14 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
 }
 
 export default function CreateBookingRequestPage() {
+  return (
+    <Suspense fallback={null}>
+      <CreateBookingRequestPageInner />
+    </Suspense>
+  );
+}
+
+function CreateBookingRequestPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
