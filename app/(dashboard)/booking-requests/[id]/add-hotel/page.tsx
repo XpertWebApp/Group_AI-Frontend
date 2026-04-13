@@ -522,21 +522,32 @@ export default function AddHotelPage() {
     );
   };
 
+  // Deduplicate by hotelCode — keep the entry with the lowest sell price (best deal)
+  const deduplicatedResults = Object.values(
+    completedResults.reduce<Record<string, HotelSearchResult>>((acc, hotel) => {
+      const existing = acc[hotel.hotelCode];
+      if (!existing || hotel.sellingPricePerRoomPerNight < existing.sellingPricePerRoomPerNight) {
+        acc[hotel.hotelCode] = hotel;
+      }
+      return acc;
+    }, {})
+  );
+
   // Client-side filter — separate main vs alternative by star rating match
   // Coerce starRating to number — live API may return it as a string or decimal (e.g. "4.5")
   // Use Math.round so that 4.5 → 5, 3.5 → 4, matching whole-number filter options
   const hotelStars = (h: { starRating: number }) => Math.round(Number(h.starRating));
   const requestedStars = Math.round(Number(request?.starRating ?? 0));
-  const mainResults = completedResults.filter(
+  const mainResults = deduplicatedResults.filter(
     (h) => !requestedStars || hotelStars(h) === requestedStars
   );
-  const altResults = completedResults.filter(
+  const altResults = deduplicatedResults.filter(
     (h) => requestedStars && hotelStars(h) !== requestedStars
   );
   // If no main results match the requested star rating, show all hotels
   const hasMainResults = mainResults.length > 0;
   const displayResults = !hasMainResults
-    ? completedResults
+    ? deduplicatedResults
     : showAlternatives
       ? altResults
       : mainResults;
@@ -1020,6 +1031,40 @@ export default function AddHotelPage() {
 
 /* ─────────────── Hotel Result Card ─────────────── */
 
+function HotelStarRating({ rating, size = 16 }: { rating: number; size?: number }) {
+  const id = `hsg-${rating.toString().replace('.', '-')}`;
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  const total = Math.ceil(rating);
+  const empty = total - full - (half ? 1 : 0);
+  const path = 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z';
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: full }).map((_, i) => (
+        <svg key={`f${i}`} width={size} height={size} viewBox="0 0 24 24" fill="#AAC737" className="shrink-0">
+          <path d={path} />
+        </svg>
+      ))}
+      {half && (
+        <svg key="h" width={size} height={size} viewBox="0 0 24 24" className="shrink-0">
+          <defs>
+            <linearGradient id={id}>
+              <stop offset="50%" stopColor="#AAC737" />
+              <stop offset="50%" stopColor="#D1D1D1" />
+            </linearGradient>
+          </defs>
+          <path d={path} fill={`url(#${id})`} />
+        </svg>
+      )}
+      {Array.from({ length: empty }).map((_, i) => (
+        <svg key={`e${i}`} width={size} height={size} viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0">
+          <path d={path} />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 function HotelResultCard({
   hotel,
   isAdded,
@@ -1057,7 +1102,7 @@ function HotelResultCard({
       {/* ── Top section: Image + Hotel Details + Action ── */}
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
         {/* ── Hotel Image ── */}
-        <div className="w-full sm:w-[200px] md:w-[220px] xl:w-[240px] h-[200px] sm:h-[180px] md:h-[200px] shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
+        <div className="w-full sm:w-[200px] md:w-[220px] xl:w-[240px] h-[200px] sm:h-auto sm:self-stretch shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
           <img
             src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
             alt={hotel.hotelName}
@@ -1077,13 +1122,34 @@ function HotelResultCard({
         <div className="flex-1 min-w-0 flex flex-col justify-between">
           {/* Top: Name, Address, Stars + Add to Offer */}
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 flex flex-col gap-3">
-              <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">
-                {hotel.hotelName}
-              </h4>
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              {/* Name + Stars on the same row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary leading-tight">
+                  {hotel.hotelName}
+                </h4>
+                <HotelStarRating rating={Number(hotel.starRating)} size={18} />
+                {isLimited && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+                    <AlertTriangle className="w-3 h-3" />
+                    {t.addHotel.limitedCapacity}
+                  </span>
+                )}
+              </div>
+              {/* Location */}
+              {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-sett-text-accent shrink-0" />
+                  <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                    {hotel.address ||
+                      [hotel.addressCity, hotel.addressCountry].filter(Boolean).join(', ')}
+                  </span>
+                </div>
+              )}
+              {/* Description */}
               {hotel.description && (
                 <p
-                  className="font-montserrat text-[13px] text-sett-text-secondary mt-0.5"
+                  className="font-montserrat text-[14px] text-sett-text-secondary leading-snug"
                   style={{
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
@@ -1094,37 +1160,13 @@ function HotelResultCard({
                   {hotel.description}
                 </p>
               )}
-
-              {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-sett-text-accent shrink-0" />
-                  <span className="font-montserrat text-[13px] text-sett-text-secondary">
-                    {hotel.address ||
-                      [hotel.addressCity, hotel.addressCountry].filter(Boolean).join(', ')}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex gap-0.5">
-                  {Array.from({ length: hotel.starRating }).map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
-                  ))}
-                </div>
-                {isLimited && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700">
-                    <AlertTriangle className="w-3 h-3" />
-                    {t.addHotel.limitedCapacity}
-                  </span>
-                )}
-              </div>
             </div>
 
-            {/* Action area */}
+            {/* Action area — primary CTA only */}
             <div className="shrink-0 flex flex-col items-end gap-2">
               {isAdded ? (
-                <span className="flex items-center gap-1 font-montserrat text-[14px] text-sett-primary font-semibold">
-                  <Check className="w-4 h-4" /> {t.addHotel.added}
+                <span className="flex items-center gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
+                  <Check className="w-4 h-4" strokeWidth={2.5} /> {t.addHotel.added}
                 </span>
               ) : (
                 <Button
@@ -1136,22 +1178,14 @@ function HotelResultCard({
                   {t.addHotel.addToOffer}
                 </Button>
               )}
-              <button
-                type="button"
-                onClick={onViewDetails}
-                className="flex items-center gap-1.5 font-montserrat text-[13px] text-sett-primary font-semibold hover:text-sett-primary-hover transition-colors group"
-              >
-                <Info className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" />
-                <span>{t.addHotel.viewDetails}</span>
-              </button>
               {hasCancellation && (
-                <div className="flex flex-col items-end gap-1 px-3 py-2 bg-[#F0F5E3]/50 rounded-[10px] border border-sett-primary/10 mt-1">
-                  <div className="flex items-center gap-1.5 font-montserrat text-[13px] text-sett-primary font-bold">
-                    <Check className="w-4 h-4" />
+                <div className="flex flex-col items-end gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
+                  <div className="flex items-center gap-1 font-montserrat text-[12px] text-sett-primary font-semibold">
+                    <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
                     <span>{t.addHotel.freeCancellation}</span>
                   </div>
                   {hotel.cxlDeadline && (
-                    <div className="flex items-center gap-1 font-montserrat text-[11px] text-sett-text-accent font-medium uppercase tracking-tight">
+                    <div className="flex items-center gap-1 font-montserrat text-[10px] text-sett-text-accent font-medium uppercase tracking-tight">
                       <Clock className="w-3 h-3" />
                       <span>{t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </div>
@@ -1263,6 +1297,18 @@ function HotelResultCard({
               </p>
             </div>
           )}
+
+          {/* ── Footer: View Details ── */}
+          <div className="flex items-center justify-end pt-3 mt-1 border-t border-sett-border-light">
+            <button
+              type="button"
+              onClick={onViewDetails}
+              className="flex items-center gap-1.5 font-montserrat text-[13px] font-semibold text-sett-primary hover:underline transition-colors group"
+            >
+              <Info className="w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-110" />
+              {t.addHotel.viewDetails}
+            </button>
+          </div>
         </div>
       </div>
     </div>
