@@ -360,7 +360,6 @@ export default function AddHotelPage() {
         includeAlternativeStars: true,
         currencyCode: request?.currencyCode || 'EUR',
         nationalityCode: request?.nationalityCode || undefined,
-        facilityIds: amenityFilters.length > 0 ? amenityFilters : undefined,
       });
       if (!mountedRef.current) return;
       setPhase('polling');
@@ -371,7 +370,7 @@ export default function AddHotelPage() {
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, amenityFilters, startPollingFallback]);
+  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback]);
 
   // Check existing search status first, only start new search if needed
   const runSearch = useCallback(async (destinationId?: number) => {
@@ -838,24 +837,41 @@ export default function AddHotelPage() {
                   <hr className="border-sett-border-light" />
 
                   {/* Price Per Night */}
-                  <div>
-                    <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary mb-2">
-                      {t.addHotel.pricePerNight}
-                    </label>
-                    <input
-                      type="range"
-                      min={0}
-                      max={3000}
-                      step={50}
-                      value={maxPrice}
-                      onChange={(e) => setMaxPrice(Number(e.target.value))}
-                      className="w-full h-[14px] rounded-full appearance-none cursor-pointer bg-sett-primary
-                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[14px] [&::-webkit-slider-thumb]:h-[14px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#F8F9FB] [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-sett-border-light [&::-webkit-slider-thumb]:shadow-sm
-                      [&::-moz-range-thumb]:w-[14px] [&::-moz-range-thumb]:h-[14px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#F8F9FB] [&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-sett-border-light [&::-moz-range-thumb]:shadow-sm"
-                    />
-                    <div className="flex justify-between font-montserrat text-[12px] text-sett-text-accent mt-1">
-                      <span>&euro;0</span>
-                      <span>&euro;{maxPrice.toLocaleString()}</span>
+                  <div className="flex flex-col gap-3">
+                    {/* Label row */}
+                    <div className="flex items-center justify-between">
+                      <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        {t.addHotel.pricePerNight}
+                      </label>
+                      {/* Active value badge */}
+                      <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
+                        style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
+                        &euro;{maxPrice.toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* Slider track */}
+                    <div className="relative pt-1 pb-1">
+                      <input
+                        type="range"
+                        min={0}
+                        max={3000}
+                        step={50}
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(Number(e.target.value))}
+                        style={{
+                          background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
+                        }}
+                        className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110
+                        [&::-moz-range-thumb]:w-[18px] [&::-moz-range-thumb]:h-[18px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-sett-primary [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Min / Max labels */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
+                      <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
                     </div>
                   </div>
 
