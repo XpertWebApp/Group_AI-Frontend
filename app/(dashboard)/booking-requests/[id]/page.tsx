@@ -1160,7 +1160,7 @@ export default function RequestDetailPage() {
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-sett-border font-montserrat text-[12px] font-medium text-sett-text-primary hover:border-sett-primary hover:text-sett-primary transition-colors"
                               >
                                 <Download className="w-3.5 h-3.5" />
-                                {t.offer.downloadPdf}
+                                {t.modals.downloadPdf}
                               </a>
                             ) : (
                               <span className="font-montserrat text-[12px] text-sett-text-accent italic">
