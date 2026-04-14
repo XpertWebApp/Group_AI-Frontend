@@ -68,7 +68,7 @@ const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
         ref={ref}
         value={value as string}
         onClick={onClick}
-        onChange={() => {}}
+        onChange={() => { }}
         placeholder={placeholder ?? 'MM/DD/YYYY'}
         readOnly
         className={cn(hasError ? errorInputCls : inputCls, 'pr-9 cursor-pointer')}
@@ -137,8 +137,8 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
       const notes = initialData.notes ?? '';
       setDay(notes.includes('Day') ? '1' : '');
       setNight(notes.includes('Night') ? '1' : '');
-      setDateFrom(null);
-      setDateTo(null);
+      setDateFrom(initialData.dateFrom ? new Date(initialData.dateFrom) : null);
+      setDateTo(initialData.dateTo ? new Date(initialData.dateTo) : null);
       setShowDropdown(false);
     } else if (!open) {
       setSelectedServices([]);
