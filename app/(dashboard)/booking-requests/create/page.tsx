@@ -196,7 +196,7 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     }
     if (!data.phone.trim()) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (data.phone.length < 5 || data.phone.length > 15) {
+    } else if (data.phone.length < 7 || data.phone.length > 15) {
       errors.phone = t.createForm.invalidPhone;
     }
   }

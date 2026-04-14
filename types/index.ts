@@ -169,8 +169,27 @@ export interface ProposalService {
   sellPrice?: number | null;
   quantity?: number | null;
   notes?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
   createdAt: string;
   includedInTotal?: boolean;
+}
+
+// ──── Offer History Types ────
+
+export interface OfferHistoryEntry {
+  id: string;
+  offerNumber: number;
+  type: 'initial' | 'final' | 'revision';
+  sentAt: string;
+  sentBy: string;
+  sentToEmails: string[];
+  totalPrice: number | null;
+  currency: string;
+  method: string;
+  pdfUrl: string | null;
+  hotelCount: number;
+  serviceCount: number;
 }
 
 // ──── Facility Types ────

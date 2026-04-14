@@ -22,6 +22,7 @@ import {
   SquarePen,
   Send,
   XCircle,
+  Download,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -35,7 +36,7 @@ import { PageLoader } from '@/components/ui/Loader';
 import { HotelMap } from '@/components/ui/HotelMap';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
-import type { Attachment, BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
+import type { Attachment, BookingRequest, OfferHistoryEntry, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import toast from 'react-hot-toast';
@@ -94,14 +95,8 @@ export default function RequestDetailPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [fromCreate, setFromCreate] = useState(false);
-
-  useEffect(() => {
-    try {
-      const draft = sessionStorage.getItem(`createFormDraft_${id}`);
-      setFromCreate(!!draft);
-    } catch { /* ignore */ }
-  }, [id]);
+  const [offerHistory, setOfferHistory] = useState<OfferHistoryEntry[]>([]);
+  const [offerHistoryLoading, setOfferHistoryLoading] = useState(false);
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
@@ -139,6 +134,11 @@ export default function RequestDetailPage() {
       if (linked) {
         const full = await proposalsApi.get(linked.id);
         if (full) setProposal(full);
+        setOfferHistoryLoading(true);
+        proposalsApi.listOffers(linked.id)
+          .then(setOfferHistory)
+          .catch(() => {})
+          .finally(() => setOfferHistoryLoading(false));
       }
     } catch {
       // ignore
@@ -470,6 +470,7 @@ export default function RequestDetailPage() {
       setApproveStepDone(false);
       setSuccessOpen(true);
       toast.success(t.toasts.proposalSent);
+      proposalsApi.listOffers(proposal.id).then(setOfferHistory).catch(() => {});
     } catch (err: unknown) {
       const ax = await import('axios');
       if (ax.isAxiosError(err)) {
@@ -579,11 +580,7 @@ export default function RequestDetailPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => {
-              const status = (proposal?.status ?? request?.status ?? '').toLowerCase();
-              const isEditable = !['sent', 'approved', 'declined', 'cancelled', 'completed'].includes(status);
-              router.push(fromCreate && isEditable ? `/booking-requests/create?draft=${id}` : '/booking-requests');
-            }}
+            onClick={() => router.push('/booking-requests')}
             className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -974,6 +971,7 @@ export default function RequestDetailPage() {
                         onRemove={() => setRemoveHotelTarget(hotel.id)}
                         onToggleIncluded={(v) => handleToggleHotelIncluded(hotel.id, v)}
                         proposalStatus={proposal!.status}
+                        offerCount={offerHistory.length}
                       />
                     ))}
                   </div>
@@ -1000,11 +998,17 @@ export default function RequestDetailPage() {
                   <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
                     {/* Desktop table */}
                     <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full min-w-[700px]">
+                      <table className="w-full min-w-[860px]">
                         <thead>
                           <tr className="border-b border-sett-border bg-sett-fill">
                             <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.service}
+                            </th>
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
+                              {t.services.dateFrom}
+                            </th>
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
+                              {t.services.dateTo}
                             </th>
                             <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.net} &euro;
@@ -1067,6 +1071,107 @@ export default function RequestDetailPage() {
                   <div className="mx-4 mb-4">
                     <HotelMap hotels={hotels} className="h-44" />
                   </div>
+                </div>
+
+                {/* Offer History */}
+                <div className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-sett-border-light">
+                    <div className="w-1 h-5 bg-sett-primary rounded-full" />
+                    <h4 className="font-montserrat text-[15px] font-semibold text-sett-text-primary">
+                      {t.offer.offerHistory}
+                    </h4>
+                  </div>
+
+                  {offerHistoryLoading && (
+                    <div className="p-4 space-y-3 animate-pulse">
+                      {[1, 2].map((n) => (
+                        <div key={n} className="rounded-[10px] border border-sett-border-light p-3 space-y-2">
+                          <div className="h-4 w-24 rounded bg-sett-border" />
+                          <div className="h-3 w-full rounded bg-sett-border" />
+                          <div className="h-3 w-3/4 rounded bg-sett-border" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!offerHistoryLoading && offerHistory.length === 0 && (
+                    <p className="px-5 py-4 font-montserrat text-[13px] text-sett-text-accent">
+                      {t.offer.noOffersSent}
+                    </p>
+                  )}
+
+                  {!offerHistoryLoading && offerHistory.length > 0 && (
+                    <div className="divide-y divide-sett-border-light">
+                      {offerHistory.map((entry) => {
+                        const badgeClass = entry.type === 'initial'
+                          ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                          : entry.type === 'final'
+                            ? 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00]'
+                            : 'bg-orange-50 border border-orange-200 text-orange-700';
+
+                        const typeLabel = entry.type === 'initial'
+                          ? t.offer.initialOffer
+                          : entry.type === 'final'
+                            ? t.offer.finalOffer
+                            : `${t.offer.revision} #${entry.offerNumber - 2}`;
+
+                        const hotelsLabel = entry.hotelCount === 1
+                          ? t.offer.hotelsCount.replace('{n}', '1')
+                          : t.offer.hotelsPluralCount.replace('{n}', String(entry.hotelCount));
+                        const servicesLabel = entry.serviceCount === 1
+                          ? t.offer.servicesCount.replace('{n}', '1')
+                          : t.offer.servicesPluralCount.replace('{n}', String(entry.serviceCount));
+
+                        return (
+                          <div key={entry.id} className="p-4 space-y-2">
+                            {/* Badge + date */}
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-badge font-montserrat text-[11px] font-semibold uppercase tracking-wide ${badgeClass}`}>
+                                #{entry.offerNumber} {typeLabel}
+                              </span>
+                              <span className="font-montserrat text-[12px] text-sett-text-accent whitespace-nowrap">
+                                {formatDate(entry.sentAt)}
+                              </span>
+                            </div>
+
+                            {/* Recipients */}
+                            <p className="font-montserrat text-[12px] text-sett-text-secondary truncate">
+                              {t.offer.sentTo}: {entry.sentToEmails.join(', ')}
+                            </p>
+
+                            {/* Item counts + total */}
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-montserrat text-[12px] text-sett-text-accent">
+                                {hotelsLabel}, {servicesLabel}
+                              </span>
+                              {entry.totalPrice != null && (
+                                <span className="font-montserrat text-[12px] font-semibold text-sett-text-primary whitespace-nowrap">
+                                  {entry.currency} {entry.totalPrice.toLocaleString('en', { minimumFractionDigits: 2 })}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Download */}
+                            {entry.pdfUrl ? (
+                              <a
+                                href={entry.pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-sett-border font-montserrat text-[12px] font-medium text-sett-text-primary hover:border-sett-primary hover:text-sett-primary transition-colors"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                {t.offer.downloadPdf}
+                              </a>
+                            ) : (
+                              <span className="font-montserrat text-[12px] text-sett-text-accent italic">
+                                {t.offer.pdfUnavailable}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Room Breakdown */}
@@ -1144,10 +1249,14 @@ export default function RequestDetailPage() {
                       }
                       setSendOpen(true);
                     }}
-                    disabled={['sent', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
+                    disabled={['declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
                   >
                     <Send className="w-4 h-4" />
-                    {(proposal?.status ?? request.status).toLowerCase() === 'approved' ? t.offer.retrySend : t.offer.approveAndSend}
+                    {offerHistory.length === 0
+                      ? t.offer.sendInitialOffer
+                      : offerHistory.length === 1
+                        ? t.offer.sendFinalOffer
+                        : t.offer.sendRevision}
                   </Button>
                   <Button
                     variant="destructive"
@@ -1159,6 +1268,7 @@ export default function RequestDetailPage() {
                     {t.offer.markDeclined}
                   </Button>
                 </div>
+
               </div>
             )}
           </div>
@@ -1218,7 +1328,11 @@ export default function RequestDetailPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="bg-white rounded-[14px] border border-sett-border-light w-full max-w-md mx-4 p-6">
                 <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-1">
-                  {approveStepDone ? t.offer.retrySend : t.offer.approveTitle}
+                  {offerHistory.length === 0
+                    ? t.offer.sendInitialOffer
+                    : offerHistory.length === 1
+                      ? t.offer.sendFinalOffer
+                      : t.offer.sendRevision}
                 </h3>
                 <p className="font-montserrat text-[14px] text-sett-text-secondary mb-5">
                   {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
@@ -1321,7 +1435,11 @@ export default function RequestDetailPage() {
                     isLoading={actionLoading}
                   >
                     <Send className="w-4 h-4" />
-                    {approveStepDone ? t.offer.retrySend : t.offer.approveAndSend}
+                    {offerHistory.length === 0
+                      ? t.offer.sendInitialOffer
+                      : offerHistory.length === 1
+                        ? t.offer.sendFinalOffer
+                        : t.offer.sendRevision}
                   </Button>
                 </div>
               </div>
@@ -1540,6 +1658,7 @@ function HotelCard({
   onRemove,
   onToggleIncluded,
   proposalStatus,
+  offerCount,
 }: {
   hotel: ProposalHotel;
   proposalId: string;
@@ -1547,6 +1666,7 @@ function HotelCard({
   onRemove: () => void;
   onToggleIncluded: (included: boolean) => void;
   proposalStatus: string;
+  offerCount: number;
 }) {
   const { t } = useLanguage();
   const [localRooms, setLocalRooms] = useState<RoomData>(
@@ -1636,27 +1756,33 @@ function HotelCard({
     [persistPricing]
   );
 
-  const isIncluded = hotel.includedInTotal !== false;
-  const canToggle = ['draft'].includes(proposalStatus.toLowerCase());
+  // Before first send: default to included (no checkboxes shown anyway)
+  // After first send: default to NOT included — staff must explicitly check the client's chosen hotel
+  const isIncluded = offerCount > 0
+    ? hotel.includedInTotal === true
+    : hotel.includedInTotal !== false;
+  const canToggle = offerCount > 0 && !['declined', 'cancelled', 'completed'].includes(proposalStatus.toLowerCase());
 
   return (
     <div className={`bg-sett-card rounded-card border transition-opacity ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
       {/* Hotel header — dark navy */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-[#1B2B44] rounded-t-card">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Include in total checkbox */}
-          <label
-            className={`flex items-center shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-            title={canToggle ? (isIncluded ? 'Exclude from total' : 'Include in total') : 'Cannot change on sent/approved proposal'}
-          >
-            <input
-              type="checkbox"
-              checked={isIncluded}
-              disabled={!canToggle}
-              onChange={(e) => onToggleIncluded(e.target.checked)}
-              className="w-4 h-4 accent-sett-primary rounded"
-            />
-          </label>
+          {/* Include in total checkbox — only shown after the first offer has been sent */}
+          {offerCount > 0 && (
+            <label
+              className={`flex items-center shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+              title={canToggle ? (isIncluded ? 'Exclude from total' : 'Include in total') : 'Cannot change on a closed offer'}
+            >
+              <input
+                type="checkbox"
+                checked={isIncluded}
+                disabled={!canToggle}
+                onChange={(e) => onToggleIncluded(e.target.checked)}
+                className="w-4 h-4 accent-sett-primary rounded"
+              />
+            </label>
+          )}
           <h4 className="text-body font-bold text-white truncate">
             {hotel.hotelName || hotel.hotelCode}
           </h4>
@@ -1698,7 +1824,7 @@ function HotelCard({
                   <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
                     {t.offer.markup}
                   </th>
-                  <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
+                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
                     {t.offer.sell} &euro;
                   </th>
                   <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
@@ -1730,7 +1856,7 @@ function HotelCard({
                       <td className="px-4 py-2.5 text-right">
                         <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
                       </td>
-                      <td className="px-4 py-2.5 text-right">
+                      <td className="px-4 py-2.5 text-left">
                         <input
                           type="number"
                           min={net.toFixed(2)}
@@ -1882,6 +2008,8 @@ function ServiceRow({
           <span>{service.serviceName ?? '—'}</span>
         </div>
       </td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatDate(service.dateFrom)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatDate(service.dateTo)}</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{buy.toFixed(2)}</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{markup.toFixed(0)}%</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{sell.toFixed(2)}</td>
@@ -1926,6 +2054,7 @@ function ServiceCard({
   onToggleIncluded: (included: boolean) => void;
   proposalStatus: string;
 }) {
+  const { t } = useLanguage();
   const buy = Number(service.buyPrice ?? 0);
   const sell = Number(service.sellPrice ?? 0);
   const qty = service.quantity ?? 1;
@@ -1962,6 +2091,18 @@ function ServiceCard({
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2 text-sm">
+        {service.dateFrom && (
+          <div>
+            <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.services.dateFrom}</span>
+            <p className="text-sett-text-primary mt-0.5">{formatDate(service.dateFrom)}</p>
+          </div>
+        )}
+        {service.dateTo && (
+          <div>
+            <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.services.dateTo}</span>
+            <p className="text-sett-text-primary mt-0.5">{formatDate(service.dateTo)}</p>
+          </div>
+        )}
         <div>
           <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
           <p className="text-sett-text-primary mt-0.5">{buy.toFixed(2)}</p>
