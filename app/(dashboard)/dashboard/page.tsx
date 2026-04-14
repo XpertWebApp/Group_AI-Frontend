@@ -109,7 +109,7 @@ export default function DashboardPage() {
                   <div className="absolute top-4 right-4 flex items-center gap-[10px] p-2 rounded-[10px] border border-sett-primary/40 bg-sett-light-green-bg">
                     <Image src={card.icon} alt="" width={16} height={16} />
                   </div>
-                  <p className="font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-secondary pr-10 break-words">
+                  <p className="font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-secondary pr-10 break-words min-h-[2.625rem]">
                     {card.label}
                   </p>
                   <p className="font-montserrat text-[32px] font-bold leading-normal text-sett-text-primary uppercase mt-1">
