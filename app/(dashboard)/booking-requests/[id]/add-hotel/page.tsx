@@ -124,6 +124,7 @@ export default function AddHotelPage() {
   const [addingHotel, setAddingHotel] = useState<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  const hotelListRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -569,7 +570,14 @@ export default function AddHotelPage() {
     <div className="flex flex-col xl:h-full xl:overflow-hidden">
       <Header title={t.createForm.title} />
 
-      <div className="p-4 md:p-6 xl:flex-1 xl:min-h-0 xl:flex xl:flex-col xl:gap-6">
+      <div
+        className="p-4 md:p-6 xl:flex-1 xl:min-h-0 xl:flex xl:flex-col xl:gap-6"
+        onWheel={(e) => {
+          if (!hotelListRef.current) return;
+          if (hotelListRef.current.contains(e.target as Node)) return;
+          hotelListRef.current.scrollTop += e.deltaY;
+        }}
+      >
         {/* Breadcrumb */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:shrink-0">
           <button
@@ -934,7 +942,7 @@ export default function AddHotelPage() {
             </aside>
 
             {/* ── Right: Hotel Results ── */}
-            <div className="flex-1 min-w-0 xl:flex xl:flex-col xl:min-h-0">
+            <div ref={hotelListRef} className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1">
               <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0">
                 {filteredResults.length < displayResults.length
                   ? t.addHotel.hotelsShowing
@@ -954,7 +962,7 @@ export default function AddHotelPage() {
                 </div>
               )}
 
-              <div className="space-y-5 xl:overflow-y-auto xl:pr-1 pb-6">
+              <div className="space-y-5 pb-6 xl:overflow-visible">
                 {filteredResults.map((hotel) => (
                   <HotelResultCard
                     key={hotel.hotelCode}

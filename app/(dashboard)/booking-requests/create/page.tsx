@@ -194,9 +194,9 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    if (!data.phone.trim() || data.phone.length < 5) {
+    if (!data.phone.trim()) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (data.phone.length > 15) {
+    } else if (data.phone.length < 5 || data.phone.length > 15) {
       errors.phone = t.createForm.invalidPhone;
     }
   }
@@ -536,6 +536,13 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const destWrapperRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
   const userTypingRef = useRef(false);
+
+  // Sync destQuery when formData.destination is restored from sessionStorage draft
+  useEffect(() => {
+    if (formData.destination && !userTypingRef.current) {
+      setDestQuery(formData.destination);
+    }
+  }, [formData.destination]);
 
   const hotelCategoryOptions = [
     { value: '1',   label: t.createForm.star1,   node: <StarDisplay rating={1}   label="1 Star" /> },

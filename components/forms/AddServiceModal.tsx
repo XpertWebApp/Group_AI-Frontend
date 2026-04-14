@@ -173,16 +173,20 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
   const handleBuyChange = (val: string) => {
     const clamped = val === '' ? '' : String(Math.max(0, Number(val)));
     setBuyPrice(clamped);
+    if (errors.buyPrice) setErrors((err) => ({ ...err, buyPrice: undefined }));
     if (clamped && markup) {
       setSellPrice((Number(clamped) * (1 + Number(markup) / 100)).toFixed(2));
+      if (errors.sellPrice) setErrors((err) => ({ ...err, sellPrice: undefined }));
     }
   };
 
   const handleMarkupChange = (val: string) => {
     const clamped = val === '' ? '' : String(Math.max(0, Number(val)));
     setMarkup(clamped);
+    if (errors.markup) setErrors((err) => ({ ...err, markup: undefined }));
     if (buyPrice && clamped) {
       setSellPrice((Number(buyPrice) * (1 + Number(clamped) / 100)).toFixed(2));
+      if (errors.sellPrice) setErrors((err) => ({ ...err, sellPrice: undefined }));
     }
   };
 

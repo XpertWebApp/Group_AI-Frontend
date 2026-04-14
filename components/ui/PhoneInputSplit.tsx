@@ -91,11 +91,11 @@ export function PhoneInputSplit({
   }
 
   return (
-    <div className="flex flex-col gap-[6px]">
+    <div className="flex flex-col">
       {label && (
-        <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
+        <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
           {label}
-          {required && <span className="text-red-500 ml-0.5">*</span>}
+          {required && <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36] ml-0.5">*</span>}
         </label>
       )}
 
@@ -103,15 +103,15 @@ export function PhoneInputSplit({
         {/* Input row */}
         <div
           className={cn(
-            'flex items-center rounded-[14px] border bg-white transition-all duration-150 focus-within:ring-2 focus-within:ring-sett-primary focus-within:border-transparent',
-            error ? 'border-red-400' : 'border-[#686868]/40'
+            'flex items-center rounded-[14px] border bg-white transition-all duration-150 focus-within:ring-2 focus-within:ring-sett-primary focus-within:border-sett-primary',
+            error ? 'border-red-500' : 'border-sett-border-light'
           )}
         >
           {/* Country code selector button */}
           <button
             type="button"
             onClick={() => { setOpen((o) => !o); setSearch(''); }}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 h-[41px] font-montserrat text-[14px] font-normal text-[#0A0A0A] hover:bg-gray-50 rounded-l-[14px] transition-colors"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-3 font-montserrat text-[14px] font-normal text-sett-text-primary hover:bg-[#F7F7F7] rounded-l-[14px] transition-colors"
           >
             {selectedCountry ? (
               <FlagImage iso2={selectedCountry.iso2} size="20px" />
@@ -121,11 +121,11 @@ export function PhoneInputSplit({
             <span className="whitespace-nowrap">
               +{selectedCountry?.dialCode ?? stripPlus(countryCode || '1')}
             </span>
-            <ChevronDown className={cn('w-3.5 h-3.5 text-[#686868] transition-transform duration-200', open && 'rotate-180')} />
+            <ChevronDown className={cn('w-3.5 h-3.5 text-sett-text-accent transition-transform duration-200', open && 'rotate-180')} />
           </button>
 
           {/* Divider */}
-          <div className="w-px h-5 bg-[#686868]/40 flex-shrink-0" />
+          <div className="w-px h-5 bg-sett-border-light flex-shrink-0" />
 
           {/* Phone number input — digits only, max 15 total including country code */}
           <input
@@ -139,7 +139,7 @@ export function PhoneInputSplit({
               onNumberChange(digits.slice(0, maxLocal));
             }}
             placeholder="201234567"
-            className="flex-1 h-[41px] px-3 bg-transparent focus:outline-none font-montserrat text-[14px] font-normal text-[#0A0A0A] placeholder:text-[#686868] rounded-r-[14px]"
+            className="flex-1 py-3 px-3 bg-transparent focus:outline-none font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent rounded-r-[14px]"
           />
         </div>
 
@@ -186,7 +186,7 @@ export function PhoneInputSplit({
       </div>
 
       {error && (
-        <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{error}</p>
+        <p className="font-montserrat text-[12px] text-red-500 leading-none mt-2">{error}</p>
       )}
     </div>
   );

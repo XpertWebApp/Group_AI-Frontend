@@ -1000,25 +1000,25 @@ export default function RequestDetailPage() {
                   <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
                     {/* Desktop table */}
                     <div className="hidden md:block overflow-x-auto">
-                      <table className="w-full min-w-[600px]">
+                      <table className="w-full min-w-[700px]">
                         <thead>
                           <tr className="border-b border-sett-border bg-sett-fill">
-                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.service}
                             </th>
-                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.net} &euro;
                             </th>
-                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.markup}
                             </th>
-                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.sell} &euro;
                             </th>
-                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                            <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.qty}
                             </th>
-                            <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium">
+                            <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2.5 font-medium whitespace-nowrap">
                               {t.offer.total} &euro;
                             </th>
                             <th className="w-20" />
@@ -1882,10 +1882,10 @@ function ServiceRow({
           <span>{service.serviceName ?? '—'}</span>
         </div>
       </td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary">{buy.toFixed(2)}</td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary">{markup.toFixed(0)}%</td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary">{sell.toFixed(2)}</td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary">{qty}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{buy.toFixed(2)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{markup.toFixed(0)}%</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{sell.toFixed(2)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{qty}</td>
       <td className={`px-4 py-2.5 text-body text-right font-semibold ${isIncluded ? 'text-sett-primary' : 'text-sett-text-accent line-through'}`}>
         {total.toLocaleString('en', { minimumFractionDigits: 2 })}
       </td>
