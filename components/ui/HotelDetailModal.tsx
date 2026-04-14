@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, MapPin, Mail, Phone, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import { hotelsApi } from '@/lib/api/hotels';
 import type { HotelDetail } from '@/lib/api/hotels';
+import { StarRating } from './StarRating';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { cn } from '@/lib/utils/cn';
 
@@ -235,11 +236,7 @@ export function HotelDetailModal({ hotelCode, hotelName, onClose }: HotelDetailM
               <div className="space-y-2">
                 {/* Stars */}
                 {detail.starRating && detail.starRating > 0 && (
-                  <div className="flex gap-0.5">
-                    {Array.from({ length: Math.round(detail.starRating) }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
-                    ))}
-                  </div>
+                  <StarRating rating={detail.starRating} />
                 )}
 
                 {/* Short location summary */}

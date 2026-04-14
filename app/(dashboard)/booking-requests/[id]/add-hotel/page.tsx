@@ -13,6 +13,7 @@ import {
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { PageLoader } from '@/components/ui/Loader';
+import { StarRating } from '@/components/ui/StarRating';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -294,7 +295,7 @@ export default function AddHotelPage() {
       // EventSource not supported or failed — fall back to polling
       startPollingFallback(reqId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchFinalResults]);
 
   // Polling fallback (if SSE fails)
@@ -1054,8 +1055,8 @@ export default function AddHotelPage() {
               <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0">
                 {filteredResults.length < displayResults.length
                   ? t.addHotel.hotelsShowing
-                      .replace('{shown}', String(filteredResults.length))
-                      .replace('{total}', String(displayResults.length))
+                    .replace('{shown}', String(filteredResults.length))
+                    .replace('{total}', String(displayResults.length))
                   : phase === 'polling'
                     ? t.addHotel.hotelsFoundSoFar.replace('{count}', String(filteredResults.length))
                     : t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))
@@ -1147,39 +1148,6 @@ export default function AddHotelPage() {
 
 /* ─────────────── Hotel Result Card ─────────────── */
 
-function HotelStarRating({ rating, size = 16 }: { rating: number; size?: number }) {
-  const id = `hsg-${rating.toString().replace('.', '-')}`;
-  const full = Math.floor(rating);
-  const half = rating % 1 >= 0.5;
-  const total = Math.ceil(rating);
-  const empty = total - full - (half ? 1 : 0);
-  const path = 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z';
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: full }).map((_, i) => (
-        <svg key={`f${i}`} width={size} height={size} viewBox="0 0 24 24" fill="#AAC737" className="shrink-0">
-          <path d={path} />
-        </svg>
-      ))}
-      {half && (
-        <svg key="h" width={size} height={size} viewBox="0 0 24 24" className="shrink-0">
-          <defs>
-            <linearGradient id={id}>
-              <stop offset="50%" stopColor="#AAC737" />
-              <stop offset="50%" stopColor="#D1D1D1" />
-            </linearGradient>
-          </defs>
-          <path d={path} fill={`url(#${id})`} />
-        </svg>
-      )}
-      {Array.from({ length: empty }).map((_, i) => (
-        <svg key={`e${i}`} width={size} height={size} viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0">
-          <path d={path} />
-        </svg>
-      ))}
-    </div>
-  );
-}
 
 function HotelResultCard({
   hotel,
@@ -1244,7 +1212,7 @@ function HotelResultCard({
                 <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary leading-tight">
                   {hotel.hotelName}
                 </h4>
-                <HotelStarRating rating={Number(hotel.starRating)} size={18} />
+                <StarRating rating={Number(hotel.starRating)} size={18} />
                 {isLimited && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
                     <AlertTriangle className="w-3 h-3" />
