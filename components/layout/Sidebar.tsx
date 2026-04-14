@@ -313,7 +313,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
                     )}
                   >
                     <GoogleIconWhite />
-                    Connect Account
+                    {t.dashboard.googleConnect.bannerTitle}
                   </Link>
                 )}
               </div>

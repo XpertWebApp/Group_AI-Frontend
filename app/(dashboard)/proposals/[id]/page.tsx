@@ -200,6 +200,7 @@ export default function ProposalPage() {
   }
 
   const isLocked = !!proposal.lockedBy;
+  const isSent = ['sent', 'accepted', 'declined', 'cancelled', 'completed'].includes(proposal.status?.toLowerCase());
 
   return (
     <div className="space-y-8 pb-28">
@@ -375,7 +376,7 @@ export default function ProposalPage() {
         <Button
           variant="secondary"
           onClick={handleSaveDraft}
-          disabled={actionLoading || isLocked}
+          disabled={actionLoading || isLocked || isSent}
         >
           Save Draft
         </Button>

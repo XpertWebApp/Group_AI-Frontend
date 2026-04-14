@@ -5,6 +5,7 @@ node_modules
 
 # Build / cache
 .next
+.next_build
 out
 dist
 build

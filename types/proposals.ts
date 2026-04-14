@@ -49,7 +49,7 @@ export interface AddProposalServicePayload {
 }
 
 export interface SendProposalPayload {
-  sendToEmail?: string;
+  sendToEmails?: string[];
 }
 
 export interface ApproveProposalPayload {

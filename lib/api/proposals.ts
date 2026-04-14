@@ -126,8 +126,8 @@ export const proposalsApi = {
     return data.data;
   },
 
-  async send(proposalId: string, payload?: SendProposalPayload): Promise<{ proposal: Proposal; emailSent: boolean; sendPlaceholder: boolean; emailError: string | null }> {
-    const { data } = await apiClient.post<ApiResponse<{ proposal: Proposal; emailSent: boolean; sendPlaceholder: boolean; sent: boolean; emailError: string | null }>>(
+  async send(proposalId: string, payload?: SendProposalPayload): Promise<{ proposal: Proposal; emailSent: boolean; sendPlaceholder: boolean; emailError: string | null; sentToEmails?: string[] }> {
+    const { data } = await apiClient.post<ApiResponse<{ proposal: Proposal; emailSent: boolean; sendPlaceholder: boolean; sent: boolean; emailError: string | null; sentToEmails?: string[] }>>(
       `/proposals/${proposalId}/actions/send`,
       payload ?? {}
     );

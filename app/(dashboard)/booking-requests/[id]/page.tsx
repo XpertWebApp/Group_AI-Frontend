@@ -112,7 +112,9 @@ export default function RequestDetailPage() {
   const [removeHotelTarget, setRemoveHotelTarget] = useState<string | null>(null);
   const [saveDraftOpen, setSaveDraftOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
-  const [sendEmail, setSendEmail] = useState('');
+  const [sendEmails, setSendEmails] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState('');
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const [sendNotes, setSendNotes] = useState('');
   const [sendError, setSendError] = useState('');
   const [sendEmailError, setSendEmailError] = useState('');
@@ -348,6 +350,40 @@ export default function RequestDetailPage() {
     }
   };
 
+  const isValidEmail = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+
+  const addEmailChip = (raw = emailInput) => {
+    const val = raw.trim().replace(/,+$/, '');
+    if (!val) return;
+    if (!isValidEmail(val)) {
+      setSendEmailError(t.offer.emailInvalid);
+      return;
+    }
+    if (sendEmails.length >= 20) {
+      setSendEmailError(t.offer.emailsMaxLimit);
+      return;
+    }
+    const lower = val.toLowerCase();
+    if (!sendEmails.map((e) => e.toLowerCase()).includes(lower)) {
+      setSendEmails((prev) => [...prev, val]);
+    }
+    setEmailInput('');
+    setSendEmailError('');
+  };
+
+  const handleEmailInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addEmailChip();
+    } else if (e.key === 'Backspace' && emailInput === '' && sendEmails.length > 0) {
+      setSendEmails((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const handleEmailInputBlur = () => {
+    if (emailInput.trim()) addEmailChip();
+  };
+
   const handleApproveAndSend = async () => {
     if (!proposal) return;
     setSendError('');
@@ -359,14 +395,24 @@ export default function RequestDetailPage() {
       return;
     }
 
-    // Validate email
-    const emailVal = sendEmail.trim();
-    if (!emailVal) {
-      setSendEmailError(t.offer.emailRequired);
-      return;
+    // Flush any email typed but not yet added as a chip
+    let finalEmails = [...sendEmails];
+    const pending = emailInput.trim();
+    if (pending) {
+      if (!isValidEmail(pending)) {
+        setSendEmailError(t.offer.emailInvalid);
+        return;
+      }
+      const lower = pending.toLowerCase();
+      if (!finalEmails.map((e) => e.toLowerCase()).includes(lower)) {
+        finalEmails = [...finalEmails, pending];
+        setSendEmails(finalEmails);
+      }
+      setEmailInput('');
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
-      setSendEmailError(t.offer.emailInvalid);
+
+    if (finalEmails.length === 0) {
+      setSendEmailError(t.offer.emailsRequired);
       return;
     }
 
@@ -377,7 +423,7 @@ export default function RequestDetailPage() {
     if (!approveStepDone) {
       try {
         await proposalsApi.approve(proposal.id, {
-          agentEmail: emailVal,
+          agentEmail: finalEmails[0],
           adminNotes: sendNotes.trim() || undefined,
         });
         setApproveStepDone(true);
@@ -412,11 +458,12 @@ export default function RequestDetailPage() {
     // Step 2: Send — marks proposal as sent
     try {
       const result = await proposalsApi.send(proposal.id, {
-        sendToEmail: emailVal,
+        sendToEmails: finalEmails,
       });
       setProposal(result.proposal);
       setSendOpen(false);
-      setSendEmail('');
+      setSendEmails([]);
+      setEmailInput('');
       setSendNotes('');
       setSendError('');
       setSendEmailFailed(false);
@@ -1073,7 +1120,12 @@ export default function RequestDetailPage() {
                     <Eye className="w-4 h-4" />
                     {t.offer.previewPdf}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setSaveDraftOpen(true)}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSaveDraftOpen(true)}
+                    disabled={['sent', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
+                  >
                     <Save className="w-4 h-4" />
                     {t.offer.saveDraft}
                   </Button>
@@ -1083,6 +1135,9 @@ export default function RequestDetailPage() {
                     onClick={() => {
                       const status = (proposal?.status ?? request.status).toLowerCase();
                       if (status === 'approved') setApproveStepDone(true);
+                      if (sendEmails.length === 0 && request.contactEmail) {
+                        setSendEmails([request.contactEmail]);
+                      }
                       setSendOpen(true);
                     }}
                     disabled={['sent', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
@@ -1186,21 +1241,53 @@ export default function RequestDetailPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
-                      {t.offer.agentEmail} <span className="text-red-500">*</span>
+                      {t.offer.emailsLabel} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="email"
-                      value={sendEmail}
-                      onChange={(e) => { setSendEmail(e.target.value); if (sendEmailError) setSendEmailError(''); }}
-                      placeholder={t.offer.emailPlaceholder}
-                      className={`w-full px-3 py-2.5 rounded-[10px] border font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none ${sendEmailError
-                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-                        : 'border-sett-border-light focus:border-sett-primary'
-                        }`}
-                    />
+                    {/* Multi-email chip input */}
+                    <div
+                      className={`min-h-[42px] w-full px-2 py-1.5 rounded-[10px] border flex flex-wrap gap-1.5 cursor-text ${
+                        sendEmailError
+                          ? 'border-red-500 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-200'
+                          : 'border-sett-border-light focus-within:border-sett-primary focus-within:ring-2 focus-within:ring-sett-primary/10'
+                      }`}
+                      onClick={() => emailInputRef.current?.focus()}
+                    >
+                      {sendEmails.map((email, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-sett-primary/10 text-sett-primary rounded-[6px] font-montserrat text-[13px] max-w-full"
+                        >
+                          <span className="truncate max-w-[200px]">{email}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSendEmails((prev) => prev.filter((_, i) => i !== idx));
+                              if (sendEmailError) setSendEmailError('');
+                            }}
+                            className="shrink-0 text-sett-primary hover:text-red-500 ml-0.5 focus:outline-none"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                      {sendEmails.length < 20 && (
+                        <input
+                          ref={emailInputRef}
+                          type="email"
+                          value={emailInput}
+                          onChange={(e) => { setEmailInput(e.target.value); if (sendEmailError) setSendEmailError(''); }}
+                          onKeyDown={handleEmailInputKeyDown}
+                          onBlur={handleEmailInputBlur}
+                          placeholder={sendEmails.length === 0 ? t.offer.addEmailPlaceholder : ''}
+                          className="flex-1 min-w-[180px] px-1 py-0.5 font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none bg-transparent"
+                        />
+                      )}
+                    </div>
                     {sendEmailError && (
                       <p className="mt-1 font-montserrat text-[12px] text-red-500">{sendEmailError}</p>
                     )}
+                    <p className="mt-1 font-montserrat text-[12px] text-sett-text-accent">{t.offer.emailsMaxLimit}</p>
                   </div>
                   <div>
                     <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
@@ -1219,7 +1306,7 @@ export default function RequestDetailPage() {
                 <div className="flex gap-3 justify-end mt-6">
                   <Button
                     variant="secondary"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmail(''); setSendNotes(''); setApproveStepDone(false); }}
+                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
                     {t.common.cancel}
