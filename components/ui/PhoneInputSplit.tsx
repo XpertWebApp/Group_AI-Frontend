@@ -41,13 +41,32 @@ export function PhoneInputSplit({
 }: PhoneInputSplitProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [internalIso2, setInternalIso2] = useState<string | undefined>();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Sync internalIso2 when countryCode prop changes from outside
+  useEffect(() => {
+    const stripped = stripPlus(countryCode || '1');
+    // If current internalIso2 matches the stripped code, no need to change
+    if (internalIso2) {
+      const current = ALL_COUNTRIES.find((c) => c.iso2 === internalIso2);
+      if (current && current.dialCode === stripped) return;
+    }
+    // Otherwise, find the best match for the new code
+    const country = ALL_COUNTRIES.find((c) => c.dialCode === stripped);
+    if (country) setInternalIso2(country.iso2);
+  }, [countryCode, internalIso2]);
+
   // Resolve the currently selected country entry
   const selectedCountry = useMemo(
-    () => findCountryByDialCode(countryCode || '+1'),
-    [countryCode]
+    () => {
+      if (internalIso2) {
+        return ALL_COUNTRIES.find((c) => c.iso2 === internalIso2);
+      }
+      return findCountryByDialCode(countryCode || '+1');
+    },
+    [countryCode, internalIso2]
   );
 
   // Filter worldwide list by search query (name or dial code)
@@ -85,7 +104,10 @@ export function PhoneInputSplit({
 
   function handleSelect(iso2: string) {
     const country = ALL_COUNTRIES.find((c) => c.iso2 === iso2);
-    if (country) onCountryCodeChange(`+${country.dialCode}`);
+    if (country) {
+      setInternalIso2(country.iso2);
+      onCountryCodeChange(`+${country.dialCode}`);
+    }
     setOpen(false);
     setSearch('');
   }

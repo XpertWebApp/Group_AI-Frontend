@@ -22,6 +22,7 @@ import {
   SquarePen,
   Send,
   XCircle,
+  X,
   Download,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
@@ -1327,16 +1328,28 @@ export default function RequestDetailPage() {
           {sendOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
               <div className="bg-white rounded-[14px] border border-sett-border-light w-full max-w-md mx-4 p-6">
-                <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-1">
-                  {offerHistory.length === 0
-                    ? t.offer.sendInitialOffer
-                    : offerHistory.length === 1
-                      ? t.offer.sendFinalOffer
-                      : t.offer.sendRevision}
-                </h3>
-                <p className="font-montserrat text-[14px] text-sett-text-secondary mb-5">
-                  {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
-                </p>
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex flex-col gap-1">
+                    <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary leading-none">
+                      {offerHistory.length === 0
+                        ? t.offer.sendInitialOffer
+                        : offerHistory.length === 1
+                          ? t.offer.sendFinalOffer
+                          : t.offer.sendRevision}
+                    </h3>
+                    <p className="font-montserrat text-[14px] text-sett-text-secondary">
+                      {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
+                    className="p-1.5 rounded-lg hover:bg-[#F7F7F7] text-[#686868] transition-colors -mt-1"
+                    aria-label="Close"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
                 {sendError && (
                   <div className="flex flex-col gap-2 mb-4 p-3 rounded-[10px] bg-red-50 border border-red-200">
@@ -1437,7 +1450,7 @@ export default function RequestDetailPage() {
                     onClick={handleApproveAndSend}
                     isLoading={actionLoading}
                   >
-                    <Send className="w-4 h-4" />
+                    <Send className="w-5 h-5" />
                     {offerHistory.length === 0
                       ? t.offer.sendInitialOffer
                       : offerHistory.length === 1

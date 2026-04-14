@@ -77,16 +77,16 @@ function StarDisplay({ rating, label }: { rating: number; label: string }) {
     <span className="flex items-center gap-1.5">
       <span className="flex items-center gap-0.5">
         {Array.from({ length: full }).map((_, i) => (
-          <svg key={`f${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#AAC737" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg key={`f${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#AAC737" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
         ))}
         {half && (
           <svg key="h" width="14" height="14" viewBox="0 0 24 24" className="shrink-0">
-            <defs><linearGradient id="half-grad-em"><stop offset="50%" stopColor="#AAC737"/><stop offset="50%" stopColor="#D1D1D1"/></linearGradient></defs>
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#half-grad-em)"/>
+            <defs><linearGradient id="half-grad-em"><stop offset="50%" stopColor="#AAC737" /><stop offset="50%" stopColor="#D1D1D1" /></linearGradient></defs>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#half-grad-em)" />
           </svg>
         )}
         {Array.from({ length: Math.max(0, empty) }).map((_, i) => (
-          <svg key={`e${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <svg key={`e${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
         ))}
       </span>
       <span className="text-sett-text-primary">{label}</span>
@@ -152,7 +152,7 @@ const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
         ref={ref}
         value={value as string}
         onClick={onClick}
-        onChange={() => {}}
+        onChange={() => { }}
         placeholder={placeholder}
         readOnly
         className={cn(inputCls, 'w-full pr-10 cursor-pointer')}
@@ -215,6 +215,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
 
   useEffect(() => {
     if (open && request) {
+      // Defensive parsing if rooms is stringified
+      let rData = request.rooms as any;
+      if (typeof rData === 'string' && rData.trim().startsWith('{')) {
+        try { rData = JSON.parse(rData); } catch { /* ignore */ }
+      }
+      const r = rData as RoomsConfig | null | undefined;
+
       setForm({
         destinationId: request.destinationId ?? 0,
         destinationName: request.destinationName ?? '',
@@ -224,13 +231,16 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         budgetRange: request.budgetRange ?? '',
         groupType: request.groupType ?? '',
         groupSize: request.groupSize?.toString() ?? '',
-        single: rooms?.single ?? 0,
-        double: rooms?.double ?? 0,
-        triple: rooms?.triple ?? 0,
-        quadruple: rooms?.quadruple ?? 0,
-        standardDoubleBeds: rooms?.standardDoubleBeds ?? 0,
-        twinBeds: rooms?.twinBeds ?? 0,
-        extraRoomsNote: rooms?.extraRoomsNote ?? '',
+        single: r?.single ?? 0,
+        // Backend often stores double:0 when standard/twin beds are used; derive total
+        double: (r?.standardDoubleBeds || r?.twinBeds)
+          ? (r?.standardDoubleBeds ?? 0) + (r?.twinBeds ?? 0)
+          : (r?.double ?? 0),
+        triple: r?.triple ?? 0,
+        quadruple: r?.quadruple ?? 0,
+        standardDoubleBeds: r?.standardDoubleBeds ?? 0,
+        twinBeds: r?.twinBeds ?? 0,
+        extraRoomsNote: r?.extraRoomsNote ?? '',
         breakfastPreference: request.breakfastPreference ?? 'BB',
         hotelLocation: request.hotelLocation ?? 'central',
         specialRequirements: request.specialRequirements ?? '',
@@ -254,7 +264,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
       setDestResults([]);
       setDestOpen(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, request]);
 
   // Close dropdown on outside click
@@ -388,32 +398,32 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
   };
 
   const hotelCategoryOptions = [
-    { value: '1',   label: t.createForm.star1,   node: <StarDisplay rating={1}   label={t.createForm.star1} /> },
+    { value: '1', label: t.createForm.star1, node: <StarDisplay rating={1} label={t.createForm.star1} /> },
     { value: '1.5', label: t.createForm.star1_5, node: <StarDisplay rating={1.5} label={t.createForm.star1_5} /> },
-    { value: '2',   label: t.createForm.star2,   node: <StarDisplay rating={2}   label={t.createForm.star2} /> },
+    { value: '2', label: t.createForm.star2, node: <StarDisplay rating={2} label={t.createForm.star2} /> },
     { value: '2.5', label: t.createForm.star2_5, node: <StarDisplay rating={2.5} label={t.createForm.star2_5} /> },
-    { value: '3',   label: t.createForm.star3,   node: <StarDisplay rating={3}   label={t.createForm.star3} /> },
+    { value: '3', label: t.createForm.star3, node: <StarDisplay rating={3} label={t.createForm.star3} /> },
     { value: '3.5', label: t.createForm.star3_5, node: <StarDisplay rating={3.5} label={t.createForm.star3_5} /> },
-    { value: '4',   label: t.createForm.star4,   node: <StarDisplay rating={4}   label={t.createForm.star4} /> },
+    { value: '4', label: t.createForm.star4, node: <StarDisplay rating={4} label={t.createForm.star4} /> },
     { value: '4.5', label: t.createForm.star4_5, node: <StarDisplay rating={4.5} label={t.createForm.star4_5} /> },
-    { value: '5',   label: t.createForm.star5,   node: <StarDisplay rating={5}   label={t.createForm.star5} /> },
+    { value: '5', label: t.createForm.star5, node: <StarDisplay rating={5} label={t.createForm.star5} /> },
     { value: '5.5', label: t.createForm.star5_5, node: <StarDisplay rating={5.5} label={t.createForm.star5_5} /> },
-    { value: '6',   label: t.createForm.star6,   node: <StarDisplay rating={6}   label={t.createForm.star6} /> },
+    { value: '6', label: t.createForm.star6, node: <StarDisplay rating={6} label={t.createForm.star6} /> },
   ];
 
   const budgetRangeOptions = [
-    { value: 'economy',  label: t.createForm.economy },
+    { value: 'economy', label: t.createForm.economy },
     { value: 'standard', label: t.createForm.standard },
-    { value: 'premium',  label: t.createForm.premium },
-    { value: 'luxury',   label: t.createForm.luxury },
+    { value: 'premium', label: t.createForm.premium },
+    { value: 'luxury', label: t.createForm.luxury },
   ];
 
   const groupTypeOptions = [
-    { value: 'business',   label: t.createForm.businessGroup },
-    { value: 'leisure',    label: t.createForm.leisureGroup },
-    { value: 'sports',     label: t.createForm.sportsTeam },
+    { value: 'business', label: t.createForm.businessGroup },
+    { value: 'leisure', label: t.createForm.leisureGroup },
+    { value: 'sports', label: t.createForm.sportsTeam },
     { value: 'conference', label: t.createForm.conference },
-    { value: 'wedding',    label: t.createForm.wedding },
+    { value: 'wedding', label: t.createForm.wedding },
   ];
 
   if (!open) return null;
