@@ -579,7 +579,11 @@ export default function RequestDetailPage() {
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={() => router.push(fromCreate ? `/booking-requests/create?draft=${id}` : '/booking-requests')}
+            onClick={() => {
+              const status = (proposal?.status ?? request?.status ?? '').toLowerCase();
+              const isEditable = !['sent', 'approved', 'declined', 'cancelled', 'completed'].includes(status);
+              router.push(fromCreate && isEditable ? `/booking-requests/create?draft=${id}` : '/booking-requests');
+            }}
             className="flex items-center gap-1 font-montserrat text-[14px] font-medium text-sett-text-secondary hover:text-sett-text-primary transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
