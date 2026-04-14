@@ -137,7 +137,7 @@ export default function RequestDetailPage() {
         setOfferHistoryLoading(true);
         proposalsApi.listOffers(linked.id)
           .then(setOfferHistory)
-          .catch(() => {})
+          .catch(() => { })
           .finally(() => setOfferHistoryLoading(false));
       }
     } catch {
@@ -470,7 +470,7 @@ export default function RequestDetailPage() {
       setApproveStepDone(false);
       setSuccessOpen(true);
       toast.success(t.toasts.proposalSent);
-      proposalsApi.listOffers(proposal.id).then(setOfferHistory).catch(() => {});
+      proposalsApi.listOffers(proposal.id).then(setOfferHistory).catch(() => { });
     } catch (err: unknown) {
       const ax = await import('axios');
       if (ax.isAxiosError(err)) {
@@ -838,7 +838,7 @@ export default function RequestDetailPage() {
                         <div className="flex flex-col gap-1">
                           {attachments.map((att) => (
                             <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer"
-                               className="font-montserrat text-[14px] font-semibold leading-none text-sett-primary hover:underline truncate">
+                              className="font-montserrat text-[14px] font-semibold leading-none text-sett-primary hover:underline truncate">
                               {att.originalName}
                             </a>
                           ))}
@@ -1363,11 +1363,10 @@ export default function RequestDetailPage() {
                     </label>
                     {/* Multi-email chip input */}
                     <div
-                      className={`min-h-[42px] w-full px-2 py-1.5 rounded-[10px] border flex flex-wrap gap-1.5 cursor-text ${
-                        sendEmailError
-                          ? 'border-red-500 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-200'
-                          : 'border-sett-border-light focus-within:border-sett-primary focus-within:ring-2 focus-within:ring-sett-primary/10'
-                      }`}
+                      className={`min-h-[42px] w-full px-2 py-1.5 rounded-[10px] border flex flex-wrap gap-1.5 cursor-text ${sendEmailError
+                        ? 'border-red-500 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-200'
+                        : 'border-sett-border-light focus-within:border-sett-primary focus-within:ring-2 focus-within:ring-sett-primary/10'
+                        }`}
                       onClick={() => emailInputRef.current?.focus()}
                     >
                       {sendEmails.map((email, idx) => (
@@ -1421,9 +1420,11 @@ export default function RequestDetailPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 justify-end mt-6">
+                <div className="flex gap-4 mt-6">
                   <Button
                     variant="secondary"
+                    size="sm"
+                    className="flex-1"
                     onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
@@ -1431,6 +1432,8 @@ export default function RequestDetailPage() {
                   </Button>
                   <Button
                     variant="primary"
+                    size="sm"
+                    className="flex-1"
                     onClick={handleApproveAndSend}
                     isLoading={actionLoading}
                   >
