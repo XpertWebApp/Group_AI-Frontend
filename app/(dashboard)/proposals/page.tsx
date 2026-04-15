@@ -6,6 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { proposalsApi } from '@/lib/api/proposals';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU } from '@/lib/dateFormatter';
 import type { Proposal } from '@/types';
 
 export default function ProposalsListPage() {
@@ -86,7 +87,7 @@ export default function ProposalsListPage() {
                     {p.totalSell != null ? Number(p.totalSell).toFixed(2) : '—'}
                   </td>
                   <td className="px-4 py-3 text-body text-sett-text-secondary">
-                    {new Date(p.createdAt).toLocaleDateString()}
+                    {formatDateEU(p.createdAt)}
                   </td>
                   <td className="px-4 py-3">
                     <Link

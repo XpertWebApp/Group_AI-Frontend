@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal } from './Modal';
 import { dashboardApi } from '@/lib/api/dashboard';
+import { formatDateTimeEU } from '@/lib/dateFormatter';
 import type { Notification } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
@@ -96,13 +97,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
                       {n.body}
                     </p>
                     <p className="text-caption text-sett-text-muted mt-1">
-                      {new Date(n.createdAt).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatDateTimeEU(n.createdAt)}
                     </p>
                   </div>
                   {!n.read && (

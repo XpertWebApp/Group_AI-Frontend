@@ -70,6 +70,7 @@ export interface BookingRequest {
   budget?: number | null;
   groupType?: string | null;
   groupSize?: number | null;
+  averageAge?: number | null;
   currencyCode?: string | null;
   nationalityCode?: string | null;
 

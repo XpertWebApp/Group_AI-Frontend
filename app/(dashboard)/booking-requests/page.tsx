@@ -8,6 +8,7 @@ import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
 import { TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
+import { formatDateEU } from '@/lib/dateFormatter';
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
@@ -16,14 +17,7 @@ const PAGE_SIZE = 6;
 /* ───── helpers ───── */
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso; // already formatted
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return formatDateEU(iso);
 }
 
 function totalRooms(rooms: RoomsConfig | null | undefined): number | null {

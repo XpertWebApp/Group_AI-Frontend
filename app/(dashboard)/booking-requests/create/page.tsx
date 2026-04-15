@@ -28,6 +28,7 @@ interface FormData {
   budgetRange: string;
   groupType: string;
   groupSize: string;
+  averageAge: number | '';
   // Step 2: Room & Accommodations
   singleRooms: number;
   doubleRooms: number;
@@ -62,6 +63,7 @@ const defaultFormData: FormData = {
   budgetRange: '',
   groupType: '',
   groupSize: '',
+  averageAge: '',
   singleRooms: 0,
   doubleRooms: 0,
   standardDoubleBeds: 0,
@@ -77,7 +79,7 @@ const defaultFormData: FormData = {
   firstName: '',
   lastName: '',
   email: '',
-  phoneCountryCode: '+1',
+  phoneCountryCode: '+44',
   phone: '',
   specialRequestsCustomer: '',
   termsAndConditions:
@@ -165,6 +167,14 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (Number(data.groupSize) <= 0) {
       errors.groupSize = t.createForm.groupSizePositive;
     }
+    const needsAge = data.groupType === 'youth_group' || data.groupType === 'school_group';
+    if (needsAge) {
+      if (data.averageAge === '' || data.averageAge == null) {
+        errors.averageAge = t.createForm.averageAgeRequired;
+      } else if (Number(data.averageAge) < 1 || Number(data.averageAge) > 120) {
+        errors.averageAge = t.createForm.averageAgeInvalid;
+      }
+    }
   }
 
   if (step === 1) {
@@ -212,11 +222,25 @@ export default function CreateBookingRequestPage() {
   );
 }
 
+const SESSION_KEY = 'createFormSession';
+
 function CreateBookingRequestPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLanguage();
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('draft')) return 0;
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const { step } = JSON.parse(saved);
+        return typeof step === 'number' ? step : 0;
+      }
+    } catch {}
+    return 0;
+  });
 
   const STEPS = [
     { label: t.createForm.stepTripDetails, icon: '/icons/streamline-ultimate_trip-road.svg' },
@@ -224,7 +248,19 @@ function CreateBookingRequestPageInner() {
     { label: t.createForm.stepCustomerDetails, icon: '/icons/boxicons_user.svg' },
     { label: t.createForm.stepPolicies, icon: '/icons/material-symbols_policy-outline-rounded.svg' },
   ];
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [formData, setFormData] = useState<FormData>(() => {
+    if (typeof window === 'undefined') return defaultFormData;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('draft')) return defaultFormData;
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const { formData: savedForm } = JSON.parse(saved) as { formData: FormData };
+        return { ...defaultFormData, ...savedForm, nameListFile: null };
+      }
+    } catch {}
+    return defaultFormData;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -246,6 +282,17 @@ function CreateBookingRequestPageInner() {
       // ignore parse errors
     }
   }, [searchParams]);
+
+  // Continuously save step + formData so a reload can restore them
+  useEffect(() => {
+    if (draftRequestId) return; // submitted request uses its own key
+    try {
+      const { nameListFile: _file, ...serializableFormData } = formData;
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ step: currentStep, formData: serializableFormData }));
+    } catch {
+      // storage full — not critical
+    }
+  }, [currentStep, formData, draftRequestId]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => {
@@ -311,6 +358,9 @@ function CreateBookingRequestPageInner() {
         budgetRange: formData.budgetRange || undefined,
         groupType: formData.groupType || undefined,
         groupSize: formData.groupSize ? Number(formData.groupSize) : undefined,
+        averageAge: (['youth_group', 'school_group'].includes(formData.groupType) && formData.averageAge !== '')
+          ? Number(formData.averageAge)
+          : undefined,
         currencyCode: 'EUR',
         // Step 2: Room & Accommodations
         rooms: {
@@ -370,6 +420,7 @@ function CreateBookingRequestPageInner() {
         }
       }
 
+      sessionStorage.removeItem(SESSION_KEY);
       router.push(`/booking-requests/${requestId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
@@ -413,7 +464,7 @@ function CreateBookingRequestPageInner() {
         <div className="flex items-center justify-between pt-6">
           <button
             type="button"
-            onClick={() => router.push('/booking-requests')}
+            onClick={() => { sessionStorage.removeItem(SESSION_KEY); router.push('/booking-requests'); }}
             className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#EBEBEB] hover:text-sett-text-primary hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
           >
             {t.common.cancel}
@@ -546,16 +597,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
 
   const hotelCategoryOptions = [
     { value: '1',   label: t.createForm.star1,   node: <StarDisplay rating={1}   label="1 Star" /> },
-    { value: '1.5', label: t.createForm.star1_5, node: <StarDisplay rating={1.5} label="1.5 Stars" /> },
     { value: '2',   label: t.createForm.star2,   node: <StarDisplay rating={2}   label="2 Stars" /> },
-    { value: '2.5', label: t.createForm.star2_5, node: <StarDisplay rating={2.5} label="2.5 Stars" /> },
     { value: '3',   label: t.createForm.star3,   node: <StarDisplay rating={3}   label="3 Stars" /> },
-    { value: '3.5', label: t.createForm.star3_5, node: <StarDisplay rating={3.5} label="3.5 Stars" /> },
     { value: '4',   label: t.createForm.star4,   node: <StarDisplay rating={4}   label="4 Stars" /> },
-    { value: '4.5', label: t.createForm.star4_5, node: <StarDisplay rating={4.5} label="4.5 Stars" /> },
     { value: '5',   label: t.createForm.star5,   node: <StarDisplay rating={5}   label="5 Stars" /> },
-    { value: '5.5', label: t.createForm.star5_5, node: <StarDisplay rating={5.5} label="5.5 Stars" /> },
-    { value: '6',   label: t.createForm.star6,   node: <StarDisplay rating={6}   label="6 Stars" /> },
   ];
   const budgetRangeOptions = [
     { value: 'economy', label: t.createForm.economy },
@@ -564,11 +609,14 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
     { value: 'luxury', label: t.createForm.luxury },
   ];
   const groupTypeOptions = [
-    { value: 'business', label: t.createForm.businessGroup },
-    { value: 'leisure', label: t.createForm.leisureGroup },
-    { value: 'sports', label: t.createForm.sportsTeam },
+    { value: 'business_group', label: t.createForm.businessGroup },
+    { value: 'leisure_group', label: t.createForm.leisureGroup },
+    { value: 'sports_team', label: t.createForm.sportsTeam },
     { value: 'conference', label: t.createForm.conference },
     { value: 'wedding', label: t.createForm.wedding },
+    { value: 'youth_group', label: t.createForm.youthGroup },
+    { value: 'school_group', label: t.createForm.schoolGroup },
+    { value: 'mice_group', label: t.createForm.miceGroup },
   ];
 
   useEffect(() => {
@@ -679,8 +727,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 onChange={(date: Date | null) => updateField('checkInDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="MM/DD/YYYY"
+                dateFormat="dd.MM.yyyy"
+                placeholderText="DD.MM.YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
                 wrapperClassName="w-full"
@@ -701,8 +749,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 onChange={(date: Date | null) => updateField('checkOutDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={formData.checkInDate ? new Date(formData.checkInDate) : new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="MM/DD/YYYY"
+                dateFormat="dd.MM.yyyy"
+                placeholderText="DD.MM.YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
                 wrapperClassName="w-full"
@@ -738,7 +786,13 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             label={`${t.createForm.groupType} *`}
             options={groupTypeOptions}
             value={formData.groupType}
-            onChange={(e) => updateField('groupType', e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              updateField('groupType', val);
+              if (val !== 'youth_group' && val !== 'school_group') {
+                updateField('averageAge', '');
+              }
+            }}
             placeholder={t.createForm.selectGroupType}
             error={errors.groupType}
           />
@@ -757,6 +811,32 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             error={errors.groupSize}
           />
         </div>
+
+        {(formData.groupType === 'youth_group' || formData.groupType === 'school_group') && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label={`${t.createForm.averageAge} *`}
+              type="number"
+              min="1"
+              max="120"
+              placeholder={t.createForm.averageAgePlaceholder}
+              value={formData.averageAge === '' ? '' : String(formData.averageAge)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '') {
+                  updateField('averageAge', '');
+                } else {
+                  const num = Number(val);
+                  if (num >= 0) {
+                    updateField('averageAge', num);
+                  }
+                }
+              }}
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
+              error={errors.averageAge}
+            />
+          </div>
+        )}
       </div>
     </>
   );

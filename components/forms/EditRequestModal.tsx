@@ -36,6 +36,7 @@ interface FormState {
   budgetRange: string;
   groupType: string;
   groupSize: string;
+  averageAge: number | '';
   single: number;
   double: number;
   triple: number;
@@ -183,6 +184,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     budgetRange: '',
     groupType: '',
     groupSize: '',
+    averageAge: '',
     single: 0,
     double: 0,
     triple: 0,
@@ -231,6 +233,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         budgetRange: request.budgetRange ?? '',
         groupType: request.groupType ?? '',
         groupSize: request.groupSize?.toString() ?? '',
+        averageAge: request.averageAge ?? '',
         single: r?.single ?? 0,
         // Backend often stores double:0 when standard/twin beds are used; derive total
         double: (r?.standardDoubleBeds || r?.twinBeds)
@@ -256,7 +259,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
             const detected = detectCountryCode(raw);
             if (detected) return { contactPhoneCountryCode: detected.code, contactPhone: detected.number };
           }
-          return { contactPhoneCountryCode: '+1', contactPhone: raw };
+          return { contactPhoneCountryCode: '+44', contactPhone: raw };
         })(),
         customerNotes: request.customerNotes ?? '',
       });
@@ -339,6 +342,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
       return;
     }
 
+    // Validate averageAge for youth/school groups
+    const needsAge = form.groupType === 'youth_group' || form.groupType === 'school_group';
+    if (needsAge && (form.averageAge === '' || form.averageAge == null)) {
+      toast.error(t.createForm.averageAgeRequired);
+      return;
+    }
+
     const destinationChanged =
       form.destinationId !== (request.destinationId ?? 0) ||
       form.destinationName !== (request.destinationName ?? '');
@@ -362,6 +372,9 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         budgetRange: form.budgetRange || undefined,
         groupType: form.groupType || undefined,
         groupSize: form.groupSize ? Number(form.groupSize) : undefined,
+        averageAge: (['youth_group', 'school_group'].includes(form.groupType) && form.averageAge !== '')
+          ? Number(form.averageAge)
+          : undefined,
         rooms: {
           single: form.single,
           double: 0,
@@ -419,11 +432,14 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
   ];
 
   const groupTypeOptions = [
-    { value: 'business', label: t.createForm.businessGroup },
-    { value: 'leisure', label: t.createForm.leisureGroup },
-    { value: 'sports', label: t.createForm.sportsTeam },
+    { value: 'business_group', label: t.createForm.businessGroup },
+    { value: 'leisure_group', label: t.createForm.leisureGroup },
+    { value: 'sports_team', label: t.createForm.sportsTeam },
     { value: 'conference', label: t.createForm.conference },
     { value: 'wedding', label: t.createForm.wedding },
+    { value: 'youth_group', label: t.createForm.youthGroup },
+    { value: 'school_group', label: t.createForm.schoolGroup },
+    { value: 'mice_group', label: t.createForm.miceGroup },
   ];
 
   if (!open) return null;
@@ -514,8 +530,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     }
                     minDate={new Date()}
                     maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                    dateFormat="MM/dd/yyyy"
-                    placeholderText="MM/DD/YYYY"
+                    dateFormat="dd.MM.yyyy"
+                    placeholderText="DD.MM.YYYY"
                     popperClassName="sett-datepicker-popper"
                     popperPlacement="bottom-start"
                     wrapperClassName="w-full"
@@ -538,8 +554,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     }
                     minDate={form.checkinDate ? new Date(form.checkinDate) : new Date()}
                     maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                    dateFormat="MM/dd/yyyy"
-                    placeholderText="MM/DD/YYYY"
+                    dateFormat="dd.MM.yyyy"
+                    placeholderText="DD.MM.YYYY"
                     popperClassName="sett-datepicker-popper"
                     popperPlacement="bottom-start"
                     wrapperClassName="w-full"
@@ -572,7 +588,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 label={t.offer.editGroupType}
                 options={groupTypeOptions}
                 value={form.groupType}
-                onChange={(e) => setField('groupType', e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setField('groupType', val);
+                  if (val !== 'youth_group' && val !== 'school_group') {
+                    setField('averageAge', '');
+                  }
+                }}
                 placeholder={t.createForm.selectGroupType}
               />
               <div>
@@ -588,6 +610,34 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 />
               </div>
             </div>
+
+            {(form.groupType === 'youth_group' || form.groupType === 'school_group') && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>{t.createForm.averageAge}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    className={inputCls}
+                    value={form.averageAge === '' ? '' : String(form.averageAge)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setField('averageAge', '');
+                      } else {
+                        const num = Number(val);
+                        if (num >= 0) {
+                          setField('averageAge', num);
+                        }
+                      }
+                    }}
+                    placeholder={t.createForm.averageAgePlaceholder}
+                    onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Room & Accommodations ── */}

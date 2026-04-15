@@ -40,12 +40,11 @@ import { proposalsApi } from '@/lib/api/proposals';
 import type { Attachment, BookingRequest, OfferHistoryEntry, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU, formatDateTimeEU } from '@/lib/dateFormatter';
 import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateEU(dateStr);
 }
 
 function formatRoomType(type: string): string {
@@ -569,7 +568,10 @@ export default function RequestDetailPage() {
         ? t.offer.outsideCityCenter
         : '—';
 
-
+  const formatGroupType = (gt: string | null | undefined): string => {
+    if (!gt) return '—';
+    return gt.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
 
 
   return (
@@ -698,12 +700,28 @@ export default function RequestDetailPage() {
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                           {t.offer.groupType}
                         </p>
-                        <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D] capitalize">
-                          {request.groupType || '—'}
+                        <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                          {formatGroupType(request.groupType)}
                         </p>
                       </div>
                       {/* Vertical divider */}
                       <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+                      {/* Average Age - conditionally shown */}
+                      {(request.groupType === 'youth_group' || request.groupType === 'school_group') &&
+                        request.averageAge != null && (
+                        <>
+                          <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                            <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                              {t.offer.averageAge}
+                            </p>
+                            <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                              {request.averageAge}
+                            </p>
+                          </div>
+                          {/* Vertical divider */}
+                          <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+                        </>
+                      )}
                       {/* Guests */}
                       <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">

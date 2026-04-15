@@ -12,6 +12,7 @@ import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { proposalsApi } from '@/lib/api/proposals';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU } from '@/lib/dateFormatter';
 import type { Proposal, ProposalHotel, ProposalService } from '@/types';
 
 export default function ProposalPage() {
@@ -229,7 +230,7 @@ export default function ProposalPage() {
           Proposal Header
         </h2>
         <p className="text-body text-sett-text-secondary">
-          Request: {proposal.requestId ?? '—'} • Created {new Date(proposal.createdAt).toLocaleDateString()}
+          Request: {proposal.requestId ?? '—'} • Created {formatDateEU(proposal.createdAt)}
         </p>
       </section>
 

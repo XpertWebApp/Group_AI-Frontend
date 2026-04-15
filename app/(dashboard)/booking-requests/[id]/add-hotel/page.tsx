@@ -18,6 +18,7 @@ import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
+import { formatDateEU } from '@/lib/dateFormatter';
 import { cn } from '@/lib/utils/cn';
 import type {
   HotelSearchResult,
@@ -131,7 +132,6 @@ export default function AddHotelPage() {
   const [starFilters, setStarFilters] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [amenityFilters, setAmenityFilters] = useState<number[]>([]);
-  const [showAlternatives, setShowAlternatives] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
@@ -546,26 +546,27 @@ export default function AddHotelPage() {
   const altResults = deduplicatedResults.filter(
     (h) => requestedStars && hotelStars(h) !== requestedStars
   );
-  // If no main results match the requested star rating, show all hotels
-  const hasMainResults = mainResults.length > 0;
-  const displayResults = !hasMainResults
-    ? deduplicatedResults
-    : showAlternatives
-      ? altResults
-      : mainResults;
 
-  const filteredResults = displayResults.filter((h) => {
-    if (starFilters.length > 0 && !starFilters.includes(hotelStars(h))) return false;
-    if (h.sellingPricePerRoomPerNight > maxPrice) return false;
-    // AND logic: hotel must have ALL selected facilities
-    if (amenityFilters.length > 0 && h.facilities) {
-      const hotelFacilityIds = new Set(h.facilities.map((f) => f.id));
-      if (!amenityFilters.every((id) => hotelFacilityIds.has(id))) return false;
-    } else if (amenityFilters.length > 0 && !h.facilities) {
-      return false;
-    }
-    return true;
-  });
+  // Filter helper function
+  const applyFilters = (hotels: HotelSearchResult[]) =>
+    hotels.filter((h) => {
+      if (starFilters.length > 0 && !starFilters.includes(hotelStars(h))) return false;
+      if (h.sellingPricePerRoomPerNight > maxPrice) return false;
+      // AND logic: hotel must have ALL selected facilities
+      if (amenityFilters.length > 0 && h.facilities) {
+        const hotelFacilityIds = new Set(h.facilities.map((f) => f.id));
+        if (!amenityFilters.every((id) => hotelFacilityIds.has(id))) return false;
+      } else if (amenityFilters.length > 0 && !h.facilities) {
+        return false;
+      }
+      return true;
+    });
+
+  // Apply filters separately to main and alt results
+  const filteredMainResults = applyFilters(mainResults);
+  const filteredAltResults = applyFilters(altResults);
+  // Combine: main results first, then alternatives
+  const filteredResults = [...filteredMainResults, ...filteredAltResults];
 
   return (
     <div className="flex flex-col xl:h-full xl:overflow-hidden">
@@ -838,7 +839,13 @@ export default function AddHotelPage() {
               {t.addHotel.noHotelsFoundMsg}
             </p>
             <div className="flex items-center justify-center gap-3">
-              <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
+              <Button variant="primary" onClick={() => {
+                setPhase('searching');
+                setErrorMsg('');
+                setCompletedResults([]);
+                setSearchSummary(null);
+                startNewSearch();
+              }}>
                 {t.addHotel.searchAgain}
               </Button>
               <Button variant="secondary" onClick={() => router.push(`/booking-requests/${requestId}`)}>
@@ -892,13 +899,9 @@ export default function AddHotelPage() {
                       {t.addHotel.stayDates}
                     </label>
                     <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                      {request?.checkinDate
-                        ? new Date(request.checkinDate).toLocaleDateString('en-GB')
-                        : '—'}
+                      {formatDateEU(request?.checkinDate)}
                       {' - '}
-                      {request?.checkoutDate
-                        ? new Date(request.checkoutDate).toLocaleDateString('en-GB')
-                        : '—'}
+                      {formatDateEU(request?.checkoutDate)}
                     </div>
                   </div>
 
@@ -1053,10 +1056,10 @@ export default function AddHotelPage() {
             {/* ── Right: Hotel Results ── */}
             <div ref={hotelListRef} className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1">
               <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0">
-                {filteredResults.length < displayResults.length
+                {filteredResults.length < deduplicatedResults.length
                   ? t.addHotel.hotelsShowing
                     .replace('{shown}', String(filteredResults.length))
-                    .replace('{total}', String(displayResults.length))
+                    .replace('{total}', String(deduplicatedResults.length))
                   : phase === 'polling'
                     ? t.addHotel.hotelsFoundSoFar.replace('{count}', String(filteredResults.length))
                     : t.addHotel.hotelsFound.replace('{count}', String(filteredResults.length))
@@ -1072,16 +1075,52 @@ export default function AddHotelPage() {
               )}
 
               <div className="space-y-5 pb-6 xl:overflow-visible">
-                {filteredResults.map((hotel) => (
-                  <HotelResultCard
-                    key={hotel.hotelCode}
-                    hotel={hotel}
-                    isAdded={addedHotels.has(hotel.hotelCode)}
-                    isAdding={addingHotel === hotel.hotelCode}
-                    onAddToOffer={() => handleAddToOffer(hotel)}
-                    onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName })}
-                  />
-                ))}
+                {/* Main Results Section */}
+                {filteredMainResults.length > 0 && (
+                  <>
+                    <div>
+                      <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-3 uppercase">
+                        {requestedStars ? `${requestedStars} Star Hotels (Matching Your Request)` : 'Main Results'}
+                      </h3>
+                      <div className="space-y-5">
+                        {filteredMainResults.map((hotel) => (
+                          <HotelResultCard
+                            key={hotel.hotelCode}
+                            hotel={hotel}
+                            isAdded={addedHotels.has(hotel.hotelCode)}
+                            isAdding={addingHotel === hotel.hotelCode}
+                            onAddToOffer={() => handleAddToOffer(hotel)}
+                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Alternative Results Section */}
+                {filteredAltResults.length > 0 && (
+                  <>
+                    {filteredMainResults.length > 0 && <hr className="border-sett-border-light my-4" />}
+                    <div>
+                      <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-3 uppercase">
+                        Other Star Ratings
+                      </h3>
+                      <div className="space-y-5">
+                        {filteredAltResults.map((hotel) => (
+                          <HotelResultCard
+                            key={hotel.hotelCode}
+                            hotel={hotel}
+                            isAdded={addedHotels.has(hotel.hotelCode)}
+                            isAdding={addingHotel === hotel.hotelCode}
+                            onAddToOffer={() => handleAddToOffer(hotel)}
+                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName })}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1271,7 +1310,7 @@ function HotelResultCard({
                   {hotel.cxlDeadline && (
                     <div className="flex items-center gap-1 font-montserrat text-[10px] text-sett-text-accent font-medium uppercase tracking-tight">
                       <Clock className="w-3 h-3" />
-                      <span>{t.addHotel.cancelBefore}: {new Date(hotel.cxlDeadline).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      <span>{t.addHotel.cancelBefore}: {formatDateEU(hotel.cxlDeadline)}</span>
                     </div>
                   )}
                 </div>

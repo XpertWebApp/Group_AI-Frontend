@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Download } from 'lucide-react';
 import { proposalsApi } from '@/lib/api/proposals';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU } from '@/lib/dateFormatter';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 
@@ -15,9 +16,7 @@ interface ContractPreviewModalProps {
 }
 
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateEU(dateStr);
 }
 
 const ROOM_TYPE_LABELS: Record<string, string> = {

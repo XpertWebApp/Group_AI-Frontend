@@ -12,12 +12,11 @@ import { Eye, Plus } from 'lucide-react';
 import { dashboardApi } from '@/lib/api/dashboard';
 import type { DashboardStatsResponse, RecentOffer } from '@/lib/api/dashboard';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU } from '@/lib/dateFormatter';
 import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateEU(dateStr);
 }
 
 export default function DashboardPage() {
