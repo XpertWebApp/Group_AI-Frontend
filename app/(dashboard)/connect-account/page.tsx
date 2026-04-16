@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { authApi } from '@/lib/api/auth';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 import toast from 'react-hot-toast';
 
 function GoogleLogo({ size = 40 }: { size?: number }) {
@@ -19,6 +20,7 @@ function GoogleLogo({ size = 40 }: { size?: number }) {
 
 export default function ConnectAccountPage() {
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const [connected, setConnected] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [connectUrl, setConnectUrl] = useState<string | null>(null);
@@ -46,16 +48,16 @@ export default function ConnectAccountPage() {
     const googleParam = searchParams.get('google');
     if (!googleParam) return;
     if (googleParam === 'connected') {
-      toast.success('Google account connected successfully!');
+      toast.success(t.dashboard.googleConnect.successToast);
       fetchStatus();
     } else if (googleParam === 'denied') {
-      toast.error('Google connection was denied.');
+      toast.error(t.dashboard.googleConnect.deniedToast);
     }
     const url = new URL(window.location.href);
     url.searchParams.delete('google');
     window.history.replaceState({}, '', url.toString());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, t]);
 
   async function handleDisconnect() {
     setDisconnecting(true);
@@ -63,11 +65,11 @@ export default function ConnectAccountPage() {
       await authApi.disconnectGoogle();
       setConnected(false);
       setEmail(null);
-      toast.success('Google account disconnected.');
+      toast.success(t.dashboard.googleConnect.disconnectedToast);
       // Re-fetch connect URL for re-connecting
       fetchConnectUrl();
     } catch {
-      toast.error('Failed to disconnect. Please try again.');
+      toast.error(t.dashboard.googleConnect.disconnectError);
     } finally {
       setDisconnecting(false);
     }
@@ -75,16 +77,16 @@ export default function ConnectAccountPage() {
 
   return (
     <>
-      <Header title="Connect Your Google Account" />
+      <Header title={t.dashboard.googleConnect.pageTitle} />
       <div className="p-4 md:p-6">
         <div className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] border border-sett-border-light overflow-hidden">
           {/* Title section */}
           <div className="px-7 pt-7 pb-5">
             <h2 className="font-montserrat text-[20px] font-bold text-sett-text-primary leading-snug">
-              Manage Your Google Account
+              {t.dashboard.googleConnect.manageTitle}
             </h2>
             <p className="font-montserrat text-[14px] font-normal text-sett-text-secondary mt-1.5 leading-relaxed">
-              Connect your Gmail account quickly and securely with just a few clicks.
+              {t.dashboard.googleConnect.description}
             </p>
           </div>
 
@@ -110,7 +112,7 @@ export default function ConnectAccountPage() {
                 </p>
               ) : !connected && (
                 <p className="font-montserrat text-[13px] font-normal text-sett-text-secondary mt-0.5">
-                  Link your Google account to quickly and easily send emails and handle all your communications
+                  {t.dashboard.googleConnect.linkDescription}
                 </p>
               )}
             </div>
@@ -128,7 +130,7 @@ export default function ConnectAccountPage() {
                     className="font-montserrat font-medium text-[14px] leading-[100%] tracking-[0%]"
                     style={{ color: '#686868' }}
                   >
-                    Connected
+                    {t.dashboard.googleConnect.connected}
                   </span>
                 </div>
 
@@ -144,7 +146,7 @@ export default function ConnectAccountPage() {
                     color: '#686868',
                   }}
                 >
-                  {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  {disconnecting ? t.dashboard.googleConnect.disconnecting : t.dashboard.googleConnect.disconnect}
                 </button>
               </div>
             ) : (
