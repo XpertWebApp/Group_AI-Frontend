@@ -330,7 +330,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
               </div>
               <div className="min-w-0 flex-1 space-y-[2px]">
                 <p className="font-montserrat text-[12px] font-semibold leading-normal text-white truncate">{displayName}</p>
-                <p className="font-montserrat text-[10px] font-normal leading-normal text-white/60 truncate">{user?.role ?? 'Admin'}</p>
+                <p className="font-montserrat text-[10px] font-normal leading-normal text-white/60 truncate">{user?.role ?? 'User'}</p>
               </div>
             </div>
           </div>
