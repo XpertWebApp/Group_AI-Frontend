@@ -41,6 +41,7 @@ import type { Attachment, BookingRequest, OfferHistoryEntry, Proposal, ProposalH
 import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU, formatDateTimeEU } from '@/lib/dateFormatter';
+import { formatPriceEU, formatCurrencyEU, formatPercentageEU, formatNumberEU } from '@/lib/numberFormatter';
 import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -49,6 +50,15 @@ function formatDate(dateStr: string | null | undefined): string {
 
 function formatRoomType(type: string): string {
   return type.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim();
+}
+
+function getRoomLabel(type: string, detail: any): string {
+  // If actual descriptions are available from the hotel, use those
+  if (detail.actualDescriptions && detail.actualDescriptions.length > 0) {
+    return detail.actualDescriptions[0];
+  }
+  // Otherwise, use the requested room type
+  return formatRoomType(type);
 }
 
 function formatPhone(code: string | null | undefined, num: string | null | undefined): string {
@@ -1165,7 +1175,7 @@ export default function RequestDetailPage() {
                               </span>
                               {entry.totalPrice != null && (
                                 <span className="font-montserrat text-[12px] font-semibold text-sett-text-primary whitespace-nowrap">
-                                  {entry.currency} {entry.totalPrice.toLocaleString('en', { minimumFractionDigits: 2 })}
+                                  {formatCurrencyEU(entry.totalPrice, entry.currency)}
                                 </span>
                               )}
                             </div>
@@ -1209,7 +1219,7 @@ export default function RequestDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalPurchase}</span>
                       <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
-                        €{totals.totalPurchase.toLocaleString('en', { minimumFractionDigits: 2 })}
+                        €{formatPriceEU(totals.totalPurchase)}
                       </span>
                     </div>
                     {/* Divider below Total Purchase */}
@@ -1218,7 +1228,7 @@ export default function RequestDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalSell}</span>
                       <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
-                        €{totals.totalSell.toLocaleString('en', { minimumFractionDigits: 2 })}
+                        €{formatPriceEU(totals.totalSell)}
                       </span>
                     </div>
                     {/* Divider below Total Sell */}
@@ -1227,7 +1237,7 @@ export default function RequestDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginEur}</span>
                       <span className="font-montserrat font-bold text-[18px] leading-none text-right" style={{ color: '#667F00' }}>
-                        €{totals.markupEur.toLocaleString('en', { minimumFractionDigits: 2 })}
+                        €{formatPriceEU(totals.markupEur)}
                       </span>
                     </div>
                     {/* Green divider below Margin */}
@@ -1236,7 +1246,7 @@ export default function RequestDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginPct}</span>
                       <span className="font-montserrat font-bold text-[16px] leading-none text-right" style={{ color: '#AAC737' }}>
-                        {totals.margin.toFixed(1)}%
+                        {formatPercentageEU(totals.margin)}
                       </span>
                     </div>
                   </div>
@@ -1821,7 +1831,7 @@ function HotelCard({
             {hotel.hotelName || hotel.hotelCode}
           </h4>
           <div className="flex gap-0.5 shrink-0">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: hotel.starRating || 0 }).map((_, i) => (
               <Star key={i} className="w-3.5 h-3.5 fill-sett-primary text-sett-primary" />
             ))}
           </div>
@@ -1883,9 +1893,9 @@ function HotelCard({
                   const total = sell * qty * nights;
                   return (
                     <tr key={type} className="border-b border-sett-border last:border-0">
-                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{formatRoomType(type)}</td>
+                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{getRoomLabel(type, detail)}</td>
                       <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
-                        {net.toFixed(2)}
+                        {formatPriceEU(net)}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <MarkupDropdown value={markup} onChange={(m) => handleMarkupChange(type, m)} />
@@ -1910,7 +1920,7 @@ function HotelCard({
                         {nights}
                       </td>
                       <td className="px-4 py-2.5 text-body text-sett-primary text-right font-semibold">
-                        {total.toLocaleString('en', { minimumFractionDigits: 2 })}
+                        {formatPriceEU(total)}
                       </td>
                     </tr>
                   );
@@ -1929,11 +1939,11 @@ function HotelCard({
               const total = sell * qty * nights;
               return (
                 <div key={type} className="p-3 space-y-2">
-                  <p className="text-body font-medium text-sett-text-primary">{formatRoomType(type)}</p>
+                  <p className="text-body font-medium text-sett-text-primary">{getRoomLabel(type, detail)}</p>
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>
-                      <p className="text-sett-text-primary mt-0.5">{net.toFixed(2)}</p>
+                      <p className="text-sett-text-primary mt-0.5">{formatPriceEU(net)}</p>
                     </div>
                     <div>
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.markup}</span>
@@ -1967,7 +1977,7 @@ function HotelCard({
                     </div>
                     <div>
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.total}</span>
-                      <p className="text-sett-primary font-semibold mt-0.5">{total.toLocaleString('en', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-sett-primary font-semibold mt-0.5">{formatPriceEU(total)}</p>
                     </div>
                   </div>
                 </div>
@@ -1978,7 +1988,7 @@ function HotelCard({
       ) : (
         <div className="px-4 py-3">
           <p className="text-body text-sett-text-secondary">
-            {hotel.currency} {Number(hotel.totalPrice).toLocaleString('en', { minimumFractionDigits: 2 })}
+            {formatCurrencyEU(hotel.totalPrice, hotel.currency)}
           </p>
         </div>
       )}
@@ -2044,12 +2054,12 @@ function ServiceRow({
       </td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatDate(service.dateFrom)}</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatDate(service.dateTo)}</td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{buy.toFixed(2)}</td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{markup.toFixed(0)}%</td>
-      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{sell.toFixed(2)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatPriceEU(buy)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatPercentageEU(markup, 0)}</td>
+      <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{formatPriceEU(sell)}</td>
       <td className="px-4 py-2.5 text-body text-sett-text-primary whitespace-nowrap">{qty}</td>
       <td className={`px-4 py-2.5 text-body text-right font-semibold ${isIncluded ? 'text-sett-primary' : 'text-sett-text-accent line-through'}`}>
-        {total.toLocaleString('en', { minimumFractionDigits: 2 })}
+        {formatPriceEU(total)}
       </td>
       <td className="px-4 py-2.5 text-right">
         <div className="flex items-center justify-end gap-2">
@@ -2139,15 +2149,15 @@ function ServiceCard({
         )}
         <div>
           <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
-          <p className="text-sett-text-primary mt-0.5">{buy.toFixed(2)}</p>
+          <p className="text-sett-text-primary mt-0.5">{formatPriceEU(buy)}</p>
         </div>
         <div>
           <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Markup</span>
-          <p className="text-sett-text-primary mt-0.5">{markup.toFixed(0)}%</p>
+          <p className="text-sett-text-primary mt-0.5">{formatPercentageEU(markup, 0)}</p>
         </div>
         <div>
           <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Sell</span>
-          <p className="text-sett-text-primary mt-0.5">{sell.toFixed(2)}</p>
+          <p className="text-sett-text-primary mt-0.5">{formatPriceEU(sell)}</p>
         </div>
         <div>
           <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Qty</span>
@@ -2155,7 +2165,7 @@ function ServiceCard({
         </div>
         <div>
           <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Total</span>
-          <p className="text-sett-primary font-semibold mt-0.5">{total.toLocaleString('en', { minimumFractionDigits: 2 })}</p>
+          <p className="text-sett-primary font-semibold mt-0.5">{formatPriceEU(total)}</p>
         </div>
       </div>
     </div>

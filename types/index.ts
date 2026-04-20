@@ -150,6 +150,7 @@ export interface ProposalHotel {
   hotelCode: string;
   hotelName?: string;
   tid?: string | null;
+  hotelRef?: string | null;
   totalPrice: number;
   currency: string;
   freeCancellation?: boolean;
@@ -158,6 +159,7 @@ export interface ProposalHotel {
   rooms?: Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
   latitude?: number | null;
   longitude?: number | null;
+  starRating?: number | null;
   createdAt: string;
   includedInTotal?: boolean;
 }

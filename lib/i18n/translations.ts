@@ -597,8 +597,8 @@ export const translations = {
 
     // ── Contract Preview ──
     contract: {
-      title: 'Contract Preview — English',
-      titleDe: 'Vertragsvorschau — Deutsch',
+      title: 'Offer Preview — English',
+      titleDe: 'Angebotsvorschau — Deutsch',
       companyName: 'SETT',
       companySubtitle: 'Professional proposal document for',
       reservationNumber: 'Reservation #',
@@ -609,7 +609,7 @@ export const translations = {
       phoneNumber: 'Phone Number',
       website: 'Website',
       address: 'Address',
-      contractSection: 'Contract',
+      contractSection: 'Offer',
       companyId: 'Company ID',
       documentCode: 'Document Code',
       createdDate: 'Created Date',
@@ -1239,8 +1239,8 @@ export const translations = {
 
     // ── Contract Preview ──
     contract: {
-      title: 'Vertragsvorschau — Deutsch',
-      titleDe: 'Vertragsvorschau — Deutsch',
+      title: 'Angebotsvorschau — Deutsch',
+      titleDe: 'Angebotsvorschau — Deutsch',
       companyName: 'SETT',
       companySubtitle: 'Professionelles Angebotsdokument für',
       reservationNumber: 'Reservierungs-Nr.',
@@ -1251,7 +1251,7 @@ export const translations = {
       phoneNumber: 'Telefonnummer',
       website: 'Webseite',
       address: 'Adresse',
-      contractSection: 'Vertrag',
+      contractSection: 'Angebot',
       companyId: 'Firmen-ID',
       documentCode: 'Dokumentencode',
       createdDate: 'Erstellungsdatum',

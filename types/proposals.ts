@@ -10,12 +10,14 @@ export interface RoomDetail {
   sell: number;
   qty: number;
   nights: number;
+  actualDescriptions?: string[];
 }
 
 export interface AddProposalHotelPayload {
   hotelCode: string;
   hotelName?: string;
   tid?: string;
+  starRating?: number | null;
   rooms?: Record<string, RoomDetail>;
   currency: string;
   totalPrice: number;

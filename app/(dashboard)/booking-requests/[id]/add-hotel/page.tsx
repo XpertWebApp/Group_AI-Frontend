@@ -494,6 +494,7 @@ export default function AddHotelPage() {
         hotelName: hotel.hotelName,
         latitude: hotel.latitude,
         longitude: hotel.longitude,
+        starRating: hotel.starRating,
         tid,
         currency: hotel.currency || 'EUR',
         totalPrice,
