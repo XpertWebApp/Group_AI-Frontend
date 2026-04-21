@@ -109,6 +109,15 @@ function formatRoomType(raw: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function getMealTypeLabel(mealValue: string, translations: Record<string, any>): string {
+  if (!mealValue) return '—';
+  const lowerValue = mealValue.toLowerCase();
+  // Try exact match first
+  if (translations[lowerValue]) return translations[lowerValue];
+  // Return original value if no translation found
+  return mealValue;
+}
+
 export default function AddHotelPage() {
   const params = useParams();
   const router = useRouter();
@@ -577,7 +586,16 @@ export default function AddHotelPage() {
         className="p-4 md:p-6 xl:flex-1 xl:min-h-0 xl:flex xl:flex-col xl:gap-6"
         onWheel={(e) => {
           if (!hotelListRef.current) return;
-          if (hotelListRef.current.contains(e.target as Node)) return;
+          const target = e.target as Node;
+          // Don't scroll hotel list if scrolling within the hotel list itself
+          if (hotelListRef.current.contains(target)) return;
+          // Don't scroll hotel list if scrolling within a scrollable element (filters sidebar, etc)
+          let current = target.parentElement;
+          while (current) {
+            const overflow = window.getComputedStyle(current).overflowY;
+            if (overflow === 'auto' || overflow === 'scroll') return;
+            current = current.parentElement;
+          }
           hotelListRef.current.scrollTop += e.deltaY;
         }}
       >
@@ -1081,7 +1099,7 @@ export default function AddHotelPage() {
                   <>
                     <div>
                       <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-3 uppercase">
-                        {requestedStars ? `${requestedStars} Star Hotels (Matching Your Request)` : 'Main Results'}
+                        {requestedStars ? t.addHotel.starHotelsMatching.replace('{stars}', String(requestedStars)) : t.addHotel.mainResults}
                       </h3>
                       <div className="space-y-5">
                         {filteredMainResults.map((hotel) => (
@@ -1332,14 +1350,18 @@ function HotelResultCard({
           {/* Facility tags */}
           {hotel.facilities && hotel.facilities.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
-              {hotel.facilities.map((facility) => (
-                <span
-                  key={facility.id}
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20"
-                >
-                  {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
-                </span>
-              ))}
+              {hotel.facilities.map((facility) => {
+                const AmenityIcon = getAmenityIcon(facility.name);
+                return (
+                  <span
+                    key={facility.id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20"
+                  >
+                    {AmenityIcon && <AmenityIcon className="w-3 h-3" />}
+                    {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                  </span>
+                );
+              })}
             </div>
           )}
 
@@ -1356,7 +1378,7 @@ function HotelResultCard({
                       {t.addHotel.rooms}
                     </th>
                     <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
-                      Rate Basis
+                      {t.addHotel.rateBasis}
                     </th>
                     <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
                       {t.addHotel.perNight}
@@ -1389,7 +1411,7 @@ function HotelResultCard({
                         {rt.roomsAllocated}
                       </td>
                       <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
-                        {String(rt.mealName || rt.mealType || '—')}
+                        {getMealTypeLabel(rt.mealName || rt.mealType || '', t.addHotel.mealTypes as Record<string, any>)}
                       </td>
                       <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
                         &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
@@ -1431,8 +1453,8 @@ function HotelResultCard({
                     <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium">{rt.roomsAllocated}</span>
                   </div>
                   <div className="text-right">
-                    <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">Rate Basis</span>
-                    <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium capitalize">{String(rt.mealName || rt.mealType || '—')}</span>
+                    <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.rateBasis}</span>
+                    <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium capitalize">{getMealTypeLabel(rt.mealName || rt.mealType || '', t.addHotel.mealTypes as Record<string, any>)}</span>
                   </div>
                 </div>
               </div>

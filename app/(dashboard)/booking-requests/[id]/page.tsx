@@ -1645,7 +1645,7 @@ function MarkupDropdown({
 
   const handleCustomSubmit = () => {
     const parsed = parseFloat(customValue);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 999) {
       onChange(parsed);
       setOpen(false);
       setIsCustom(false);
@@ -1693,7 +1693,7 @@ function MarkupDropdown({
                 <input
                   type="number"
                   min="0"
-                  max="100"
+                  max="999"
                   step="0.1"
                   value={customValue}
                   onChange={(e) => {
@@ -1708,7 +1708,7 @@ function MarkupDropdown({
                   }}
                   autoFocus
                   className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
-                  placeholder="0-100"
+                  placeholder="0-999"
                 />
                 <span className="text-body text-sett-text-accent">%</span>
                 <button
