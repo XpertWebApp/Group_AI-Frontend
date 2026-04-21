@@ -1240,94 +1240,43 @@ export default function RequestDetailPage() {
                   </div>
                   {/* Divider below title */}
                   <div className="mx-5" style={{ borderTop: '1px solid #6868681A' }} />
-
-                  {/* Per-Hotel Breakdowns */}
-                  {hotelBreakdowns.length > 0 && (
-                    <div className="px-5 pt-5 pb-5 flex flex-col gap-4">
-                      {hotelBreakdowns.map((breakdown) => (
-                        <div key={breakdown.hotelId} className="flex flex-col gap-3 p-4 rounded-[10px]" style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB' }}>
-                          {/* Hotel Name */}
-                          <h5 className="font-montserrat font-semibold text-[14px] text-[#1D1D1D]">
-                            {breakdown.hotelName}
-                          </h5>
-                          {/* Purchase & Sell in 2 columns */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1">
-                              <span className="font-montserrat text-[12px] font-medium text-[#686868] uppercase tracking-tight">
-                                {t.offer.totalPurchase}
-                              </span>
-                              <span className="font-montserrat font-semibold text-[14px] text-[#071C42]">
-                                €{formatPriceEU(breakdown.buy)}
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="font-montserrat text-[12px] font-medium text-[#686868] uppercase tracking-tight">
-                                {t.offer.totalSell}
-                              </span>
-                              <span className="font-montserrat font-semibold text-[14px] text-[#071C42]">
-                                €{formatPriceEU(breakdown.sell)}
-                              </span>
-                            </div>
-                          </div>
-                          {/* Margin EUR & % in 2 columns */}
-                          <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: '1px solid #D1D5DB' }}>
-                            <div className="flex flex-col gap-1">
-                              <span className="font-montserrat text-[12px] font-medium text-[#686868] uppercase tracking-tight">
-                                {t.offer.marginEur}
-                              </span>
-                              <span className="font-montserrat font-bold text-[14px]" style={{ color: '#667F00' }}>
-                                €{formatPriceEU(breakdown.margin)}
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="font-montserrat text-[12px] font-medium text-[#686868] uppercase tracking-tight">
-                                {t.offer.marginPct}
-                              </span>
-                              <span className="font-montserrat font-bold text-[14px]" style={{ color: '#AAC737' }}>
-                                {formatPercentageEU(breakdown.marginPct)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {/* Divider before Grand Total */}
-                      <div style={{ borderTop: '1px solid #6868681A', marginTop: 8 }} />
-                      {/* Grand Total */}
-                      <div className="pt-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-montserrat text-[14px] font-bold text-[#1D1D1D] uppercase">Total Purchase</span>
-                          <span className="font-montserrat font-bold text-[16px] text-[#071C42]">
-                            €{formatPriceEU(totals.totalPurchase)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-montserrat text-[14px] font-bold text-[#1D1D1D] uppercase">Total Sell</span>
-                          <span className="font-montserrat font-bold text-[16px] text-[#071C42]">
-                            €{formatPriceEU(totals.totalSell)}
-                          </span>
-                        </div>
-                        <div style={{ borderTop: '2px solid #AAC737' }} />
-                        <div className="flex items-center justify-between pt-3">
-                          <span className="font-montserrat text-[14px] font-bold text-[#1D1D1D] uppercase">Grand Margin</span>
-                          <div className="text-right">
-                            <div className="font-montserrat font-bold text-[18px]" style={{ color: '#667F00' }}>
-                              €{formatPriceEU(totals.markupEur)}
-                            </div>
-                            <div className="font-montserrat font-bold text-[14px]" style={{ color: '#AAC737' }}>
-                              {formatPercentageEU(totals.margin)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                  {/* Rows */}
+                  <div className="px-5 pt-5 pb-5 flex flex-col gap-4">
+                    {/* Total Purchase */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalPurchase}</span>
+                      <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
+                        €{formatPriceEU(totals.totalPurchase)}
+                      </span>
                     </div>
-                  )}
-                  {hotelBreakdowns.length === 0 && (
-                    <div className="px-5 py-8 text-center">
-                      <p className="font-montserrat text-[14px] text-[#686868]">
-                        No hotels added yet
-                      </p>
+                    {/* Divider below Total Purchase */}
+                    <div style={{ borderTop: '1px solid #6868681A' }} />
+                    {/* Total Sell */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalSell}</span>
+                      <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
+                        €{formatPriceEU(totals.totalSell)}
+                      </span>
                     </div>
-                  )}
+                    {/* Divider below Total Sell */}
+                    <div style={{ borderTop: '1px solid #6868681A' }} />
+                    {/* Margin */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginEur}</span>
+                      <span className="font-montserrat font-bold text-[18px] leading-none text-right" style={{ color: '#667F00' }}>
+                        €{formatPriceEU(totals.markupEur)}
+                      </span>
+                    </div>
+                    {/* Green divider below Margin */}
+                    <div style={{ borderTop: '1px solid #AAC737' }} />
+                    {/* Margin % */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginPct}</span>
+                      <span className="font-montserrat font-bold text-[16px] leading-none text-right" style={{ color: '#AAC737' }}>
+                        {formatPercentageEU(totals.margin)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Action Buttons */}
@@ -1983,7 +1932,7 @@ function HotelCard({
                           type="text"
                           value={formatPriceEU(sell)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value.replace(/\./g, '').replace(/,/, '.'));
+                            const val = parseFloat(e.target.value.replace(/,/g, ''));
                             if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
@@ -2034,7 +1983,7 @@ function HotelCard({
                           type="text"
                           value={formatPriceEU(sell)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value.replace(/\./g, '').replace(/,/, '.'));
+                            const val = parseFloat(e.target.value.replace(/,/g, ''));
                             if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-full max-w-[80px] px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
@@ -2080,6 +2029,51 @@ function HotelCard({
           </p>
         </div>
       )}
+
+      {/* Hotel Breakdown — Total Purchase, Sell, Margin */}
+      <div className="px-4 py-3 border-t border-sett-border/50 bg-[#F9FAFB]">
+        <div className="space-y-2">
+          {/* Total Purchase */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-sett-text-accent font-medium">Total Purchase</span>
+            <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
+              Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
+                (sum, detail) => sum + Number(detail.net ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
+                0
+              )
+            )}</span>
+          </div>
+          {/* Total Sell */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-sett-text-accent font-medium">Total Sell</span>
+            <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
+              Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
+                (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
+                0
+              )
+            )}</span>
+          </div>
+          {/* Margin Amount */}
+          <div className="flex items-center justify-between text-sm pt-1 border-t border-sett-border/50">
+            <span className="text-sett-text-accent font-medium">Margin</span>
+            <span className="font-semibold" style={{ color: '#667F00' }}>
+              €{formatPriceEU(
+                (() => {
+                  const sell = Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
+                    (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
+                    0
+                  );
+                  const buy = Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
+                    (sum, detail) => sum + Number(detail.net ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
+                    0
+                  );
+                  return sell - buy;
+                })()
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
