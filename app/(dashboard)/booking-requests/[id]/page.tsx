@@ -1938,7 +1938,7 @@ function HotelCard({
                     {t.offer.nights}
                   </th>
                   <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-4 py-2 font-medium">
-                    {t.offer.total} &euro;
+                    {t.offer.amount} &euro;
                   </th>
                 </tr>
               </thead>
@@ -1965,7 +1965,7 @@ function HotelCard({
                           type="text"
                           value={formatPriceEU(sell)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value.replace(/,/g, ''));
+                            const val = parseFloat(e.target.value.replace(/\./g, '').replace(/,/g, '.'));
                             if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
@@ -2016,7 +2016,7 @@ function HotelCard({
                           type="text"
                           value={formatPriceEU(sell)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value.replace(/,/g, ''));
+                            const val = parseFloat(e.target.value.replace(/\./g, '').replace(/,/g, '.'));
                             if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-full max-w-[80px] px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
@@ -2032,7 +2032,7 @@ function HotelCard({
                       <p className="text-sett-text-primary mt-0.5">{nights}</p>
                     </div>
                     <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.total}</span>
+                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.amount}</span>
                       <p className="text-sett-primary font-semibold mt-0.5">{formatPriceEU(total)}</p>
                     </div>
                   </div>
@@ -2063,48 +2063,16 @@ function HotelCard({
         </div>
       )}
 
-      {/* Hotel Breakdown — Total Purchase, Sell, Margin */}
+      {/* Hotel Breakdown — Total Sell */}
       <div className="px-4 py-3 border-t border-sett-border/50 bg-[#F9FAFB]">
-        <div className="space-y-2">
-          {/* Total Purchase */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-sett-text-accent font-medium">Total Purchase</span>
-            <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
-              Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
-                (sum, detail) => sum + Number(detail.net ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
-                0
-              )
-            )}</span>
-          </div>
-          {/* Total Sell */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-sett-text-accent font-medium">Total Sell</span>
-            <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
-              Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
-                (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
-                0
-              )
-            )}</span>
-          </div>
-          {/* Margin Amount */}
-          <div className="flex items-center justify-between text-sm pt-1 border-t border-sett-border/50">
-            <span className="text-sett-text-accent font-medium">Margin</span>
-            <span className="font-semibold" style={{ color: '#667F00' }}>
-              €{formatPriceEU(
-                (() => {
-                  const sell = Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
-                    (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
-                    0
-                  );
-                  const buy = Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
-                    (sum, detail) => sum + Number(detail.net ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
-                    0
-                  );
-                  return sell - buy;
-                })()
-              )}
-            </span>
-          </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-sett-text-accent font-medium">Total Sell</span>
+          <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
+            Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
+              (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
+              0
+            )
+          )}</span>
         </div>
       </div>
     </div>
