@@ -129,6 +129,19 @@ export default function RequestDetailPage() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editRequestOpen, setEditRequestOpen] = useState(false);
+  const [selectedHotelsForBreakdown, setSelectedHotelsForBreakdown] = useState<Set<string>>(new Set());
+
+  const toggleHotelBreakdownSelection = (hotelId: string) => {
+    setSelectedHotelsForBreakdown((prev) => {
+      const updated = new Set(prev);
+      if (updated.has(hotelId)) {
+        updated.delete(hotelId);
+      } else {
+        updated.add(hotelId);
+      }
+      return updated;
+    });
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -1028,6 +1041,8 @@ export default function RequestDetailPage() {
                         onToggleIncluded={(v) => handleToggleHotelIncluded(hotel.id, v)}
                         proposalStatus={proposal!.status}
                         offerCount={offerHistory.length}
+                        isSelectedForBreakdown={selectedHotelsForBreakdown.has(hotel.id)}
+                        onToggleBreakdownSelection={() => toggleHotelBreakdownSelection(hotel.id)}
                       />
                     ))}
                   </div>
@@ -1242,40 +1257,42 @@ export default function RequestDetailPage() {
                   <div className="mx-5" style={{ borderTop: '1px solid #6868681A' }} />
                   {/* Rows */}
                   <div className="px-5 pt-5 pb-5 flex flex-col gap-4">
-                    {/* Total Purchase */}
-                    <div className="flex items-center justify-between">
-                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalPurchase}</span>
-                      <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
-                        €{formatPriceEU(totals.totalPurchase)}
-                      </span>
-                    </div>
-                    {/* Divider below Total Purchase */}
-                    <div style={{ borderTop: '1px solid #6868681A' }} />
-                    {/* Total Sell */}
-                    <div className="flex items-center justify-between">
-                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.totalSell}</span>
-                      <span className="font-montserrat font-semibold text-[16px] leading-none text-right" style={{ color: '#071C42' }}>
-                        €{formatPriceEU(totals.totalSell)}
-                      </span>
-                    </div>
-                    {/* Divider below Total Sell */}
-                    <div style={{ borderTop: '1px solid #6868681A' }} />
-                    {/* Margin */}
-                    <div className="flex items-center justify-between">
-                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginEur}</span>
-                      <span className="font-montserrat font-bold text-[18px] leading-none text-right" style={{ color: '#667F00' }}>
-                        €{formatPriceEU(totals.markupEur)}
-                      </span>
-                    </div>
-                    {/* Green divider below Margin */}
-                    <div style={{ borderTop: '1px solid #AAC737' }} />
-                    {/* Margin % */}
-                    <div className="flex items-center justify-between">
-                      <span className="font-montserrat text-[14px] font-medium text-[#686868]">{t.offer.marginPct}</span>
-                      <span className="font-montserrat font-bold text-[16px] leading-none text-right" style={{ color: '#AAC737' }}>
-                        {formatPercentageEU(totals.margin)}
-                      </span>
-                    </div>
+                    {/* Selected Hotels Breakdowns */}
+                    {selectedHotelsForBreakdown.size > 0 ? (
+                      <>
+                        {hotelBreakdowns
+                          .filter((b) => selectedHotelsForBreakdown.has(b.hotelId))
+                          .map((breakdown) => (
+                            <div key={breakdown.hotelId} className="flex flex-col gap-3 p-3 rounded-[8px]" style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB' }}>
+                              <h5 className="font-montserrat font-semibold text-[13px] text-[#1D1D1D]">
+                                {breakdown.hotelName}
+                              </h5>
+                              <div className="flex items-center justify-between">
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Purchase</span>
+                                <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#071C42' }}>
+                                  €{formatPriceEU(breakdown.buy)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Sell</span>
+                                <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#071C42' }}>
+                                  €{formatPriceEU(breakdown.sell)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid #D1D5DB' }}>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Margin</span>
+                                <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#667F00' }}>
+                                  €{formatPriceEU(breakdown.margin)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                      </>
+                    ) : (
+                      <p className="font-montserrat text-[14px] text-[#686868] text-center py-4">
+                        Check hotel names to view breakdown details
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1730,6 +1747,8 @@ function HotelCard({
   onToggleIncluded,
   proposalStatus,
   offerCount,
+  isSelectedForBreakdown,
+  onToggleBreakdownSelection,
 }: {
   hotel: ProposalHotel;
   proposalId: string;
@@ -1738,6 +1757,8 @@ function HotelCard({
   onToggleIncluded: (included: boolean) => void;
   proposalStatus: string;
   offerCount: number;
+  isSelectedForBreakdown: boolean;
+  onToggleBreakdownSelection: () => void;
 }) {
   const { t } = useLanguage();
   const [localRooms, setLocalRooms] = useState<RoomData>(
@@ -1854,6 +1875,18 @@ function HotelCard({
               />
             </label>
           )}
+          {/* Breakdown selection checkbox */}
+          <label
+            className="flex items-center shrink-0 cursor-pointer"
+            title="Show detailed breakdown in sidebar"
+          >
+            <input
+              type="checkbox"
+              checked={isSelectedForBreakdown}
+              onChange={onToggleBreakdownSelection}
+              className="w-4 h-4 accent-sett-primary rounded"
+            />
+          </label>
           <h4 className="text-body font-bold text-white truncate">
             {hotel.hotelName || hotel.hotelCode}
           </h4>
