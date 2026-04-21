@@ -1378,12 +1378,10 @@ function HotelResultCard({
                           )}
                         </div>
                         {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
-                          <div className="mt-1 space-y-0.5">
-                            {rt.actualDescriptions.map((desc, idx) => (
-                              <div key={idx} className="text-[12px] text-sett-text-accent">
-                                ↳ {desc}
-                              </div>
-                            ))}
+                          <div className="mt-1">
+                            <div className="text-[12px] text-sett-text-accent">
+                              ↳ {rt.actualDescriptions[0]}
+                            </div>
                           </div>
                         )}
                       </td>
@@ -1415,12 +1413,10 @@ function HotelResultCard({
                       {rt.supplierCode && <span className="block text-[11px] text-sett-text-accent mt-0.5">{rt.supplierCode}</span>}
                     </p>
                     {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
-                      <div className="mt-1.5 space-y-0.5">
-                        {rt.actualDescriptions.map((desc: string, idx: number) => (
-                          <div key={idx} className="text-[11px] text-sett-text-accent">
-                            ↳ {desc}
-                          </div>
-                        ))}
+                      <div className="mt-1.5">
+                        <div className="text-[11px] text-sett-text-accent">
+                          ↳ {rt.actualDescriptions[0]}
+                        </div>
                       </div>
                     )}
                   </div>
