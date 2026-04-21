@@ -473,11 +473,16 @@ export default function AddHotelPage() {
   // Restart search from scratch
   const handleRestartSearch = useCallback(async () => {
     if (!request) return;
+    // Clear results and state
+    setCompletedResults([]);
+    setSearchSummary(null);
+    setErrorMsg('');
+    setPhase('searching');
     // Clear localStorage to force a fresh search
     localStorage.removeItem(`lastSearchDest_${requestId}`);
-    // Call runSearch which will clear results and start over
-    runSearch(request.destinationId);
-  }, [request, requestId, runSearch]);
+    // Directly start a new search via API
+    await startNewSearch();
+  }, [request, requestId, startNewSearch]);
 
   // Add hotel to offer flow
   const handleAddToOffer = async (hotel: HotelSearchResult) => {
