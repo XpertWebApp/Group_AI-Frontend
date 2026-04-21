@@ -1980,12 +1980,10 @@ function HotelCard({
                       </td>
                       <td className="px-4 py-2.5 text-left">
                         <input
-                          type="number"
-                          min={net.toFixed(2)}
-                          step="0.01"
-                          value={sell.toFixed(2)}
+                          type="text"
+                          value={formatPriceEU(sell)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value);
+                            const val = parseFloat(e.target.value.replace(/\./g, '').replace(/,/, '.'));
                             if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-20 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
@@ -2033,12 +2031,10 @@ function HotelCard({
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.sell}</span>
                       <div className="mt-0.5">
                         <input
-                          type="number"
-                          min={net.toFixed(2)}
-                          step="0.01"
-                          value={sell.toFixed(2)}
+                          type="text"
+                          value={formatPriceEU(sell)}
                           onChange={(e) => {
-                            const val = parseFloat(e.target.value);
+                            const val = parseFloat(e.target.value.replace(/\./g, '').replace(/,/, '.'));
                             if (!isNaN(val) && val >= net) handleSellChange(type, val);
                           }}
                           className="w-full max-w-[80px] px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary text-right focus:border-sett-primary focus:outline-none bg-white"
