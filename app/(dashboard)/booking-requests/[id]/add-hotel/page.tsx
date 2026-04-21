@@ -1218,6 +1218,8 @@ function HotelResultCard({
     ...rt,
     mealName: rt.mealName || mealName,
     mealType: rt.mealType || mealType,
+    // Deduplicate actual descriptions to avoid showing same info twice
+    actualDescriptions: rt.actualDescriptions ? rt.actualDescriptions.filter((desc, idx, arr) => arr.indexOf(desc) === idx) : undefined,
   }));
 
   const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
