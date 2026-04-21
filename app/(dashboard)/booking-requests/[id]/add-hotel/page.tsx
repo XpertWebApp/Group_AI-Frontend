@@ -1226,12 +1226,20 @@ function HotelResultCard({
   const isLimited = hotel.capacityStatus === 'LIMITED';
 
   // Build room type list from perTypeAllocations, enriched with meal plan data from bestOption/supplierSplit
-  const mealName = hotel.supplierSplit?.[0]?.mealName ?? hotel.bestOption?.mealName ?? '';
-  const mealType = hotel.supplierSplit?.[0]?.mealType ?? hotel.bestOption?.mealType ?? '';
+  const mealName: string = (hotel.supplierSplit?.[0]?.mealName as string | undefined) ?? hotel.bestOption?.mealName ?? '';
+  const mealType: string = (hotel.supplierSplit?.[0]?.mealType as string | undefined) ?? hotel.bestOption?.mealType ?? '';
 
-  const roomTypes = (hotel.perTypeAllocations && hotel.perTypeAllocations.length > 0
+  const roomTypes: Array<{
+    roomType: string;
+    roomsAllocated: number;
+    supplierCode?: string;
+    mealType: string;
+    mealName: string;
+    pricePerRoomPerNight?: number;
+    actualDescriptions?: string[];
+  }> = (hotel.perTypeAllocations && hotel.perTypeAllocations.length > 0
     ? hotel.perTypeAllocations
-    : [{ roomType: 'Standard Room', roomsAllocated: hotel.roomsAllocated || 1, mealType: '', mealName: '' }]
+    : [{ roomType: 'Standard Room', roomsAllocated: hotel.roomsAllocated || 1, mealType: '', mealName: '', supplierCode: undefined, pricePerRoomPerNight: undefined, actualDescriptions: undefined }]
   ).map((rt) => ({
     ...rt,
     mealName: rt.mealName || mealName,
@@ -1411,7 +1419,7 @@ function HotelResultCard({
                         {rt.roomsAllocated}
                       </td>
                       <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
-                        {getMealTypeLabel(rt.mealName || rt.mealType || '', t.addHotel.mealTypes as Record<string, any>)}
+                        {getMealTypeLabel(rt.mealName || rt.mealType || '', (t.addHotel.mealTypes as any))}
                       </td>
                       <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
                         &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
