@@ -8,7 +8,7 @@ import {
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
-  WashingMachine, Dog, Flower2, TreePine, type LucideIcon,
+  WashingMachine, Dog, Flower2, TreePine, RotateCcw, type LucideIcon,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -469,6 +469,15 @@ export default function AddHotelPage() {
       runSearch(request.destinationId);
     }
   }, [request, runSearch]);
+
+  // Restart search from scratch
+  const handleRestartSearch = useCallback(async () => {
+    if (!request) return;
+    // Clear localStorage to force a fresh search
+    localStorage.removeItem(`lastSearchDest_${requestId}`);
+    // Call runSearch which will clear results and start over
+    runSearch(request.destinationId);
+  }, [request, requestId, runSearch]);
 
   // Add hotel to offer flow
   const handleAddToOffer = async (hotel: HotelSearchResult) => {
@@ -1098,9 +1107,19 @@ export default function AddHotelPage() {
                 {filteredMainResults.length > 0 && (
                   <>
                     <div>
-                      <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-3 uppercase">
-                        {requestedStars ? t.addHotel.starHotelsMatching.replace('{stars}', String(requestedStars)) : t.addHotel.mainResults}
-                      </h3>
+                      <div className="flex items-center gap-3 mb-3">
+                        <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase">
+                          {requestedStars ? t.addHotel.starHotelsMatching.replace('{stars}', String(requestedStars)) : t.addHotel.mainResults}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={handleRestartSearch}
+                          className="p-1 rounded hover:bg-gray-100 transition-colors"
+                          title="Search again"
+                        >
+                          <RotateCcw className="w-4 h-4 text-sett-text-secondary hover:text-sett-text-primary transition-colors" />
+                        </button>
+                      </div>
                       <div className="space-y-5">
                         {filteredMainResults.map((hotel) => (
                           <HotelResultCard
