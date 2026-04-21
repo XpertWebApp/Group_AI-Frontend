@@ -225,6 +225,7 @@ export interface PerTypeAllocation {
   mealType?: string;
   mealName?: string;
   pricePerRoomPerNight?: number;
+  actualDescriptions?: string[];
 }
 
 export interface SupplierSplitItem {

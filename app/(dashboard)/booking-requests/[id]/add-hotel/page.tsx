@@ -1207,10 +1207,18 @@ function HotelResultCard({
   const hasCancellation = !!hotel.cxlDeadline;
   const isLimited = hotel.capacityStatus === 'LIMITED';
 
-  // Build room type list from perTypeAllocations
-  const roomTypes = hotel.perTypeAllocations && hotel.perTypeAllocations.length > 0
+  // Build room type list from perTypeAllocations, enriched with meal plan data from bestOption/supplierSplit
+  const mealName = hotel.supplierSplit?.[0]?.mealName ?? hotel.bestOption?.mealName ?? '';
+  const mealType = hotel.supplierSplit?.[0]?.mealType ?? hotel.bestOption?.mealType ?? '';
+
+  const roomTypes = (hotel.perTypeAllocations && hotel.perTypeAllocations.length > 0
     ? hotel.perTypeAllocations
-    : [{ roomType: 'Standard Room', roomsAllocated: hotel.roomsAllocated || 1 }];
+    : [{ roomType: 'Standard Room', roomsAllocated: hotel.roomsAllocated || 1, mealType: '', mealName: '' }]
+  ).map((rt) => ({
+    ...rt,
+    mealName: rt.mealName || mealName,
+    mealType: rt.mealType || mealType,
+  }));
 
   const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
 
@@ -1357,20 +1365,31 @@ function HotelResultCard({
                   {roomTypes.map((rt, i) => (
                     <tr key={i} className="border-t border-sett-border-light">
                       <td className="py-2.5 px-4">
-                        <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
-                          {formatRoomType(rt.roomType)}
-                        </span>
-                        {rt.supplierCode && (
-                          <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
-                            {rt.supplierCode}
+                        <div>
+                          <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
+                            {formatRoomType(rt.roomType)}
                           </span>
+                          {rt.supplierCode && (
+                            <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
+                              {rt.supplierCode}
+                            </span>
+                          )}
+                        </div>
+                        {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
+                          <div className="mt-1 space-y-0.5">
+                            {rt.actualDescriptions.map((desc, idx) => (
+                              <div key={idx} className="text-[12px] text-sett-text-accent">
+                                ↳ {desc}
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
                         {rt.roomsAllocated}
                       </td>
                       <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
-                        {rt.mealName || rt.mealType || '—'}
+                        {String(rt.mealName || rt.mealType || '—')}
                       </td>
                       <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
                         &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
@@ -1393,6 +1412,15 @@ function HotelResultCard({
                       {formatRoomType(rt.roomType)}
                       {rt.supplierCode && <span className="block text-[11px] text-sett-text-accent mt-0.5">{rt.supplierCode}</span>}
                     </p>
+                    {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
+                      <div className="mt-1.5 space-y-0.5">
+                        {rt.actualDescriptions.map((desc: string, idx: number) => (
+                          <div key={idx} className="text-[11px] text-sett-text-accent">
+                            ↳ {desc}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.perNight}</span>
@@ -1406,7 +1434,7 @@ function HotelResultCard({
                   </div>
                   <div className="text-right">
                     <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">Rate Basis</span>
-                    <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium capitalize">{rt.mealName || rt.mealType || '—'}</span>
+                    <span className="font-montserrat text-[14px] text-sett-text-secondary font-medium capitalize">{String(rt.mealName || rt.mealType || '—')}</span>
                   </div>
                 </div>
               </div>
