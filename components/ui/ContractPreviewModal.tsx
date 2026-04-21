@@ -328,7 +328,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                             {/* Table header */}
                             <div className="flex items-center px-[13px] py-[14px]" style={{ borderBottom: '1px solid #E6EAF0' }}>
                               <span className="flex-1 font-semibold text-[12px] uppercase" style={{ color: '#4A4A4A' }}>
-                                {t.contract.destination ?? 'Destination'}
+                                {t.contract.roomType ?? 'Room Type'}
                               </span>
                               <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 80, color: '#4A4A4A' }}>
                                 Rate
