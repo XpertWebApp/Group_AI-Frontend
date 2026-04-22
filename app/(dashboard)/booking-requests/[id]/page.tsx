@@ -1662,7 +1662,7 @@ function MarkupDropdown({
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 px-2 py-1 rounded border border-sett-border hover:border-sett-primary text-body text-sett-text-primary bg-white transition-colors min-w-[72px] justify-between"
       >
-        <span>{Math.round(value)}%</span>
+        <span>{value % 1 === 0 ? Math.round(value) : value.toFixed(2)}%</span>
         <svg className="w-3 h-3 text-sett-text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -1708,7 +1708,7 @@ function MarkupDropdown({
                   }}
                   autoFocus
                   className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
-                  placeholder="0-999"
+                  placeholder="0-999.99"
                 />
                 <span className="text-body text-sett-text-accent">%</span>
                 <button
@@ -1722,7 +1722,7 @@ function MarkupDropdown({
             ) : (
               <button
                 type="button"
-                onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(Math.round(value))); }}
+                onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(value)); }}
                 className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
               >
                 Custom...
