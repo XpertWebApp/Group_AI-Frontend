@@ -1707,7 +1707,7 @@ function MarkupDropdown({
                     if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
                   }}
                   autoFocus
-                  className="w-16 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
+                  className="w-24 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
                   placeholder="0-999.99"
                 />
                 <span className="text-body text-sett-text-accent">%</span>
