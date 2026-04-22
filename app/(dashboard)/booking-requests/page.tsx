@@ -9,6 +9,7 @@ import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
 import { TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
+import { getCurrentUserId } from '@/lib/auth/getCurrentUser';
 import { formatDateEU } from '@/lib/dateFormatter';
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -116,6 +117,7 @@ export default function BookingRequestsPage() {
     totalPages: number;
   } | null>(null);
   const [claimingRequestId, setClaimingRequestId] = useState<string | null>(null);
+  const [currentUserId] = useState(() => getCurrentUserId());
 
   const loadRequests = useCallback(async () => {
     try {
@@ -161,7 +163,7 @@ export default function BookingRequestsPage() {
         const ownerName = owner && (owner.firstName || owner.lastName)
           ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim()
           : 'another user';
-        toast.success(`This request is already owned by ${ownerName}`);
+        toast.success(`Already owned by ${ownerName}`);
         // Update the row with the owner who claimed it
         if (owner) {
           setRequests((prev) =>
@@ -308,10 +310,12 @@ export default function BookingRequestsPage() {
                         </td>
                         <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary flex items-center gap-2">
                           {row.assignedUser ? (
-                            <span>
-                              {row.assignedUser.firstName && row.assignedUser.lastName
-                                ? `${row.assignedUser.firstName} ${row.assignedUser.lastName}`
-                                : row.assignedUser.email}
+                            <span className={row.assignedUser.id === currentUserId ? 'font-semibold' : ''}>
+                              {row.assignedUser.id === currentUserId
+                                ? 'You'
+                                : row.assignedUser.firstName && row.assignedUser.lastName
+                                  ? `${row.assignedUser.firstName} ${row.assignedUser.lastName}`
+                                  : row.assignedUser.email}
                             </span>
                           ) : (
                             <>
