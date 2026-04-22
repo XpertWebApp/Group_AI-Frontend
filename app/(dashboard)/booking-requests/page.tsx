@@ -312,7 +312,7 @@ export default function BookingRequestsPage() {
                           {row.assignedUser ? (
                             <span className={row.assignedUser.id === currentUserId ? 'font-semibold' : ''}>
                               {row.assignedUser.id === currentUserId
-                                ? 'You'
+                                ? t.requests.you
                                 : row.assignedUser.firstName && row.assignedUser.lastName
                                   ? `${row.assignedUser.firstName} ${row.assignedUser.lastName}`
                                   : row.assignedUser.email}
