@@ -1246,7 +1246,7 @@ export default function RequestDetailPage() {
                 </div>
 
                 {/* Room Breakdown */}
-                <div className="bg-white flex flex-col" style={{ borderRadius: 14, border: '1px solid #6868681A' }}>
+                <div className="bg-white flex flex-col" style={{ borderRadius: 14, border: '1px solid #D1D5DB' }}>
                   {/* Title */}
                   <div className="px-5 pt-5 pb-5">
                     <h4 className="font-montserrat font-semibold text-[18px] leading-none tracking-normal text-[#1D1D1D]">
@@ -1254,7 +1254,7 @@ export default function RequestDetailPage() {
                     </h4>
                   </div>
                   {/* Divider below title */}
-                  <div className="mx-5" style={{ borderTop: '1px solid #6868681A' }} />
+                  <div className="mx-5" style={{ borderTop: '1px solid #D1D5DB' }} />
                   {/* Rows */}
                   <div className="px-5 pt-5 pb-5 flex flex-col gap-4">
                     {/* Selected Hotels Breakdowns */}
