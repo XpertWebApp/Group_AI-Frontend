@@ -308,9 +308,9 @@ export default function BookingRequestsPage() {
                         <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-olive text-right">
                           {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </td>
-                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary flex items-center gap-2">
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
                           {row.assignedUser ? (
-                            <span className={row.assignedUser.id === currentUserId ? 'font-semibold' : ''}>
+                            <span className={row.assignedUser.id === currentUserId ? 'font-semibold text-sett-primary' : ''}>
                               {row.assignedUser.id === currentUserId
                                 ? t.requests.you
                                 : row.assignedUser.firstName && row.assignedUser.lastName
@@ -318,20 +318,24 @@ export default function BookingRequestsPage() {
                                   : row.assignedUser.email}
                             </span>
                           ) : (
-                            <>
-                              <span className="text-sett-text-secondary">{t.requests.unassigned}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleClaimRequest(row.id);
-                                }}
-                                disabled={claimingRequestId === row.id}
-                                className="px-2 py-1 text-xs font-medium text-sett-primary border border-sett-primary rounded hover:bg-sett-primary hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                              >
-                                {claimingRequestId === row.id ? 'Claiming...' : t.requests.claim}
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClaimRequest(row.id);
+                              }}
+                              disabled={claimingRequestId === row.id}
+                              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-sett-primary rounded-md hover:bg-sett-primary/90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150"
+                            >
+                              {claimingRequestId === row.id ? (
+                                <>
+                                  <span className="inline-block w-3 h-3 mr-1.5 border-2 border-transparent border-t-white rounded-full animate-spin" />
+                                  {t.requests.claim}
+                                </>
+                              ) : (
+                                t.requests.claim
+                              )}
+                            </button>
                           )}
                         </td>
                         <td className="px-3 2xl:px-5 py-4">
