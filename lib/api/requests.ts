@@ -195,6 +195,16 @@ export const requestsApi = {
     }
     return data.data;
   },
+
+  async claim(requestId: string): Promise<{ owner: { id: string; firstName: string | null; lastName: string | null; email: string } }> {
+    const { data } = await apiClient.post<ApiResponse<{ owner: { id: string; firstName: string | null; lastName: string | null; email: string } }>>(
+      `/requests/${requestId}/actions/claim`
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to claim request');
+    }
+    return data.data;
+  },
 };
 
 export { getApiError };

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
@@ -114,6 +115,7 @@ export default function BookingRequestsPage() {
     total: number;
     totalPages: number;
   } | null>(null);
+  const [claimingRequestId, setClaimingRequestId] = useState<string | null>(null);
 
   const loadRequests = useCallback(async () => {
     try {
@@ -139,6 +141,42 @@ export default function BookingRequestsPage() {
       setLoading(false);
     }
   }, [page, search, statusFilter]);
+
+  const handleClaimRequest = useCallback(async (requestId: string) => {
+    setClaimingRequestId(requestId);
+    try {
+      const response = await requestsApi.claim(requestId);
+      // Optimistically update the row
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId ? { ...r, assignedUser: response.owner } : r
+        )
+      );
+      toast.success('Request claimed successfully');
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { data?: { owner?: unknown } } } };
+      if (error.response?.status === 409) {
+        // Someone else claimed it
+        const owner = (error.response.data?.data as { owner?: { firstName?: string; lastName?: string } } | undefined)?.owner;
+        const ownerName = owner && (owner.firstName || owner.lastName)
+          ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim()
+          : 'another user';
+        toast.success(`This request is already owned by ${ownerName}`);
+        // Update the row with the owner who claimed it
+        if (owner) {
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === requestId ? { ...r, assignedUser: owner as never } : r
+            )
+          );
+        }
+      } else {
+        toast.error('Failed to claim request');
+      }
+    } finally {
+      setClaimingRequestId(null);
+    }
+  }, []);
 
   useEffect(() => {
     loadRequests();
@@ -225,6 +263,7 @@ export default function BookingRequestsPage() {
                     <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.rooms}</th>
                     <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.totalSell}</th>
                     <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.margin}</th>
+                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.owner}</th>
                     <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.status}</th>
                     <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.createdOn}</th>
                     <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.lastUpdated}</th>
@@ -266,6 +305,30 @@ export default function BookingRequestsPage() {
                         </td>
                         <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-olive text-right">
                           {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary flex items-center gap-2">
+                          {row.assignedUser ? (
+                            <span>
+                              {row.assignedUser.firstName && row.assignedUser.lastName
+                                ? `${row.assignedUser.firstName} ${row.assignedUser.lastName}`
+                                : row.assignedUser.email}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-sett-text-secondary">{t.requests.unassigned}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleClaimRequest(row.id);
+                                }}
+                                disabled={claimingRequestId === row.id}
+                                className="px-2 py-1 text-xs font-medium text-sett-primary border border-sett-primary rounded hover:bg-sett-primary hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              >
+                                {claimingRequestId === row.id ? 'Claiming...' : t.requests.claim}
+                              </button>
+                            </>
+                          )}
                         </td>
                         <td className="px-3 2xl:px-5 py-4">
                           <Badge variant={getStatusBadgeVariant(row.status)}>

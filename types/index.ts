@@ -100,6 +100,12 @@ export interface BookingRequest {
   status: BookingRequestStatus;
   createdAt: string;
   updatedAt?: string | null;
+  assignedUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 
   // Joined from proposals (included in list response)
   proposals?: {
@@ -123,6 +129,12 @@ export interface BookingRequestListItem {
   margin?: number | null;
   status: BookingRequestStatus | ProposalStatus;
   createdAt: string;
+  assignedUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 export interface Proposal {
