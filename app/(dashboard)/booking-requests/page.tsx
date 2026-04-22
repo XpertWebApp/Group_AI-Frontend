@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { RefreshCw } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
@@ -118,6 +119,7 @@ export default function BookingRequestsPage() {
   } | null>(null);
   const [claimingRequestId, setClaimingRequestId] = useState<string | null>(null);
   const [currentUserId] = useState(() => getCurrentUserId());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const loadRequests = useCallback(async () => {
     try {
@@ -180,6 +182,18 @@ export default function BookingRequestsPage() {
     }
   }, []);
 
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadRequests();
+      toast.success('Requests updated');
+    } catch {
+      toast.error('Failed to refresh requests');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadRequests]);
+
   useEffect(() => {
     loadRequests();
   }, [loadRequests]);
@@ -221,16 +235,28 @@ export default function BookingRequestsPage() {
       <div className="p-4 md:p-6 space-y-6">
         {/* Card with filters + table */}
         <div className="bg-white rounded-[14px] border border-sett-border">
-          {/* Filter bar — no overflow-hidden here so Select dropdowns are never clipped */}
-          <div className="relative z-10 p-3 sm:p-5">
-            <BookingRequestFilters
-              search={search}
-              onSearchChange={setSearch}
-              status={statusFilter}
-              onStatusChange={setStatusFilter}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
+          {/* Filter bar with refresh button — no overflow-hidden here so Select dropdowns are never clipped */}
+          <div className="relative z-10 p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <BookingRequestFilters
+                search={search}
+                onSearchChange={setSearch}
+                status={statusFilter}
+                onStatusChange={setStatusFilter}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading || isRefreshing}
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              title={t.requests.refresh || 'Refresh requests'}
+            >
+              <RefreshCw className={`w-4 h-4 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{t.requests.refresh || 'Refresh'}</span>
+            </button>
           </div>
 
           {/* Loading skeleton */}
