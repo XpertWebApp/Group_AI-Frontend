@@ -85,6 +85,14 @@ function getAmenityLabel(name: string, facilityNames: Record<string, string>): s
   return facilityNames[name.toLowerCase().trim()] ?? name;
 }
 
+// Helper to construct proper image URL for both CDN and proxy paths
+function getImageUrl(imageUrl: string | null | undefined): string {
+  if (!imageUrl) return '/icons/placeholder-hotel.svg';
+  if (imageUrl.startsWith('http') || imageUrl.startsWith('/api/')) return imageUrl;
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
+  return `${API_BASE}${imageUrl}`;
+}
+
 // Known API room type names → human-readable labels
 const ROOM_TYPE_LABELS: Record<string, string> = {
   twinbeds: 'Twin Rooms',
@@ -1288,7 +1296,7 @@ function HotelResultCard({
         {/* ── Hotel Image ── */}
         <div className="w-full sm:w-[200px] md:w-[220px] xl:w-[240px] h-[200px] sm:h-auto sm:self-stretch shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
           <img
-            src={hotel.imageUrl ?? PLACEHOLDER_IMAGE}
+            src={getImageUrl(hotel.imageUrl)}
             alt={hotel.hotelName}
             className="absolute inset-0 w-full h-full object-cover"
             onError={(e) => {
