@@ -34,7 +34,6 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
 import { PageLoader } from '@/components/ui/Loader';
-import { HotelMap } from '@/components/ui/HotelMap';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import type { Attachment, BookingRequest, OfferHistoryEntry, Proposal, ProposalHotel, ProposalService } from '@/types';
@@ -1134,16 +1133,6 @@ export default function RequestDetailPage() {
             {/* Right sidebar — only show when proposal exists with hotels */}
             {proposal && hotels.length > 0 && (
               <div className="w-full lg:w-72 shrink-0 space-y-4">
-                {/* View on map */}
-                <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
-                  <h4 className="text-body font-bold text-sett-text-primary px-5 pt-4 pb-2">
-                    {t.offer.viewOnMap}
-                  </h4>
-                  <div className="mx-4 mb-4">
-                    <HotelMap hotels={hotels} className="h-44" />
-                  </div>
-                </div>
-
                 {/* Offer History */}
                 <div className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden">
                   <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-sett-border-light">
