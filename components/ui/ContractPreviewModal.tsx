@@ -163,7 +163,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                   className="font-montserrat"
                   style={{ fontWeight: 500, fontSize: 14, lineHeight: '100%', letterSpacing: 0, color: '#071C42' }}
                 >
-                  DE123456789
+                  1001233897
                 </span>
               </div>
             </div>

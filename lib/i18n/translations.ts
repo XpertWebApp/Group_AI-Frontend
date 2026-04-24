@@ -664,7 +664,7 @@ export const translations = {
       grandTotal: 'Grand Total',
       cancellationConditions: 'Cancellation Conditions',
       termsConditions: 'Terms & Conditions',
-      taxId: 'TAX ID',
+      taxId: 'Ontario Corporation Number',
     },
   },
 
@@ -1329,7 +1329,7 @@ export const translations = {
       grandTotal: 'Gesamtbetrag',
       cancellationConditions: 'Stornierungsbedingungen',
       termsConditions: 'Allgemeine Geschäftsbedingungen',
-      taxId: 'Steuer-ID',
+      taxId: 'Ontario Corporation Number',
     },
   },
 } as const;
