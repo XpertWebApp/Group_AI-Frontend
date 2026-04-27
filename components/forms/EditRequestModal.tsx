@@ -210,10 +210,12 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
   const [destLoading, setDestLoading] = useState(false);
   const [destOpen, setDestOpen] = useState(false);
   const destWrapperRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const justSelectedRef = useRef(false);
   const destDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open && request) {
@@ -281,6 +283,20 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close datepickers when modal scrolls to keep calendar in view
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      // Trigger a document click to close any open datepicker
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
   const handleDestinationInputChange = useCallback((value: string) => {
     justSelectedRef.current = false;
     setDestQuery(value);
@@ -316,19 +332,35 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
 
   const setField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field when user starts typing
+    setFieldErrors((prev) => {
+      const updated = { ...prev };
+      delete updated[field];
+      return updated;
+    });
   };
 
-  const handleSave = async () => {
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!form.checkinDate) {
+      errors.checkinDate = t.createForm.checkinDateRequired;
+    }
+    if (!form.checkoutDate) {
+      errors.checkoutDate = t.createForm.checkoutDateRequired;
+    }
+    if (form.checkinDate && form.checkoutDate && new Date(form.checkoutDate) <= new Date(form.checkinDate)) {
+      errors.checkoutDate = t.createForm.checkoutAfterCheckin;
+    }
+
     const totalRooms = form.single + form.double + form.triple + form.quadruple;
     if (totalRooms === 0) {
-      toast.error(t.offer.editRoomsRequired);
-      return;
+      errors.rooms = t.offer.editRoomsRequired;
     }
 
     // Validate bed config if double rooms are set
     if (form.double > 0 && form.standardDoubleBeds + form.twinBeds !== form.double) {
-      toast.error(t.createForm.bedConfigRequired.replace(/{count}/g, String(form.double)));
-      return;
+      errors.bedConfig = t.createForm.bedConfigRequired.replace(/{count}/g, String(form.double));
     }
 
     // Validate guest capacity vs group size
@@ -336,18 +368,28 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
       + form.triple * 3 + form.quadruple * 4;
     const groupSize = Number(form.groupSize);
     if (groupSize > 0 && guestCapacity > 0 && guestCapacity < groupSize) {
-      toast.error(t.createForm.capacityTooSmall
+      errors.rooms = t.createForm.capacityTooSmall
         .replace('{capacity}', String(guestCapacity))
-        .replace('{groupSize}', String(groupSize)));
-      return;
+        .replace('{groupSize}', String(groupSize));
     }
 
     // Validate averageAge for youth/school groups
     const needsAge = form.groupType === 'youth_group' || form.groupType === 'school_group';
     if (needsAge && (form.averageAge === '' || form.averageAge == null)) {
-      toast.error(t.createForm.averageAgeRequired);
-      return;
+      errors.averageAge = t.createForm.averageAgeRequired;
     }
+
+    // If there are errors, set them and return
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validateForm()) return;
 
     const destinationChanged =
       form.destinationId !== (request.destinationId ?? 0) ||
@@ -471,6 +513,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
 
         {/* Scrollable body */}
         <div
+          ref={scrollContainerRef}
           className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-7"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
         >
@@ -520,7 +563,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
               {/* Check-in */}
               <div>
                 <label className={labelCls}>{t.offer.editCheckIn}</label>
-                <div className="sett-datepicker">
+                <div className="sett-datepicker relative z-40">
                   <DatePicker
                     selected={form.checkinDate ? new Date(form.checkinDate) : null}
                     onChange={(date: Date | null) =>
@@ -539,12 +582,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     customInput={<DateInput />}
                   />
                 </div>
+                {fieldErrors.checkinDate && <p className="mt-1 text-caption text-red-500">{fieldErrors.checkinDate}</p>}
               </div>
 
               {/* Check-out */}
               <div>
                 <label className={labelCls}>{t.offer.editCheckOut}</label>
-                <div className="sett-datepicker">
+                <div className="sett-datepicker relative z-40">
                   <DatePicker
                     selected={form.checkoutDate ? new Date(form.checkoutDate) : null}
                     onChange={(date: Date | null) =>
@@ -563,6 +607,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     customInput={<DateInput />}
                   />
                 </div>
+                {fieldErrors.checkoutDate && <p className="mt-1 text-caption text-red-500">{fieldErrors.checkoutDate}</p>}
               </div>
             </div>
 
@@ -635,6 +680,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     placeholder={t.createForm.averageAgePlaceholder}
                     onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   />
+                  {fieldErrors.averageAge && <p className="mt-1 text-caption text-red-500">{fieldErrors.averageAge}</p>}
                 </div>
               </div>
             )}
@@ -679,6 +725,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 onChange={(v) => setField('quadruple', v)}
               />
             </div>
+            {fieldErrors.rooms && <p className="mt-1 text-caption text-red-500">{fieldErrors.rooms}</p>}
+            {fieldErrors.bedConfig && <p className="mt-1 text-caption text-red-500">{fieldErrors.bedConfig}</p>}
 
             {/* Bed configuration for double rooms */}
             {form.double > 0 && (

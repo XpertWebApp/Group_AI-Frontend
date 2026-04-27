@@ -253,6 +253,7 @@ export interface HotelSearchResult {
   hotelName: string;
   starRating: number;
   imageUrl?: string | null;
+  sethubDetailsUrl?: string | null;
   address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;

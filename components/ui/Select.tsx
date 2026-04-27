@@ -39,11 +39,26 @@ export function Select({
   name,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'fixed', visibility: 'hidden' });
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'absolute', visibility: 'hidden' });
+  const [positionMode, setPositionMode] = useState<'fixed' | 'absolute'>('fixed');
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const isFilter = variant === 'filter';
+
+  // Detect if we're inside a scrollable container (modal, etc.)
+  useEffect(() => {
+    let parent = containerRef.current?.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      if (style.overflow === 'auto' || style.overflow === 'scroll' || style.overflowY === 'auto' || style.overflowY === 'scroll') {
+        setPositionMode('absolute');
+        return;
+      }
+      parent = parent.parentElement;
+    }
+    setPositionMode('fixed');
+  }, []);
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label || placeholder || '';
@@ -75,36 +90,78 @@ export function Select({
   // Compute dropdown position (flip up if not enough space below)
   // useLayoutEffect runs before the browser paints, so the dropdown is
   // never visible in an unpositioned state — prevents the right-side layout shift.
-  useLayoutEffect(() => {
+  const updateDropdownPosition = useCallback(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
     const dropdownHeight = 260; // max-h-[240px] + padding
-    const spaceBelow = viewportHeight - rect.bottom;
-    const spaceAbove = rect.top;
 
-    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-      // Open upward
-      setDropdownStyle({
-        position: 'fixed',
-        visibility: 'visible',
-        top: rect.top - dropdownHeight + 'px',
-        left: rect.left + 'px',
-        width: rect.width + 'px',
-        zIndex: 9999,
-      });
+    const baseStyle: React.CSSProperties = {
+      position: positionMode,
+      visibility: 'visible',
+      width: rect.width + 'px',
+      zIndex: 9999,
+    };
+
+    if (positionMode === 'absolute') {
+      // For absolute positioning (inside scrollable containers like modals)
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (!containerRect) return;
+
+      const relativeTop = rect.top - containerRect.top + containerRect.height;
+      const relativeLeft = rect.left - containerRect.left;
+      const spaceBelow = containerRect.bottom - rect.bottom;
+      const spaceAbove = rect.top - containerRect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        // Open upward only if not enough space below AND enough space above
+        setDropdownStyle({
+          ...baseStyle,
+          top: spaceAbove - dropdownHeight + 'px',
+          left: relativeLeft + 'px',
+        });
+      } else {
+        // Open downward
+        setDropdownStyle({
+          ...baseStyle,
+          top: relativeTop + 6 + 'px',
+          left: relativeLeft + 'px',
+        });
+      }
     } else {
-      // Open downward
-      setDropdownStyle({
-        position: 'fixed',
-        visibility: 'visible',
-        top: rect.bottom + 6 + 'px',
-        left: rect.left + 'px',
-        width: rect.width + 'px',
-        zIndex: 9999,
-      });
+      // For fixed positioning (normal page context)
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        // Open upward
+        setDropdownStyle({
+          ...baseStyle,
+          top: rect.top - dropdownHeight + 'px',
+          left: rect.left + 'px',
+        });
+      } else {
+        // Open downward
+        setDropdownStyle({
+          ...baseStyle,
+          top: rect.bottom + 6 + 'px',
+          left: rect.left + 'px',
+        });
+      }
     }
-  }, [open]);
+  }, [open, positionMode]);
+
+  useLayoutEffect(() => {
+    updateDropdownPosition();
+  }, [open, updateDropdownPosition, positionMode]);
+
+  // Recalculate dropdown position on scroll (for modals with scrollable content)
+  useEffect(() => {
+    if (!open) return;
+    const handleScroll = () => updateDropdownPosition();
+    document.addEventListener('scroll', handleScroll, { capture: true });
+    return () => document.removeEventListener('scroll', handleScroll, { capture: true });
+  }, [open, updateDropdownPosition]);
 
   // Scroll selected item into view when opening
   useEffect(() => {
@@ -117,8 +174,8 @@ export function Select({
   const handleSelect = useCallback((optValue: string) => {
     onChange?.({ target: { value: optValue } });
     setOpen(false);
-    setDropdownStyle({ position: 'fixed', visibility: 'hidden' });
-  }, [onChange]);
+    setDropdownStyle({ position: positionMode, visibility: 'hidden' });
+  }, [onChange, positionMode]);
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -172,8 +229,8 @@ export function Select({
         />
       </button>
 
-      {/* Dropdown panel — rendered in a portal to escape overflow:hidden parents */}
-      {open && typeof document !== 'undefined' && createPortal(
+      {/* Dropdown panel — rendered in a portal for fixed, or inline for absolute */}
+      {open && positionMode === 'fixed' && typeof document !== 'undefined' && createPortal(
         <div
           ref={listRef}
           style={dropdownStyle}
@@ -219,6 +276,54 @@ export function Select({
           </div>
         </div>,
         document.body
+      )}
+
+      {/* For absolute positioning inside modals, render inline */}
+      {open && positionMode === 'absolute' && (
+        <div
+          ref={listRef}
+          style={dropdownStyle}
+          className="rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
+        >
+          <div className="max-h-[240px] overflow-y-auto py-1.5">
+            {placeholder && (
+              <button
+                type="button"
+                onClick={() => handleSelect('')}
+                className={cn(
+                  'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                  !value ? 'text-sett-primary font-medium bg-sett-light-green-bg' : 'text-sett-text-accent hover:bg-[#F7F7F7]'
+                )}
+              >
+                <span>{placeholder}</span>
+                {!value && <Check className="w-4 h-4 text-sett-primary shrink-0" />}
+              </button>
+            )}
+            {options.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-selected={isSelected}
+                  onClick={() => handleSelect(opt.value)}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                    isSelected
+                      ? 'text-sett-primary font-medium bg-sett-light-green-bg'
+                      : 'text-sett-text-primary hover:bg-[#F7F7F7]'
+                  )}
+                >
+                  {opt.node
+                    ? <span className="flex items-center gap-2">{opt.node}</span>
+                    : <span className="truncate">{opt.label}</span>
+                  }
+                  {isSelected && <Check className="w-4 h-4 text-sett-primary shrink-0 ml-2" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {error && <p className="mt-1 text-caption text-red-500">{error}</p>}
