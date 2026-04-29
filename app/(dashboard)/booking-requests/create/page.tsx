@@ -201,7 +201,7 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     if (!data.lastName.trim()) errors.lastName = t.createForm.lastNameRequired;
     if (!data.email.trim()) {
       errors.email = t.createForm.emailRequired;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    } else if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
     if (!data.phone.trim()) {
@@ -989,7 +989,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
   const getEmailError = () => {
     if (!emailTouched) return errors.email;
     if (!formData.email.trim()) return t.createForm.emailRequired;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return t.createForm.invalidEmail;
+    if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email)) return t.createForm.invalidEmail;
     return errors.email;
   };
   const emailError = getEmailError();

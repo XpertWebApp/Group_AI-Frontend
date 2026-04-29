@@ -116,14 +116,14 @@ export function Select({
         // Open upward only if not enough space below AND enough space above
         setDropdownStyle({
           ...baseStyle,
-          top: spaceAbove - dropdownHeight + 'px',
+          top: spaceAbove - dropdownHeight - 2 + 'px',
           left: relativeLeft + 'px',
         });
       } else {
         // Open downward
         setDropdownStyle({
           ...baseStyle,
-          top: relativeTop + 6 + 'px',
+          top: relativeTop - 2 + 'px',
           left: relativeLeft + 'px',
         });
       }
@@ -137,14 +137,14 @@ export function Select({
         // Open upward
         setDropdownStyle({
           ...baseStyle,
-          top: rect.top - dropdownHeight + 'px',
+          top: rect.top - dropdownHeight - 2 + 'px',
           left: rect.left + 'px',
         });
       } else {
         // Open downward
         setDropdownStyle({
           ...baseStyle,
-          top: rect.bottom + 6 + 'px',
+          top: rect.bottom - 2 + 'px',
           left: rect.left + 'px',
         });
       }

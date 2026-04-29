@@ -268,6 +268,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
       setDestQuery(request.destinationName ?? '');
       setDestResults([]);
       setDestOpen(false);
+      // Clear any previous validation errors when modal opens
+      setFieldErrors({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, request]);
@@ -343,6 +345,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
+    // Trip Details validation
+    if (!form.destinationName?.trim()) {
+      errors.destinationName = t.createForm.destinationRequired || 'Destination is required';
+    }
+    if (!form.starRating) {
+      errors.starRating = t.createForm.hotelCategoryRequired || 'Hotel category is required';
+    }
     if (!form.checkinDate) {
       errors.checkinDate = t.createForm.checkinDateRequired;
     }
@@ -351,6 +360,12 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     }
     if (form.checkinDate && form.checkoutDate && new Date(form.checkoutDate) <= new Date(form.checkinDate)) {
       errors.checkoutDate = t.createForm.checkoutAfterCheckin;
+    }
+    if (!form.groupType) {
+      errors.groupType = t.createForm.groupTypeRequired || 'Group type is required';
+    }
+    if (!form.groupSize) {
+      errors.groupSize = t.createForm.groupSizeRequired || 'Group size is required';
     }
 
     const totalRooms = form.single + form.double + form.triple + form.quadruple;
@@ -377,6 +392,30 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     const needsAge = form.groupType === 'youth_group' || form.groupType === 'school_group';
     if (needsAge && (form.averageAge === '' || form.averageAge == null)) {
       errors.averageAge = t.createForm.averageAgeRequired;
+    }
+
+    // Customer Details validation
+    if (!form.companyName?.trim()) {
+      errors.companyName = t.createForm.companyNameRequired || 'Company name is required';
+    }
+    if (!form.firstName?.trim()) {
+      errors.firstName = t.createForm.firstNameRequired || 'First name is required';
+    }
+    if (!form.contactEmail?.trim()) {
+      errors.contactEmail = t.createForm.emailRequired || 'Email is required';
+    } else if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(form.contactEmail)) {
+      errors.contactEmail = t.createForm.invalidEmail || 'Please enter a valid email address';
+    }
+
+    // Phone validation - required and must have at least 7 digits
+    const phoneValue = form.contactPhone?.trim() ?? '';
+    if (!phoneValue) {
+      errors.contactPhone = t.createForm.phoneRequired || 'Phone number is required';
+    } else {
+      const digitsOnly = phoneValue.replace(/\D/g, '');
+      if (digitsOnly.length < 7) {
+        errors.contactPhone = 'Phone number must have at least 7 digits';
+      }
     }
 
     // If there are errors, set them and return
@@ -557,6 +596,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   ))}
                 </ul>
               )}
+              {fieldErrors.destinationName && <p className="mt-1 text-caption text-red-500">{fieldErrors.destinationName}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -612,36 +652,44 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select
-                label={t.offer.editHotelCategory}
-                options={hotelCategoryOptions}
-                value={form.starRating}
-                onChange={(e) => setField('starRating', e.target.value)}
-                placeholder={t.createForm.selectHotelCategory}
-              />
-              <Select
-                label={`${t.offer.editBudgetRange} ${t.createForm.optional}`}
-                options={budgetRangeOptions}
-                value={form.budgetRange}
-                onChange={(e) => setField('budgetRange', e.target.value)}
-                placeholder={t.createForm.selectBudgetRange}
-              />
+              <div>
+                <Select
+                  label={t.offer.editHotelCategory}
+                  options={hotelCategoryOptions}
+                  value={form.starRating}
+                  onChange={(e) => setField('starRating', e.target.value)}
+                  placeholder={t.createForm.selectHotelCategory}
+                />
+                {fieldErrors.starRating && <p className="mt-1 text-caption text-red-500">{fieldErrors.starRating}</p>}
+              </div>
+              <div>
+                <Select
+                  label={`${t.offer.editBudgetRange} ${t.createForm.optional}`}
+                  options={budgetRangeOptions}
+                  value={form.budgetRange}
+                  onChange={(e) => setField('budgetRange', e.target.value)}
+                  placeholder={t.createForm.selectBudgetRange}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select
-                label={t.offer.editGroupType}
-                options={groupTypeOptions}
-                value={form.groupType}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setField('groupType', val);
-                  if (val !== 'youth_group' && val !== 'school_group') {
-                    setField('averageAge', '');
-                  }
-                }}
-                placeholder={t.createForm.selectGroupType}
-              />
+              <div>
+                <Select
+                  label={t.offer.editGroupType}
+                  options={groupTypeOptions}
+                  value={form.groupType}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setField('groupType', val);
+                    if (val !== 'youth_group' && val !== 'school_group') {
+                      setField('averageAge', '');
+                    }
+                  }}
+                  placeholder={t.createForm.selectGroupType}
+                />
+                {fieldErrors.groupType && <p className="mt-1 text-caption text-red-500">{fieldErrors.groupType}</p>}
+              </div>
               <div>
                 <label className={labelCls}>{t.offer.editGroupSize}</label>
                 <input
@@ -653,6 +701,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   placeholder="e.g. 45"
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
+                {fieldErrors.groupSize && <p className="mt-1 text-caption text-red-500">{fieldErrors.groupSize}</p>}
               </div>
             </div>
 
@@ -832,6 +881,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('companyName', e.target.value)}
                   placeholder="Company name"
                 />
+                {fieldErrors.companyName && <p className="mt-1 text-caption text-red-500">{fieldErrors.companyName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editFirstName}</label>
@@ -841,6 +891,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('firstName', e.target.value)}
                   placeholder="First name"
                 />
+                {fieldErrors.firstName && <p className="mt-1 text-caption text-red-500">{fieldErrors.firstName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editLastName}</label>
@@ -850,6 +901,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('lastName', e.target.value)}
                   placeholder="Last name"
                 />
+                {fieldErrors.lastName && <p className="mt-1 text-caption text-red-500">{fieldErrors.lastName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editEmail}</label>
@@ -860,6 +912,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('contactEmail', e.target.value)}
                   placeholder="email@example.com"
                 />
+                {fieldErrors.contactEmail && <p className="mt-1 text-caption text-red-500">{fieldErrors.contactEmail}</p>}
               </div>
               <div>
                 <PhoneInputSplit
@@ -868,7 +921,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onCountryCodeChange={(code) => setField('contactPhoneCountryCode', code)}
                   onNumberChange={(num) => setField('contactPhone', num)}
                   label={t.offer.editPhone}
-                  required={false}
+                  required={true}
+                  error={fieldErrors.contactPhone}
                 />
               </div>
             </div>

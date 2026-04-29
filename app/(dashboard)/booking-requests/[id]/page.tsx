@@ -48,7 +48,14 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 function formatRoomType(type: string): string {
-  return type.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim();
+  return type
+    .replace(/_+/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
 function getRoomLabel(type: string, detail: any): string {
@@ -1582,6 +1589,7 @@ function MarkupDropdown({
 }) {
   const [isCustom, setIsCustom] = useState(false);
   const [customValue, setCustomValue] = useState('');
+  const [error, setError] = useState('');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -1607,6 +1615,7 @@ function MarkupDropdown({
       ) return;
       setOpen(false);
       setIsCustom(false);
+      setError('');
     };
     // Use capture phase so this fires before other dropdowns' handlers
     document.addEventListener('mousedown', handleClick, true);
@@ -1616,7 +1625,7 @@ function MarkupDropdown({
   // Close on scroll so it doesn't float detached
   useEffect(() => {
     if (!open) return;
-    const handleScroll = () => { setOpen(false); setIsCustom(false); };
+    const handleScroll = () => { setOpen(false); setIsCustom(false); setError(''); };
     const main = document.querySelector('main');
     main?.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('scroll', handleScroll, { passive: true });
@@ -1633,13 +1642,34 @@ function MarkupDropdown({
   };
 
   const handleCustomSubmit = () => {
-    const parsed = parseFloat(customValue);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 999) {
-      onChange(parsed);
-      setOpen(false);
-      setIsCustom(false);
-      setCustomValue('');
+    setError('');
+
+    if (!customValue.trim()) {
+      setError('Markup value is required');
+      return;
     }
+
+    const parsed = parseFloat(customValue);
+
+    if (isNaN(parsed)) {
+      setError('Please enter a valid number');
+      return;
+    }
+
+    if (parsed < 0) {
+      setError('Markup must be 0 or greater');
+      return;
+    }
+
+    if (parsed > 999) {
+      setError('Markup cannot exceed 999');
+      return;
+    }
+
+    onChange(parsed);
+    setOpen(false);
+    setIsCustom(false);
+    setCustomValue('');
   };
 
   return (
@@ -1678,40 +1708,48 @@ function MarkupDropdown({
             ))}
             <hr className="border-sett-border my-1" />
             {isCustom ? (
-              <div className="px-3 py-1.5 flex items-center gap-1">
-                <input
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.1"
-                  value={customValue}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    // Prevent negative values from being entered
-                    if (v === '' || parseFloat(v) >= 0) setCustomValue(v);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === '-') e.preventDefault();
-                    if (e.key === 'Enter') handleCustomSubmit();
-                    if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
-                  }}
-                  autoFocus
-                  className="w-24 px-1.5 py-0.5 border border-sett-border rounded text-body text-sett-text-primary focus:border-sett-primary focus:outline-none"
-                  placeholder="0-999.99"
-                />
-                <span className="text-body text-sett-text-accent">%</span>
-                <button
-                  type="button"
-                  onClick={handleCustomSubmit}
-                  className="text-sett-primary text-body font-medium hover:underline ml-1"
-                >
-                  OK
-                </button>
+              <div className="px-3 py-1.5">
+                <div className="flex items-center gap-1 mb-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    max="999"
+                    step="0.1"
+                    value={customValue}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      // Prevent negative values from being entered
+                      if (v === '' || parseFloat(v) >= 0) {
+                        setCustomValue(v);
+                        setError('');
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === '-') e.preventDefault();
+                      if (e.key === 'Enter') handleCustomSubmit();
+                      if (e.key === 'Escape') { setIsCustom(false); setOpen(false); }
+                    }}
+                    autoFocus
+                    className={`w-24 px-1.5 py-0.5 border rounded text-body focus:outline-none transition-colors ${
+                      error ? 'border-red-500 text-red-500 focus:border-red-500' : 'border-sett-border text-sett-text-primary focus:border-sett-primary'
+                    }`}
+                    placeholder="0-999.99"
+                  />
+                  <span className="text-body text-sett-text-accent">%</span>
+                  <button
+                    type="button"
+                    onClick={handleCustomSubmit}
+                    className="text-sett-primary text-body font-medium hover:underline ml-1"
+                  >
+                    OK
+                  </button>
+                </div>
+                {error && <p className="text-[12px] text-red-500 font-montserrat">{error}</p>}
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(value)); }}
+                onClick={() => { setIsCustom(true); setCustomValue(isPreset ? '' : String(value)); setError(''); }}
                 className="w-full text-left px-3 py-1.5 text-body text-sett-primary hover:bg-sett-fill transition-colors font-medium"
               >
                 Custom...

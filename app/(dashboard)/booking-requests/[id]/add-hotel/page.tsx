@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { PageLoader } from '@/components/ui/Loader';
 import { StarRating } from '@/components/ui/StarRating';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
+import { HotelName } from '@/components/ui/HotelName';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
@@ -152,7 +153,7 @@ export default function AddHotelPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
-  const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string } | null>(null);
+  const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string; sethubDetailsUrl?: string | null } | null>(null);
 
   // Load request data
   useEffect(() => {
@@ -601,11 +602,11 @@ export default function AddHotelPage() {
   const filteredResults = [...filteredMainResults, ...filteredAltResults];
 
   return (
-    <div className="flex flex-col xl:h-full xl:overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       <Header title={t.createForm.title} />
 
       <div
-        className="p-4 md:p-6 xl:flex-1 xl:min-h-0 xl:flex xl:flex-col xl:gap-6"
+        className="p-4 md:p-6 flex-1 min-h-0 flex flex-col gap-6"
         onWheel={(e) => {
           if (!hotelListRef.current) return;
           const target = e.target as Node;
@@ -1141,7 +1142,7 @@ export default function AddHotelPage() {
                             isAdded={addedHotels.has(hotel.hotelCode)}
                             isAdding={addingHotel === hotel.hotelCode}
                             onAddToOffer={() => handleAddToOffer(hotel)}
-                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName })}
+                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                           />
                         ))}
                       </div>
@@ -1165,7 +1166,7 @@ export default function AddHotelPage() {
                             isAdded={addedHotels.has(hotel.hotelCode)}
                             isAdding={addingHotel === hotel.hotelCode}
                             onAddToOffer={() => handleAddToOffer(hotel)}
-                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName })}
+                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                           />
                         ))}
                       </div>
@@ -1182,6 +1183,7 @@ export default function AddHotelPage() {
         <HotelDetailModal
           hotelCode={detailHotel.hotelCode}
           hotelName={detailHotel.hotelName}
+          sethubDetailsUrl={detailHotel.sethubDetailsUrl}
           onClose={() => setDetailHotel(null)}
         />
       )}
@@ -1318,7 +1320,7 @@ function HotelResultCard({
               {/* Name + Stars on the same row */}
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary leading-tight">
-                  {hotel.hotelName}
+                  <HotelName hotel={hotel} className="text-sett-text-primary" />
                 </h4>
                 <StarRating rating={Number(hotel.starRating)} size={18} />
                 {isLimited && (

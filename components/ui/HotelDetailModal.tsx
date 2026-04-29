@@ -5,6 +5,7 @@ import { X, MapPin, Mail, Phone, ChevronLeft, ChevronRight, Star } from 'lucide-
 import { hotelsApi } from '@/lib/api/hotels';
 import type { HotelDetail } from '@/lib/api/hotels';
 import { StarRating } from './StarRating';
+import { HotelName } from './HotelName';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { cn } from '@/lib/utils/cn';
 
@@ -72,10 +73,11 @@ function LazyImage({
 interface HotelDetailModalProps {
   hotelCode: string;
   hotelName: string;
+  sethubDetailsUrl?: string | null;
   onClose: () => void;
 }
 
-export function HotelDetailModal({ hotelCode, hotelName, onClose }: HotelDetailModalProps) {
+export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClose }: HotelDetailModalProps) {
   const { t } = useLanguage();
   const [detail, setDetail] = useState<HotelDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,7 +140,14 @@ export function HotelDetailModal({ hotelCode, hotelName, onClose }: HotelDetailM
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-sett-border-light shrink-0">
           <h2 className="font-montserrat text-[16px] font-semibold text-sett-text-primary truncate pr-4">
-            {detail?.name ?? hotelName}
+            {sethubDetailsUrl ? (
+              <HotelName
+                hotel={{ hotelName: detail?.name ?? hotelName, sethubDetailsUrl }}
+                className="text-sett-text-primary"
+              />
+            ) : (
+              detail?.name ?? hotelName
+            )}
           </h2>
           <button
             type="button"
