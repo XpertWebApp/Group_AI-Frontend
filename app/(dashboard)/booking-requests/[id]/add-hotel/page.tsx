@@ -1464,8 +1464,8 @@ export default function AddHotelPage() {
           </div>
         )}
 
-        {/* Normal results grid */}
-        {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && !manualRequestOnly && completedResults.length > 0 && (
+        {/* Normal results grid — show results as soon as they arrive, even while polling */}
+        {completedResults.length > 0 && !manualRequestOnly && (
           <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
             {/* ── Mobile/tablet filter toggle ── */}
             <button
