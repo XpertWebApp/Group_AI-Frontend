@@ -489,18 +489,46 @@ export default function AddHotelPage() {
         }
 
         const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
-        setSearchSummary({
+        const newSummary = {
           total: status.summary.total,
           completed: checked,
           hotelsFound: status.summary.completed,
           queued: status.summary.queued,
           running: status.summary.running,
-        });
+        };
 
         const results = status.jobs
           .filter((j) => j.status === 'COMPLETED' && j.resultJson)
           .map((j) => j.resultJson!);
-        setCompletedResults(results);
+
+        // Only update state if data has meaningfully changed to prevent excessive re-renders
+        // This prevents the UI from blinking during fast consecutive poll responses
+        setSearchSummary((prev) => {
+          if (!prev) return newSummary;
+          // Only re-render if counts or hotel count changed
+          if (
+            prev.total !== newSummary.total ||
+            prev.completed !== newSummary.completed ||
+            prev.hotelsFound !== newSummary.hotelsFound ||
+            prev.queued !== newSummary.queued ||
+            prev.running !== newSummary.running
+          ) {
+            return newSummary;
+          }
+          return prev;
+        });
+
+        setCompletedResults((prev) => {
+          // Only update if the number of results changed or if hotels were added
+          if (prev.length !== results.length) return results;
+          // Check if any new hotels were added (by hotel code)
+          const prevCodes = new Set(prev.map((h) => h.hotelCode));
+          const newCodes = new Set(results.map((h) => h.hotelCode));
+          if (prevCodes.size !== newCodes.size || !Array.from(newCodes).every((code) => prevCodes.has(code))) {
+            return results;
+          }
+          return prev;
+        });
 
         // CORRECT RULE (per backend developer):
         // Three terminal signals:
