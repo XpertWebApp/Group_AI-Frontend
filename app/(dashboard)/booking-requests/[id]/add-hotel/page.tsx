@@ -211,6 +211,8 @@ export default function AddHotelPage() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
   const hotelListRef = useRef<HTMLDivElement>(null);
+  const lastSearchSummaryRef = useRef<typeof searchSummary>(null);
+  const searchSummaryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -501,22 +503,29 @@ export default function AddHotelPage() {
           .filter((j) => j.status === 'COMPLETED' && j.resultJson)
           .map((j) => j.resultJson!);
 
-        // Only update state if data has meaningfully changed to prevent excessive re-renders
-        // This prevents the UI from blinking during fast consecutive poll responses
-        setSearchSummary((prev) => {
-          if (!prev) return newSummary;
-          // Only re-render if counts or hotel count changed
-          if (
-            prev.total !== newSummary.total ||
-            prev.completed !== newSummary.completed ||
-            prev.hotelsFound !== newSummary.hotelsFound ||
-            prev.queued !== newSummary.queued ||
-            prev.running !== newSummary.running
-          ) {
-            return newSummary;
-          }
-          return prev;
-        });
+        // Debounce summary updates to prevent excessive re-renders from rapid API responses
+        // Only update if data meaningfully changed OR enough time has passed
+        const summaryChanged =
+          !lastSearchSummaryRef.current ||
+          lastSearchSummaryRef.current.total !== newSummary.total ||
+          lastSearchSummaryRef.current.completed !== newSummary.completed ||
+          lastSearchSummaryRef.current.hotelsFound !== newSummary.hotelsFound ||
+          lastSearchSummaryRef.current.queued !== newSummary.queued ||
+          lastSearchSummaryRef.current.running !== newSummary.running;
+
+        if (summaryChanged) {
+          // Clear any pending update
+          if (searchSummaryTimeoutRef.current) clearTimeout(searchSummaryTimeoutRef.current);
+
+          // Update immediately if we have new data
+          lastSearchSummaryRef.current = newSummary;
+          setSearchSummary(newSummary);
+
+          // But throttle further updates for 500ms to avoid rapid re-renders
+          searchSummaryTimeoutRef.current = setTimeout(() => {
+            searchSummaryTimeoutRef.current = null;
+          }, 500);
+        }
 
         setCompletedResults((prev) => {
           // Only update if the number of results changed or if hotels were added
@@ -1089,7 +1098,7 @@ export default function AddHotelPage() {
         )}
 
         {/* Searching / Polling phase */}
-        {(phase === 'searching' || phase === 'polling') && (() => {
+        {(phase === 'searching' || phase === 'polling') && useMemo(() => {
           const pct = searchSummary && searchSummary.total > 0
             ? Math.round((searchSummary.completed / searchSummary.total) * 100)
             : 0;
@@ -1191,7 +1200,7 @@ export default function AddHotelPage() {
               )}
             </div>
           );
-        })()}
+        }, [searchSummary, t])}
 
         {/* Skeleton — searching/polling with no results yet */}
         {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && (
