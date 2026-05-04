@@ -1098,7 +1098,7 @@ export default function AddHotelPage() {
         )}
 
         {/* Searching / Polling phase */}
-        {(phase === 'searching' || phase === 'polling') && useMemo(() => {
+        {(phase === 'searching' || phase === 'polling') && (() => {
           const pct = searchSummary && searchSummary.total > 0
             ? Math.round((searchSummary.completed / searchSummary.total) * 100)
             : 0;
@@ -1200,7 +1200,7 @@ export default function AddHotelPage() {
               )}
             </div>
           );
-        }, [searchSummary, t])}
+        })()}
 
         {/* Skeleton — searching/polling with no results yet */}
         {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && (
