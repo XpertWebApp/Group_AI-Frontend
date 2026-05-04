@@ -5,6 +5,7 @@ export enum BookingRequestStatus {
   AI_GENERATED = 'ai_generated',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
+  NEEDS_MANUAL_HANDLING = 'needs_manual_handling',
 }
 
 export enum ProposalStatus {
@@ -278,6 +279,9 @@ export interface HotelSearchResult {
   usableOptions?: unknown[];
   selectedOptions?: unknown[];
   name?: string;
+  // Alternatives search
+  searchKind?: 'main' | 'alternative';
+  alternativeReason?: string | null;
 }
 
 export interface HotelSearchResponse {
@@ -359,6 +363,19 @@ export interface HotelSearchInitResponse {
   message: string;
   sseEndpoint: string;
   statusEndpoint: string;
+  relaxation?: {
+    level: 'star_pm2' | 'star_any' | 'meal_dropped' | 'location_dropped' | 'facilities_dropped';
+    bannerMessage: string;
+  } | null;
+  destinationFallback?: {
+    originalDestinationId: number;
+    originalDestinationName: string;
+    usedDestinationId: number;
+    usedDestinationName: string;
+    bannerMessage: string;
+  } | null;
+  manualRequestOnly?: boolean;
+  hasAlternativesAvailable?: boolean;
 }
 
 export interface HotelSearchJobStatus {

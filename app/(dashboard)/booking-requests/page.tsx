@@ -103,6 +103,7 @@ export default function BookingRequestsPage() {
       completed: t.requests.completed,
       cancelled: t.requests.cancelled,
       approved: t.requests.approved,
+      needs_manual_handling: t.requests.needsManualHandling,
     };
     return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };

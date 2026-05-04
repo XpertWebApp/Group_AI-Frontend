@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown,
+  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
-  WashingMachine, Dog, Flower2, TreePine, RotateCcw, type LucideIcon,
+  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, type LucideIcon,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -25,6 +27,7 @@ import type {
   HotelSearchResult,
   BookingRequest,
   Facility,
+  HotelSearchInitResponse,
 } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
@@ -86,6 +89,51 @@ function getAmenityLabel(name: string, facilityNames: Record<string, string>): s
   return facilityNames[name.toLowerCase().trim()] ?? name;
 }
 
+// Convert ISO date string to Date object
+function isoToDate(isoDate: string): Date | null {
+  if (!isoDate) return null;
+  try {
+    return new Date(isoDate);
+  } catch {
+    return null;
+  }
+}
+
+// Convert Date object to ISO string (YYYY-MM-DD)
+function dateToISO(date: Date | null): string {
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+// DateInput component with calendar icon for react-datepicker
+interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  hasError?: boolean;
+}
+const DateInputComponent = forwardRef<HTMLInputElement, DateInputProps>(
+  ({ hasError, value, onClick, placeholder }, ref) => (
+    <div className="relative w-full">
+      <input
+        ref={ref}
+        value={value as string}
+        onClick={onClick}
+        onChange={() => {}}
+        placeholder={placeholder}
+        readOnly
+        className="w-full px-3 py-2 rounded-[10px] border border-sett-primary bg-white font-montserrat text-[14px] text-sett-text-primary focus:outline-none focus:ring-2 focus:ring-sett-primary/30 cursor-pointer pr-10"
+      />
+      <span onClick={onClick} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer pointer-events-none">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AAC737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      </span>
+    </div>
+  )
+);
+DateInputComponent.displayName = 'DateInputComponent';
+
 // Helper to construct proper image URL for both CDN and proxy paths
 function getImageUrl(imageUrl: string | null | undefined): string {
   if (!imageUrl) return '/icons/placeholder-hotel.svg';
@@ -142,6 +190,24 @@ export default function AddHotelPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [addedHotels, setAddedHotels] = useState<Set<string>>(new Set());
   const [addingHotel, setAddingHotel] = useState<string | null>(null);
+  const [relaxation, setRelaxation] = useState<HotelSearchInitResponse['relaxation']>(null);
+  const [destinationFallback, setDestinationFallback] = useState<HotelSearchInitResponse['destinationFallback']>(null);
+  const [manualRequestOnly, setManualRequestOnly] = useState(false);
+  const [editingTripDetails, setEditingTripDetails] = useState(false);
+  const [editCheckinDate, setEditCheckinDate] = useState<Date | null>(null);
+  const [editCheckoutDate, setEditCheckoutDate] = useState<Date | null>(null);
+  const [savingTripDetails, setSavingTripDetails] = useState(false);
+  const [showSearchingWithRelaxation, setShowSearchingWithRelaxation] = useState(false);
+  const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
+  const [searchExhausted, setSearchExhausted] = useState(false);
+  const [searchSettled, setSearchSettled] = useState(false);
+
+  // Alternatives feature
+  const [hasAlternativesAvailable, setHasAlternativesAvailable] = useState(false);
+  const [alternativesFetched, setAlternativesFetched] = useState(false);
+  const [alternativesLoading, setAlternativesLoading] = useState(false);
+  const [alternativesExpanded, setAlternativesExpanded] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
   const hotelListRef = useRef<HTMLDivElement>(null);
@@ -158,9 +224,48 @@ export default function AddHotelPage() {
   // Load request data
   useEffect(() => {
     requestsApi.get(requestId).then((r) => {
-      if (r) setRequest(r);
+      if (r) {
+        setRequest(r);
+        // If request is already in needs_manual_handling state, show it immediately
+        if (r.status === 'needs_manual_handling') {
+          setManualRequestOnly(true);
+          setPhase('done');
+        }
+      }
     });
   }, [requestId]);
+
+  // Periodically check request status to detect when watcher is truly done
+  useEffect(() => {
+    if (phase !== 'polling') return; // Only check during polling phase
+
+    const checkStatus = async () => {
+      try {
+        const updatedRequest = await requestsApi.get(requestId);
+        if (!mountedRef.current) return;
+        if (updatedRequest) {
+          setRequest(updatedRequest);
+          // If backend says needs_manual_handling, watcher is done exhausting ladder
+          if (updatedRequest.status === 'needs_manual_handling') {
+            // Mark search as exhausted since backend confirmed watcher finished
+            setSearchExhausted(true);
+            setManualRequestOnly(true);
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            setPhase('done');
+          }
+        }
+      } catch {
+        // Silently fail — we'll detect terminal state another way
+      }
+    };
+
+    // Check immediately on entering polling phase
+    checkStatus();
+
+    const statusCheckInterval = setInterval(checkStatus, 5000); // Check every 5 seconds during polling
+
+    return () => clearInterval(statusCheckInterval);
+  }, [phase, requestId]);
 
   // Pre-populate addedHotels from the proposal so page refresh doesn't lose "Added" state
   useEffect(() => {
@@ -216,6 +321,10 @@ export default function AddHotelPage() {
         queued: 0,
         running: 0,
       });
+      // Only show manual request card if zero successful results AND all probes are terminal
+      if (finalHotels.length === 0) {
+        setManualRequestOnly(true);
+      }
       setPhase('done');
     } catch {
       // If final fetch fails, keep whatever we have from SSE
@@ -302,6 +411,43 @@ export default function AddHotelPage() {
         } catch { /* ignore */ }
       });
 
+      // Listen for relaxation level changes (post-probe watcher advancing)
+      es.addEventListener('searchRelaxed', (e) => {
+        if (!mountedRef.current) return;
+        try {
+          const event = JSON.parse(e.data);
+          // Backend auto-advanced relaxation; watcher is continuing to search
+          // We can optionally update UI to show "Searching with relaxed criteria" if desired
+          setShowSearchingWithRelaxation(true);
+        } catch { /* ignore */ }
+      });
+
+      // Listen for search exhaustion (watcher gave up, ladder exhausted)
+      es.addEventListener('searchExhausted', (e) => {
+        if (!mountedRef.current) return;
+        try {
+          const event = JSON.parse(e.data);
+          // Backend watcher has exhausted all relaxation levels with zero results
+          // Mark search as exhausted so the empty-state gate can safely render
+          setSearchExhausted(true);
+          setShowSearchingWithRelaxation(false);
+          // The phase will be set to 'done' by polling logic once queued/running are both 0
+        } catch { /* ignore */ }
+      });
+
+      // Listen for search settled (watcher found results and won't advance further)
+      es.addEventListener('searchSettled', (e) => {
+        if (!mountedRef.current) return;
+        try {
+          const event = JSON.parse(e.data);
+          // Backend watcher found 1+ successful hotels and confirmed search is done
+          // Mark search as settled so results can be displayed and polling can stop
+          setSearchSettled(true);
+          setShowSearchingWithRelaxation(false);
+          // The phase will be set to 'done' by polling logic once queued/running are both 0
+        } catch { /* ignore */ }
+      });
+
       es.onerror = () => {
         // SSE failed — fall back to polling
         es.close();
@@ -320,11 +466,27 @@ export default function AddHotelPage() {
   const startPollingFallback = useCallback((reqId: string) => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     zeroPollCountRef.current = 0;
+    setPollingStartTime(Date.now());
 
     const poll = async () => {
       try {
         const status = await requestsApi.getHotelSearchStatus(reqId);
         if (!mountedRef.current) return;
+
+        // CRITICAL: Also check request status for needs_manual_handling
+        // This is the fallback signal when SSE events don't arrive
+        let hasBackendSignal = searchExhausted || searchSettled;
+        if (!hasBackendSignal) {
+          try {
+            const req = await requestsApi.get(reqId);
+            if (req?.status === 'needs_manual_handling') {
+              hasBackendSignal = true;
+              setSearchExhausted(true);
+            }
+          } catch {
+            // Silently ignore request status fetch errors
+          }
+        }
 
         const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
         setSearchSummary({
@@ -340,23 +502,48 @@ export default function AddHotelPage() {
           .map((j) => j.resultJson!);
         setCompletedResults(results);
 
-        // Stop when all jobs are finished
-        if (status.summary.total > 0 && status.summary.queued + status.summary.running === 0) {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          zeroPollCountRef.current = 0;
-          setPhase('done');
-        } else if (status.summary.total === 0) {
-          // total=0 can mean jobs haven't been queued yet OR the destination has no
-          // candidate hotels at all. After 3 consecutive zero-total polls (~9s) we
-          // treat it as "no hotels found" and stop.
+        // CORRECT RULE (per backend developer):
+        // Three terminal signals:
+        // 1. searchExhausted: watcher exhausted all levels with zero results
+        // 2. searchSettled: watcher found 1+ results and confirmed done
+        // 3. request.status === 'needs_manual_handling': fallback signal (polling-only clients)
+        const isSearchTerminal = status.summary.queued === 0 && status.summary.running === 0;
+        const isSearchDone = hasBackendSignal;
+        const showEmptyState = isSearchTerminal && status.summary.completed === 0 && (searchExhausted || hasBackendSignal);
+
+        if (status.summary.total === 0) {
+          // No jobs queued yet — keep polling
           zeroPollCountRef.current += 1;
           if (zeroPollCountRef.current >= 3) {
+            // After 3 consecutive zero-total polls, assume no candidates exist
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             zeroPollCountRef.current = 0;
+            setManualRequestOnly(true);
             setPhase('done');
           }
-        } else {
+        } else if (isSearchTerminal && isSearchDone) {
+          // Search is truly terminal: queued === 0 AND running === 0 AND (searchExhausted OR searchSettled)
+          // Only now is it safe to stop polling and show final results
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           zeroPollCountRef.current = 0;
+          setShowSearchingWithRelaxation(false);
+
+          // Only show "No Hotels Found" if search exhausted with zero results
+          if (showEmptyState) {
+            setManualRequestOnly(true);
+          }
+          setPhase('done');
+        } else if (isSearchTerminal && !isSearchDone) {
+          // Probes finished but watcher is still advancing (searchRelaxed events incoming)
+          // Keep polling until searchExhausted OR searchSettled === true
+          zeroPollCountRef.current = 0;
+          // Continue polling — don't stop yet
+        } else {
+          // Search still in progress: queued > 0 OR running > 0
+          // Keep polling and showing "Searching…" regardless of current results
+          zeroPollCountRef.current = 0;
+          setShowSearchingWithRelaxation(false);
+          setManualRequestOnly(false);
         }
       } catch (err) {
         if (!mountedRef.current) return;
@@ -368,20 +555,69 @@ export default function AddHotelPage() {
     };
 
     poll();
-    pollIntervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    // Dynamic polling: every 3 seconds for first 60s, then every 15s after
+    const poll3s = setInterval(() => {
+      const elapsed = Date.now() - pollingStartTime!;
+      if (elapsed > 60000) {
+        // After 60 seconds, switch to slower polling
+        clearInterval(poll3s);
+        setPollingStartTime(null);
+        startPollingFallback(reqId);
+        return;
+      }
+      poll();
+    }, POLL_INTERVAL_MS);
+    pollIntervalRef.current = poll3s;
   }, []);
 
   // Check existing search status first, only start new search if needed
   // Start a brand-new hotel search
   const startNewSearch = useCallback(async () => {
     try {
-      await requestsApi.startHotelSearch(requestId, {
+      setRelaxation(null);
+      setDestinationFallback(null);
+      setManualRequestOnly(false);
+      setSearchExhausted(false);
+      setSearchSettled(false);
+      // Reset alternatives when starting fresh search
+      setHasAlternativesAvailable(false);
+      setAlternativesFetched(false);
+      setAlternativesLoading(false);
+      setAlternativesExpanded(false);
+
+      const resp = await requestsApi.startHotelSearch(requestId, {
         mealType: request?.breakfastPreference || undefined,
         includeAlternativeStars: true,
         currencyCode: request?.currencyCode || 'EUR',
         nationalityCode: request?.nationalityCode || undefined,
       });
+
       if (!mountedRef.current) return;
+
+      // Check if search is already in flight — if so, show toast and don't reset state
+      if ((resp as any).alreadyInFlight) {
+        toast.error('Search already in progress');
+        return;
+      }
+
+      setRelaxation(resp.relaxation ?? null);
+      setDestinationFallback(resp.destinationFallback ?? null);
+      setSearchExhausted(false);
+
+      // CRITICAL FIX: NEVER trust manualRequestOnly from initial response
+      // The initial response only has jobsQueued, not jobsRunning.
+      // Jobs can still be RUNNING even if jobsQueued === 0.
+      // Only set manualRequestOnly=true from polling status or final results, never from initial response.
+      setManualRequestOnly(false);
+
+      // Edge case: if no jobs will ever be processed (totalCandidates === 0), skip polling entirely
+      // Use totalCandidates (total jobs to process) instead of jobsQueued (jobs waiting in queue)
+      // because jobs can be RUNNING even if jobsQueued === 0
+      if (resp.totalCandidates === 0) {
+        setPhase('done');
+        return;
+      }
+
       setPhase('polling');
       startPollingFallback(requestId);
     } catch (err: unknown) {
@@ -390,14 +626,24 @@ export default function AddHotelPage() {
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback]);
+  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback, t]);
 
   // Check existing search status first, only start new search if needed
   const runSearch = useCallback(async (destinationId?: number) => {
+    // If request is already in needs_manual_handling, don't override the 'done' phase
+    if (request?.status === 'needs_manual_handling') {
+      return;
+    }
+
     setPhase('searching');
     setErrorMsg('');
     setCompletedResults([]);
     setSearchSummary(null);
+    // Reset alternatives state on new search
+    setHasAlternativesAvailable(false);
+    setAlternativesFetched(false);
+    setAlternativesLoading(false);
+    setAlternativesExpanded(false);
 
     // If the request was recently edited, always start fresh regardless of destination
     const needsNewSearch = localStorage.getItem(`requestNeedsNewSearch_${requestId}`);
@@ -450,13 +696,22 @@ export default function AddHotelPage() {
           running: status.summary.running,
         });
 
+        // Detect if alternatives have already been fetched
+        const hasAlt = completedHotels.some(h => h.searchKind === 'alternative');
+        if (hasAlt) setAlternativesFetched(true);
+
         if (stillRunning > 0) {
           // Still running — resume polling
           setPhase('polling');
           startPollingFallback(requestId);
-        } else {
-          // Already finished — show results as-is, do NOT restart
+        } else if (completedHotels.length > 0) {
+          // Found hotels and nothing running — show results
           setPhase('done');
+        } else {
+          // No hotels yet but probes finished. Backend watcher may queue next relaxation level.
+          // Start polling to detect new probes or request status change to needs_manual_handling
+          setPhase('polling');
+          startPollingFallback(requestId);
         }
         return;
       }
@@ -486,12 +741,141 @@ export default function AddHotelPage() {
     setCompletedResults([]);
     setSearchSummary(null);
     setErrorMsg('');
+    setRelaxation(null);
+    setDestinationFallback(null);
+    setManualRequestOnly(false);
     setPhase('searching');
     // Clear localStorage to force a fresh search
     localStorage.removeItem(`lastSearchDest_${requestId}`);
     // Directly start a new search via API
     await startNewSearch();
   }, [request, requestId, startNewSearch]);
+
+  // Open trip details sidebar in edit mode
+  const handleEditTripDetails = useCallback(() => {
+    if (!request) return;
+    // Convert ISO dates to Date objects
+    setEditCheckinDate(isoToDate(request.checkinDate ?? ''));
+    setEditCheckoutDate(isoToDate(request.checkoutDate ?? ''));
+    setEditingTripDetails(true);
+    // Scroll sidebar into view with a small delay to ensure state is updated
+    setTimeout(() => {
+      sidebarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, [request]);
+
+  // Save edited trip details and trigger new search
+  const handleSaveTripDetails = useCallback(async () => {
+    if (!editCheckinDate) return;
+    setSavingTripDetails(true);
+    try {
+      // Convert Date objects to ISO format (YYYY-MM-DD)
+      const isoCheckin = dateToISO(editCheckinDate);
+      const isoCheckout = dateToISO(editCheckoutDate);
+
+      if (!isoCheckin) {
+        toast.error('Invalid check-in date');
+        return;
+      }
+
+      const updated = await requestsApi.update(requestId, {
+        checkinDate: isoCheckin,
+        checkoutDate: isoCheckout || undefined,
+      });
+      setRequest(updated);
+      setEditingTripDetails(false);
+
+      // Auto-trigger re-search after save
+      setCompletedResults([]);
+      setSearchSummary(null);
+      setRelaxation(null);
+      setDestinationFallback(null);
+      setManualRequestOnly(false);
+
+      // Scroll to top so user can see search progress
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Small delay to let UI update before starting search
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setPhase('searching');
+
+      // Start search with fresh API call (not using cached startNewSearch callback)
+      try {
+        const resp = await requestsApi.startHotelSearch(requestId, {
+          mealType: updated.breakfastPreference || undefined,
+          includeAlternativeStars: true,
+          currencyCode: updated.currencyCode || 'EUR',
+          nationalityCode: updated.nationalityCode || undefined,
+        });
+
+        if (!mountedRef.current) return;
+
+        // Check if search is already in flight — if so, show toast and don't proceed
+        if ((resp as any).alreadyInFlight) {
+          toast.error('Search already in progress');
+          setPhase('done');
+          return;
+        }
+
+        setRelaxation(resp.relaxation ?? null);
+        setDestinationFallback(resp.destinationFallback ?? null);
+        setSearchExhausted(false);
+        setSearchSettled(false);
+
+        // CRITICAL FIX: NEVER trust manualRequestOnly from initial response
+        // The initial response only has jobsQueued, not jobsRunning.
+        // Jobs can still be RUNNING even if jobsQueued === 0.
+        // Only set manualRequestOnly=true from polling status or final results, never from initial response.
+        setManualRequestOnly(false);
+
+        // Edge case: if no jobs will ever be processed (totalCandidates === 0), skip polling entirely
+        // Use totalCandidates (total jobs to process) instead of jobsQueued (jobs waiting in queue)
+        // because jobs can be RUNNING even if jobsQueued === 0
+        if (resp.totalCandidates === 0) {
+          setPhase('done');
+          return;
+        }
+
+        setPhase('polling');
+        startPollingFallback(requestId);
+      } catch (searchErr: unknown) {
+        if (!mountedRef.current) return;
+        const msg = searchErr instanceof Error ? searchErr.message : 'Hotel search failed';
+        setErrorMsg(msg);
+        setPhase('error');
+        toast.error(`Search failed: ${msg}`);
+      }
+    } catch {
+      toast.error('Failed to save trip details');
+    } finally {
+      setSavingTripDetails(false);
+    }
+  }, [editCheckinDate, editCheckoutDate, requestId, startPollingFallback]);
+
+  // Show alternatives (relaxed criteria search)
+  const handleShowAlternatives = useCallback(async () => {
+    setAlternativesLoading(true);
+    try {
+      const resp = await requestsApi.startHotelSearchAlternatives(requestId, {
+        appliedLevel: relaxation?.level ?? 'exact',
+        currencyCode: request?.currencyCode || 'EUR',
+        nationalityCode: request?.nationalityCode || undefined,
+      });
+      if (resp.totalCandidates === 0) {
+        toast.error(t.addHotel.noAlternativesFound);
+        return;
+      }
+      setAlternativesFetched(true);
+      setAlternativesExpanded(true);
+      // Resume polling to pick up alternative probe results
+      setPhase('polling');
+      startPollingFallback(requestId);
+    } catch {
+      toast.error('Failed to fetch alternatives');
+    } finally {
+      setAlternativesLoading(false);
+    }
+  }, [requestId, relaxation, request, startPollingFallback, t]);
 
   // Add hotel to offer flow
   const handleAddToOffer = async (hotel: HotelSearchResult) => {
@@ -568,16 +952,25 @@ export default function AddHotelPage() {
     }, {})
   );
 
-  // Client-side filter — separate main vs alternative by star rating match
+  // Split results into 3 buckets: main, star-mismatch, and true alternatives
   // Coerce starRating to number — live API may return it as a string or decimal (e.g. "4.5")
   // Use Math.round so that 4.5 → 5, 3.5 → 4, matching whole-number filter options
   const hotelStars = (h: { starRating: number }) => Math.round(Number(h.starRating));
   const requestedStars = Math.round(Number(request?.starRating ?? 0));
+
+  // Main results: searchKind=main OR (no searchKind AND star rating matches)
   const mainResults = deduplicatedResults.filter(
-    (h) => !requestedStars || hotelStars(h) === requestedStars
+    (h) => h.searchKind === 'main' || (!h.searchKind && (!requestedStars || hotelStars(h) === requestedStars))
   );
-  const altResults = deduplicatedResults.filter(
-    (h) => requestedStars && hotelStars(h) !== requestedStars
+
+  // Star mismatch results: no searchKind AND star rating doesn't match (old relaxation)
+  const starMismatchResults = deduplicatedResults.filter(
+    (h) => !h.searchKind && requestedStars && hotelStars(h) !== requestedStars
+  );
+
+  // True alternatives: searchKind=alternative (from alternatives endpoint)
+  const trueAltResults = deduplicatedResults.filter(
+    (h) => h.searchKind === 'alternative'
   );
 
   // Filter helper function
@@ -595,11 +988,29 @@ export default function AddHotelPage() {
       return true;
     });
 
-  // Apply filters separately to main and alt results
+  // Apply filters separately to main and star-mismatch results (not to true alternatives)
   const filteredMainResults = applyFilters(mainResults);
-  const filteredAltResults = applyFilters(altResults);
-  // Combine: main results first, then alternatives
-  const filteredResults = [...filteredMainResults, ...filteredAltResults];
+  const filteredStarMismatchResults = applyFilters(starMismatchResults);
+  // True alternatives use raw list (no star/price/amenity filters applied)
+  const filteredAltResults = trueAltResults;
+  // Combine: main results first, then star-mismatch, then true alternatives
+  const filteredResults = [...filteredMainResults, ...filteredStarMismatchResults, ...filteredAltResults];
+
+  // Compute "Show Alternatives" button visibility locally
+  // Show button only when 1-4 main hotels succeeded and alternatives not yet fetched
+  const TERMINAL_STATUSES = new Set(['COMPLETED', 'SKIPPED_INSUFFICIENT', 'FAILED']);
+  const mainProbeJobs = completedResults.filter((h) => h.searchKind !== 'alternative') || [];
+  const allMainProbesTerminal = mainProbeJobs.length > 0 && mainProbeJobs.every((h) => {
+    // Check if this hotel was from a completed probe (searchKind=main or no searchKind)
+    return !h.searchKind || h.searchKind === 'main';
+  });
+  const mainSuccessfulCount = completedResults.filter((h) => h.searchKind !== 'alternative').length;
+  const shouldShowAlternativesButton =
+    allMainProbesTerminal &&
+    mainSuccessfulCount >= 1 &&
+    mainSuccessfulCount <= 4 &&
+    !alternativesFetched &&
+    !manualRequestOnly;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -751,10 +1162,10 @@ export default function AddHotelPage() {
         })()}
 
         {/* Skeleton — searching/polling with no results yet */}
-        {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && (
+        {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && (
           <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
-            {/* Left sidebar skeleton */}
-            <div className="xl:w-[300px] shrink-0 xl:overflow-y-auto">
+            {/* Left sidebar skeleton — hidden on mobile */}
+            <div className="hidden xl:block xl:w-[300px] shrink-0 xl:overflow-y-auto">
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-pulse">
                 {/* Section title */}
                 <div className="h-4 w-24 rounded bg-sett-border mb-5" />
@@ -870,37 +1281,41 @@ export default function AddHotelPage() {
           </div>
         )}
 
-        {/* No hotels found for this destination */}
-        {phase === 'done' && completedResults.length === 0 && (
-          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
-            <Hotel className="w-10 h-10 text-sett-text-accent mx-auto mb-3" />
-            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
-              {t.addHotel.noHotelsFoundTitle}
-            </h3>
-            <p className="font-montserrat text-[14px] text-sett-text-accent mb-5 max-w-md mx-auto">
-              {t.addHotel.noHotelsFoundMsg}
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <Button variant="primary" onClick={() => {
-                setPhase('searching');
-                setErrorMsg('');
-                setCompletedResults([]);
-                setSearchSummary(null);
-                startNewSearch();
-              }}>
-                {t.addHotel.searchAgain}
-              </Button>
-              <Button variant="secondary" onClick={() => router.push(`/booking-requests/${requestId}`)}>
-                {t.addHotel.backToOffer}
-              </Button>
+        {/* Searching with relaxed criteria message */}
+        {phase === 'polling' && showSearchingWithRelaxation && (
+          <div className="bg-blue-50 rounded-[14px] border-l-4 border-l-blue-400 border border-blue-200 px-5 py-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-montserrat text-[14px] font-semibold text-blue-900">Searching with relaxed criteria...</p>
+                <p className="font-montserrat text-[13px] text-blue-700 mt-0.5">Our system is searching for the best matches across different hotel categories.</p>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Results — show when done, or progressively during polling if results exist */}
-        {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && completedResults.length > 0 && (
+        {/* No hotels found for this destination */}
+        {/* Banners — shown during polling or after done, dismissible */}
+        {(phase === 'done' || phase === 'polling') && (relaxation || destinationFallback) && (
+          <div className="mb-2">
+            {relaxation && (
+              <SearchBanner type="relaxation" message={relaxation.bannerMessage} onDismiss={() => setRelaxation(null)} />
+            )}
+            {destinationFallback && (
+              <SearchBanner type="destinationFallback" message={destinationFallback.bannerMessage} onDismiss={() => setDestinationFallback(null)} />
+            )}
+          </div>
+        )}
+
+        {/* Manual request card + sidebar — when no hotels found */}
+        {phase === 'done' && manualRequestOnly && (
           <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
-            {/* ── Mobile/tablet filter toggle ── */}
+            {/* ── Mobile/tablet sidebar toggle ── */}
             <button
               type="button"
               onClick={() => setFiltersOpen(!filtersOpen)}
@@ -908,18 +1323,21 @@ export default function AddHotelPage() {
             >
               <SlidersHorizontal className="w-4 h-4" />
               {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
-              {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
-                <span className="w-2 h-2 rounded-full bg-sett-primary" />
-              )}
             </button>
 
-            {/* ── Left Sidebar: Trip Details + Filters ── */}
-            <aside className={cn(
+            {/* ── Left Sidebar: Trip Details + Filters (always visible in manual mode) ── */}
+            <aside ref={sidebarRef} className={cn(
               'xl:w-[300px] shrink-0 xl:overflow-y-auto',
               filtersOpen ? 'block' : 'hidden xl:block'
             )}>
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
+                {editingTripDetails && (
+                  <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
+                    <SquarePen className="w-3.5 h-3.5 text-sett-primary shrink-0" />
+                    <span className="font-montserrat text-[12px] font-semibold text-sett-primary">{t.addHotel.editingTripDetails}</span>
+                  </div>
+                )}
                 <hr className="border-sett-border-light mb-5" />
 
                 <div className="space-y-5">
@@ -940,12 +1358,219 @@ export default function AddHotelPage() {
                     <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
                       {t.addHotel.stayDates}
                     </label>
-                    <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                      {formatDateEU(request?.checkinDate)}
-                      {' - '}
-                      {formatDateEU(request?.checkoutDate)}
+                    {editingTripDetails ? (
+                      <div className="flex flex-col gap-2">
+                        <DatePicker
+                          selected={editCheckinDate}
+                          onChange={(date: Date | null) => setEditCheckinDate(date)}
+                          minDate={new Date()}
+                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                          dateFormat="dd.MM.yyyy"
+                          placeholderText="DD.MM.YYYY"
+                          popperClassName="sett-datepicker-popper"
+                          popperPlacement="bottom-start"
+                          wrapperClassName="w-full"
+                          todayButton={t.addHotel.today}
+                          showPopperArrow={false}
+                          customInput={<DateInputComponent />}
+                        />
+                        <DatePicker
+                          selected={editCheckoutDate}
+                          onChange={(date: Date | null) => setEditCheckoutDate(date)}
+                          minDate={editCheckinDate || new Date()}
+                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                          dateFormat="dd.MM.yyyy"
+                          placeholderText="DD.MM.YYYY"
+                          popperClassName="sett-datepicker-popper"
+                          popperPlacement="bottom-start"
+                          wrapperClassName="w-full"
+                          todayButton={t.addHotel.today}
+                          showPopperArrow={false}
+                          customInput={<DateInputComponent />}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                        {formatDateEU(request?.checkinDate)}
+                        {' - '}
+                        {formatDateEU(request?.checkoutDate)}
+                      </div>
+                    )}
+                  </div>
+
+                  {editingTripDetails && (
+                    <div className="flex gap-2 pb-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1"
+                        disabled={!editCheckinDate || savingTripDetails}
+                        onClick={handleSaveTripDetails}
+                      >
+                        {savingTripDetails ? `${t.common.loading}` : t.addHotel.saveAndResearch}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setEditingTripDetails(false)}
+                        disabled={savingTripDetails}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+
+                  <hr className="border-sett-border-light" />
+
+                  {/* Rooms Required */}
+                  {request?.rooms && (
+                    <div className="flex flex-col gap-[6px]">
+                      <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                        {t.addHotel.roomsrequired}
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
+                          { key: 'roomStandardDouble', label: t.addHotel.standardDoubleBed, value: request.rooms.standardDoubleBeds },
+                          { key: 'roomTwin', label: t.addHotel.twinBed, value: request.rooms.twinBeds },
+                          { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
+                          { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
+                        ]
+                          .filter((r) => r.value && r.value > 0)
+                          .map((r) => (
+                            <div key={r.key} className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                              <span>{r.label}</span>
+                              <span className="font-semibold text-sett-text-primary">{r.value}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </aside>
+
+            {/* Manual request card */}
+            <div className="flex-1 min-w-0">
+              <ManualRequestCard
+                requestRef={request?.referenceNumber?.toString() ?? requestId}
+                onSent={() => toast.success(t.addHotel.manualRequestSent)}
+                onEditTripDetails={handleEditTripDetails}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Normal results grid */}
+        {(phase === 'done' || (phase === 'polling' && completedResults.length > 0)) && !manualRequestOnly && completedResults.length > 0 && (
+          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
+            {/* ── Mobile/tablet filter toggle ── */}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
+              {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
+                <span className="w-2 h-2 rounded-full bg-sett-primary" />
+              )}
+            </button>
+
+            {/* ── Left Sidebar: Trip Details + Filters ── */}
+            <aside ref={sidebarRef} className={cn(
+              'xl:w-[300px] shrink-0 xl:overflow-y-auto',
+              filtersOpen ? 'block' : 'hidden xl:block'
+            )}>
+              <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+                <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
+                {editingTripDetails && (
+                  <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
+                    <SquarePen className="w-3.5 h-3.5 text-sett-primary shrink-0" />
+                    <span className="font-montserrat text-[12px] font-semibold text-sett-primary">{t.addHotel.editingTripDetails}</span>
+                  </div>
+                )}
+                <hr className="border-sett-border-light mb-5" />
+
+                <div className="space-y-5">
+                  {/* Destination */}
+                  <div className="flex flex-col gap-[6px]">
+                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                      {t.addHotel.destination}
+                    </label>
+                    <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
+                      {request?.destinationName || '—'}
                     </div>
                   </div>
+
+                  <hr className="border-sett-border-light" />
+
+                  {/* Stay Dates */}
+                  <div className="flex flex-col gap-[6px]">
+                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                      {t.addHotel.stayDates}
+                    </label>
+                    {editingTripDetails ? (
+                      <div className="flex flex-col gap-2">
+                        <DatePicker
+                          selected={editCheckinDate}
+                          onChange={(date: Date | null) => setEditCheckinDate(date)}
+                          minDate={new Date()}
+                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                          dateFormat="dd.MM.yyyy"
+                          placeholderText="DD.MM.YYYY"
+                          popperClassName="sett-datepicker-popper"
+                          popperPlacement="bottom-start"
+                          wrapperClassName="w-full"
+                          todayButton={t.addHotel.today}
+                          showPopperArrow={false}
+                          customInput={<DateInputComponent />}
+                        />
+                        <DatePicker
+                          selected={editCheckoutDate}
+                          onChange={(date: Date | null) => setEditCheckoutDate(date)}
+                          minDate={editCheckinDate || new Date()}
+                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                          dateFormat="dd.MM.yyyy"
+                          placeholderText="DD.MM.YYYY"
+                          popperClassName="sett-datepicker-popper"
+                          popperPlacement="bottom-start"
+                          wrapperClassName="w-full"
+                          todayButton={t.addHotel.today}
+                          showPopperArrow={false}
+                          customInput={<DateInputComponent />}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                        {formatDateEU(request?.checkinDate)}
+                        {' - '}
+                        {formatDateEU(request?.checkoutDate)}
+                      </div>
+                    )}
+                  </div>
+
+                  {editingTripDetails && (
+                    <div className="flex gap-2 pb-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1"
+                        disabled={!editCheckinDate || savingTripDetails}
+                        onClick={handleSaveTripDetails}
+                      >
+                        {savingTripDetails ? `${t.common.loading}` : t.addHotel.saveAndResearch}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setEditingTripDetails(false)}
+                        disabled={savingTripDetails}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
 
                   <hr className="border-sett-border-light" />
 
@@ -1150,8 +1775,35 @@ export default function AddHotelPage() {
                   </>
                 )}
 
-                {/* Alternative Results Section */}
-                {filteredAltResults.length > 0 && (
+                {/* Show Alternatives button — computed locally when 1-4 main hotels succeeded */}
+                {shouldShowAlternativesButton && (
+                  <div className="flex justify-center py-3">
+                    <button
+                      type="button"
+                      onClick={handleShowAlternatives}
+                      disabled={alternativesLoading}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-[10px] border border-sett-primary text-sett-primary font-montserrat text-[14px] font-semibold hover:bg-sett-primary/5 transition-colors disabled:opacity-60"
+                    >
+                      {alternativesLoading ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          {t.addHotel.searchingAlternatives}
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          {t.addHotel.showAlternatives}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* Star Mismatch Results Section (old relaxation) */}
+                {filteredStarMismatchResults.length > 0 && (
                   <>
                     {filteredMainResults.length > 0 && <hr className="border-sett-border-light my-4" />}
                     <div>
@@ -1159,7 +1811,7 @@ export default function AddHotelPage() {
                         Other Star Ratings
                       </h3>
                       <div className="space-y-5">
-                        {filteredAltResults.map((hotel) => (
+                        {filteredStarMismatchResults.map((hotel) => (
                           <HotelResultCard
                             key={hotel.hotelCode}
                             hotel={hotel}
@@ -1173,10 +1825,71 @@ export default function AddHotelPage() {
                     </div>
                   </>
                 )}
+
+                {/* True Alternatives Collapsible Section (from alternatives endpoint) */}
+                {alternativesFetched && (
+                  <>
+                    {(filteredMainResults.length > 0 || filteredStarMismatchResults.length > 0) && <hr className="border-sett-border-light my-4" />}
+                    <div>
+                      {/* Collapsible header */}
+                      <button
+                        type="button"
+                        onClick={() => setAlternativesExpanded(!alternativesExpanded)}
+                        className="flex items-center gap-2 w-full text-left mb-3"
+                      >
+                        {alternativesExpanded ? <ChevronDown className="w-4 h-4 text-sett-text-secondary" /> : <ChevronRight className="w-4 h-4 text-sett-text-secondary" />}
+                        <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase">
+                          {t.addHotel.similarAlternatives}
+                          {' '}
+                          <span className="text-sett-text-secondary font-normal">
+                            ({phase === 'polling' && alternativesFetched ? t.addHotel.alternativesLoading : String(filteredAltResults.length)})
+                          </span>
+                        </h3>
+                      </button>
+
+                      {/* Expanded content */}
+                      {alternativesExpanded && (
+                        <div className="space-y-5">
+                          {filteredAltResults.length === 0 && phase === 'done' ? (
+                            // Polling is done and still no alternatives found
+                            <p className="font-montserrat text-[14px] text-sett-text-secondary px-1">
+                              {t.addHotel.noAlternativesFound}
+                            </p>
+                          ) : filteredAltResults.length === 0 && phase === 'polling' ? (
+                            // Still polling for alternatives
+                            <div className="flex items-center gap-2 py-4">
+                              <svg className="w-4 h-4 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              <p className="font-montserrat text-[14px] text-sett-text-secondary">
+                                {t.addHotel.alternativesLoading}
+                              </p>
+                            </div>
+                          ) : (
+                            // Alternatives found
+                            filteredAltResults.map((hotel) => (
+                              <HotelResultCard
+                                key={hotel.hotelCode}
+                                hotel={hotel}
+                                alternativeReason={hotel.alternativeReason ? (t.addHotel.alternativeReasons[hotel.alternativeReason] ?? hotel.alternativeReason) : null}
+                                isAdded={addedHotels.has(hotel.hotelCode)}
+                                isAdding={addingHotel === hotel.hotelCode}
+                                onAddToOffer={() => handleAddToOffer(hotel)}
+                                onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                              />
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
         )}
+
       </div>
 
       {detailHotel && (
@@ -1238,6 +1951,88 @@ export default function AddHotelPage() {
   );
 }
 
+/* ─────────────── Search Banner ─────────────── */
+
+function SearchBanner({ type, message, onDismiss }: {
+  type: 'relaxation' | 'destinationFallback';
+  message: string;
+  onDismiss: () => void;
+}) {
+  const isRelaxation = type === 'relaxation';
+
+  const wrapperCls = isRelaxation
+    ? 'bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400'
+    : 'bg-blue-50 border border-blue-200 border-l-4 border-l-blue-400';
+  const iconCircleCls = isRelaxation
+    ? 'bg-amber-400'
+    : 'bg-blue-500';
+  const titleCls = isRelaxation ? 'text-amber-900' : 'text-blue-900';
+  const msgCls = isRelaxation ? 'text-amber-700' : 'text-blue-700';
+  const title = isRelaxation ? 'Search adjusted' : 'Destination widened';
+  const IconComp = isRelaxation ? Info : MapPin;
+
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-[14px] px-4 py-3.5 mb-3 ${wrapperCls}`}
+      role="alert"
+    >
+      {/* Icon circle */}
+      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${iconCircleCls}`}>
+        <IconComp className="w-3.5 h-3.5 text-white" />
+      </div>
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p className={`font-montserrat text-[13px] font-semibold leading-snug ${titleCls}`}>{title}</p>
+        <p className={`font-montserrat text-[13px] font-normal leading-snug mt-0.5 ${msgCls}`}>{message}</p>
+      </div>
+
+      {/* Dismiss */}
+      <button
+        type="button"
+        onClick={onDismiss}
+        className={`shrink-0 p-0.5 rounded-full hover:bg-black/5 transition-colors mt-0.5 ${titleCls} opacity-50 hover:opacity-100`}
+        aria-label="Dismiss"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/* ─────────────── Manual Request Card ─────────────── */
+
+function ManualRequestCard({ requestRef, onSent, onEditTripDetails }: { requestRef: string; onSent: () => void; onEditTripDetails: () => void }) {
+  const { t } = useLanguage();
+  return (
+    <div className="relative overflow-hidden flex flex-col items-center justify-center py-16 px-6 text-center bg-white rounded-[14px] border border-sett-border-light shadow-card">
+      {/* Top accent strip */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-sett-primary rounded-t-[14px]" />
+
+      {/* Icon cluster */}
+      <div className="w-16 h-16 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center mb-5">
+        <Hotel className="w-7 h-7 text-amber-500" />
+      </div>
+
+      <h3 className="font-montserrat text-[20px] font-bold text-sett-text-primary mb-2">
+        {t.addHotel.manualRequestTitle}
+      </h3>
+      <p className="font-montserrat text-[14px] text-sett-text-secondary leading-relaxed mb-7 max-w-sm">
+        {t.addHotel.manualRequestMsg}
+      </p>
+
+      <button
+        type="button"
+        onClick={onEditTripDetails}
+        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-white bg-sett-primary hover:bg-sett-primary-hover transition-colors shadow-button"
+      >
+        <SquarePen className="w-4 h-4" />
+        {t.addHotel.editTripDetailsBtn}
+      </button>
+    </div>
+  );
+}
+
 /* ─────────────── Hotel Result Card ─────────────── */
 
 
@@ -1247,12 +2042,14 @@ function HotelResultCard({
   isAdding,
   onAddToOffer,
   onViewDetails,
+  alternativeReason,
 }: {
   hotel: HotelSearchResult;
   isAdded: boolean;
   isAdding: boolean;
   onAddToOffer: () => void;
   onViewDetails: () => void;
+  alternativeReason?: string | null;
 }) {
   const { t } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
@@ -1296,11 +2093,11 @@ function HotelResultCard({
       {/* ── Top section: Image + Hotel Details + Action ── */}
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
         {/* ── Hotel Image ── */}
-        <div className="w-full sm:w-[200px] md:w-[220px] xl:w-[240px] h-[200px] sm:h-auto sm:self-stretch shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
+        <div className="w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
           <img
             src={getImageUrl(hotel.imageUrl)}
             alt={hotel.hotelName}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="w-full h-full object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
@@ -1327,6 +2124,11 @@ function HotelResultCard({
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
                     <AlertTriangle className="w-3 h-3" />
                     {t.addHotel.limitedCapacity}
+                  </span>
+                )}
+                {alternativeReason && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 font-montserrat text-[11px] font-medium text-blue-700 shrink-0">
+                    {alternativeReason}
                   </span>
                 )}
               </div>

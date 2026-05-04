@@ -169,6 +169,26 @@ export const requestsApi = {
     return data.data;
   },
 
+  // Start searching for alternative hotels (when main results are few)
+  async startHotelSearchAlternatives(
+    requestId: string,
+    params?: {
+      appliedLevel?: string;
+      mealType?: string;
+      currencyCode?: string;
+      nationalityCode?: string;
+    }
+  ): Promise<HotelSearchInitResponse> {
+    const { data } = await apiClient.post<ApiResponse<HotelSearchInitResponse>>(
+      `/requests/${requestId}/hotel-search/alternatives`,
+      params ?? {}
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to start alternatives search');
+    }
+    return data.data;
+  },
+
   async getOptionDetails(
     requestId: string,
     selections: { sessionId: string; tid: string; hotelCode: string }[]

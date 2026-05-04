@@ -12,6 +12,7 @@ type BadgeVariant =
   | 'approved'
   | 'declined'
   | 'cancelled'
+  | 'needs_manual_handling'
   | 'default';
 
 interface BadgeProps {
@@ -30,6 +31,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   approved: 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00] opacity-60',
   declined: 'bg-[#ffeaeb] border border-[#feb1b5] text-[#fb2c36]',
   cancelled: 'bg-[#f7f7f7] border border-sett-border-light text-sett-text-secondary',
+  needs_manual_handling: 'bg-amber-50 border border-amber-300 text-amber-700 font-semibold',
   default: 'bg-sett-border text-sett-text-secondary border border-sett-border',
 };
 
@@ -57,5 +59,6 @@ export function getStatusBadgeVariant(status: string): BadgeVariant {
   if (s === 'sent' || s === 'accepted' || s === 'approved') return 'sent';
   if (s === 'declined') return 'declined';
   if (s === 'cancelled') return 'cancelled';
+  if (s === 'needs_manual_handling') return 'needs_manual_handling';
   return 'default';
 }

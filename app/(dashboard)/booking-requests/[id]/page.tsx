@@ -24,6 +24,7 @@ import {
   XCircle,
   X,
   Download,
+  AlertTriangle,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -655,6 +656,39 @@ export default function RequestDetailPage() {
               .replace(/\b\w/g, (c) => c.toUpperCase())}
           </Badge>
         </div>
+
+        {/* ════════════════════ MANUAL HANDLING REQUIRED BANNER ════════════════════ */}
+        {request.status === 'needs_manual_handling' && (
+          <div className="flex items-start gap-4 rounded-[14px] border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 px-5 py-4 mb-6">
+            {/* Icon circle */}
+            <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+              <AlertTriangle className="w-4 h-4 text-white" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <p className="font-montserrat text-[14px] font-semibold text-amber-900 leading-snug">
+                Manual handling required
+              </p>
+              <p className="font-montserrat text-[13px] font-normal text-amber-700 mt-0.5 mb-3 leading-snug">
+                Our automated search couldn&apos;t find suitable hotels for this request. Please contact suppliers directly or adjust the criteria and re-run the search.
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="secondary" size="sm" onClick={() => router.push(`/booking-requests/${id}/add-hotel`)}>
+                  Re-run Search
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    window.location.href = `mailto:${request.contactEmail || ''}?subject=Following%20Up%20on%20Your%20Hotel%20Request`;
+                  }}
+                >
+                  Contact Customer
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ════════════════════ MAIN CONTENT CARD ════════════════════ */}
         <div className="bg-white rounded-[14px] border border-[#686868]/40 p-5">
