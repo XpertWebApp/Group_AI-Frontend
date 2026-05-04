@@ -212,7 +212,9 @@ export default function AddHotelPage() {
   const mountedRef = useRef(true);
   const hotelListRef = useRef<HTMLDivElement>(null);
   const lastSearchSummaryRef = useRef<typeof searchSummary>(null);
-  const searchSummaryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summaryUpdateThrottledRef = useRef(false);
+  const lastHotelCountRef = useRef(0);
+  const hotelUpdateThrottledRef = useRef(false);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -503,41 +505,30 @@ export default function AddHotelPage() {
           .filter((j) => j.status === 'COMPLETED' && j.resultJson)
           .map((j) => j.resultJson!);
 
-        // Debounce summary updates to prevent excessive re-renders from rapid API responses
-        // Only update if data meaningfully changed OR enough time has passed
-        const summaryChanged =
-          !lastSearchSummaryRef.current ||
-          lastSearchSummaryRef.current.total !== newSummary.total ||
-          lastSearchSummaryRef.current.completed !== newSummary.completed ||
-          lastSearchSummaryRef.current.hotelsFound !== newSummary.hotelsFound ||
-          lastSearchSummaryRef.current.queued !== newSummary.queued ||
-          lastSearchSummaryRef.current.running !== newSummary.running;
-
-        if (summaryChanged) {
-          // Clear any pending update
-          if (searchSummaryTimeoutRef.current) clearTimeout(searchSummaryTimeoutRef.current);
-
-          // Update immediately if we have new data
+        // Throttle summary updates to max once per 1 second to prevent excessive re-renders
+        // This is critical when API responses come back very fast
+        if (!summaryUpdateThrottledRef.current) {
           lastSearchSummaryRef.current = newSummary;
           setSearchSummary(newSummary);
 
-          // But throttle further updates for 500ms to avoid rapid re-renders
-          searchSummaryTimeoutRef.current = setTimeout(() => {
-            searchSummaryTimeoutRef.current = null;
-          }, 500);
+          // Mark as throttled for next 1 second
+          summaryUpdateThrottledRef.current = true;
+          setTimeout(() => {
+            summaryUpdateThrottledRef.current = false;
+          }, 1000);
         }
 
-        setCompletedResults((prev) => {
-          // Only update if the number of results changed or if hotels were added
-          if (prev.length !== results.length) return results;
-          // Check if any new hotels were added (by hotel code)
-          const prevCodes = new Set(prev.map((h) => h.hotelCode));
-          const newCodes = new Set(results.map((h) => h.hotelCode));
-          if (prevCodes.size !== newCodes.size || !Array.from(newCodes).every((code) => prevCodes.has(code))) {
-            return results;
-          }
-          return prev;
-        });
+        // Throttle hotel results updates to max once per 1 second
+        if (!hotelUpdateThrottledRef.current && results.length !== lastHotelCountRef.current) {
+          lastHotelCountRef.current = results.length;
+          setCompletedResults(results);
+
+          // Mark as throttled for next 1 second
+          hotelUpdateThrottledRef.current = true;
+          setTimeout(() => {
+            hotelUpdateThrottledRef.current = false;
+          }, 1000);
+        }
 
         // CORRECT RULE (per backend developer):
         // Three terminal signals:
