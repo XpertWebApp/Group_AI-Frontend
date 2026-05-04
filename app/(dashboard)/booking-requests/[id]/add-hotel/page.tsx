@@ -521,9 +521,11 @@ export default function AddHotelPage() {
             setManualRequestOnly(true);
             setPhase('done');
           }
-        } else if (isSearchTerminal && isSearchDone) {
-          // Search is truly terminal: queued === 0 AND running === 0 AND (searchExhausted OR searchSettled)
-          // Only now is it safe to stop polling and show final results
+        } else if (isSearchTerminal && (isSearchDone || results.length > 0)) {
+          // Search is terminal when: queued === 0 AND running === 0 AND either:
+          // - We got SSE signals (searchExhausted OR searchSettled), OR
+          // - We have results to show (even without signals, poll timeout or results indicate done)
+          // This handles the case where SSE events don't arrive but probes completed
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           zeroPollCountRef.current = 0;
           setShowSearchingWithRelaxation(false);
@@ -533,9 +535,10 @@ export default function AddHotelPage() {
             setManualRequestOnly(true);
           }
           setPhase('done');
-        } else if (isSearchTerminal && !isSearchDone) {
+        } else if (isSearchTerminal && !isSearchDone && results.length === 0) {
           // Probes finished but watcher is still advancing (searchRelaxed events incoming)
-          // Keep polling until searchExhausted OR searchSettled === true
+          // AND we have no results yet
+          // Keep polling until searchExhausted OR searchSettled === true OR results appear
           zeroPollCountRef.current = 0;
           // Continue polling — don't stop yet
         } else {
