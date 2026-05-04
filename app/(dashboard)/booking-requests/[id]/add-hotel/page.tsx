@@ -597,9 +597,10 @@ export default function AddHotelPage() {
 
       if (!mountedRef.current) return;
 
-      // Check if search is already in flight — if so, show toast and don't reset state
+      // Check if search is already in flight — if so, quietly resume polling without error
       if ((resp as any).alreadyInFlight) {
-        toast.error('Search already in progress');
+        setPhase('polling');
+        startPollingFallback(requestId);
         return;
       }
 
@@ -813,10 +814,10 @@ export default function AddHotelPage() {
 
         if (!mountedRef.current) return;
 
-        // Check if search is already in flight — if so, show toast and don't proceed
+        // Check if search is already in flight — if so, quietly resume polling
         if ((resp as any).alreadyInFlight) {
-          toast.error('Search already in progress');
-          setPhase('done');
+          setPhase('polling');
+          startPollingFallback(requestId);
           return;
         }
 
