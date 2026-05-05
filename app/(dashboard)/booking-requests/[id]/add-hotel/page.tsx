@@ -33,7 +33,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 type SearchPhase = 'idle' | 'searching' | 'polling' | 'done' | 'error';
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds instead of 3 to reduce API load
 
 /** Map amenity name (lowercased) to a Lucide icon */
 const AMENITY_ICON_MAP: Record<string, LucideIcon> = {
@@ -215,6 +215,8 @@ export default function AddHotelPage() {
   const summaryUpdateThrottledRef = useRef(false);
   const lastHotelCountRef = useRef(0);
   const hotelUpdateThrottledRef = useRef(false);
+  const lastRequestStatusCheckRef = useRef(0);
+  const isPollingActiveRef = useRef(false);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -346,123 +348,9 @@ export default function AddHotelPage() {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     const sseUrl = `${apiBase}/requests/${reqId}/hotel-search/events${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
-    try {
-      const es = new EventSource(sseUrl);
-      eventSourceRef.current = es;
-
-      es.addEventListener('connected', (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.totalCandidates) {
-            totalCountRef.current = data.totalCandidates;
-            setSearchSummary((prev) => ({
-              total: data.totalCandidates,
-              completed: prev?.completed ?? 0,
-              hotelsFound: prev?.hotelsFound ?? 0,
-              queued: data.totalCandidates,
-              running: 0,
-            }));
-          }
-        } catch { /* ignore parse errors */ }
-      });
-
-      es.addEventListener('hotelProbeProgress', (e) => {
-        if (!mountedRef.current) return;
-        try {
-          const event = JSON.parse(e.data);
-          checkedCountRef.current++;
-          const total = totalCountRef.current || 1;
-
-          // Update progress
-          setSearchSummary((prev) => ({
-            total: prev?.total ?? total,
-            completed: checkedCountRef.current,
-            hotelsFound: foundCountRef.current,
-            queued: Math.max(0, (prev?.total ?? total) - checkedCountRef.current),
-            running: 0,
-          }));
-
-          // If hotel result available, add to display
-          if ((event.status === 'CONFIRMED' || event.status === 'LIMITED') && event.result) {
-            foundCountRef.current++;
-            setCompletedResults((prev) => [...prev, event.result]);
-            setSearchSummary((s) => s ? { ...s, hotelsFound: foundCountRef.current } : s);
-          }
-        } catch { /* ignore */ }
-      });
-
-      es.addEventListener('hotelProbeCompleted', (e) => {
-        if (!mountedRef.current) return;
-        try {
-          const event = JSON.parse(e.data);
-          // If this is a per-hotel completion with result
-          if ((event.status === 'CONFIRMED' || event.status === 'LIMITED') && event.result) {
-            foundCountRef.current++;
-            setCompletedResults((prev) => {
-              // Avoid duplicates
-              if (prev.some((h) => h.hotelCode === event.result.hotelCode)) return prev;
-              return [...prev, event.result];
-            });
-            setSearchSummary((s) => s ? { ...s, hotelsFound: foundCountRef.current } : s);
-          }
-
-          // If this is the final "all done" event with summary
-          if (event.summary) {
-            es.close();
-            eventSourceRef.current = null;
-            fetchFinalResults(reqId);
-          }
-        } catch { /* ignore */ }
-      });
-
-      // Listen for relaxation level changes (post-probe watcher advancing)
-      es.addEventListener('searchRelaxed', (e) => {
-        if (!mountedRef.current) return;
-        try {
-          const event = JSON.parse(e.data);
-          // Backend auto-advanced relaxation; watcher is continuing to search
-          // We can optionally update UI to show "Searching with relaxed criteria" if desired
-          setShowSearchingWithRelaxation(true);
-        } catch { /* ignore */ }
-      });
-
-      // Listen for search exhaustion (watcher gave up, ladder exhausted)
-      es.addEventListener('searchExhausted', (e) => {
-        if (!mountedRef.current) return;
-        try {
-          const event = JSON.parse(e.data);
-          // Backend watcher has exhausted all relaxation levels with zero results
-          // Mark search as exhausted so the empty-state gate can safely render
-          setSearchExhausted(true);
-          setShowSearchingWithRelaxation(false);
-          // The phase will be set to 'done' by polling logic once queued/running are both 0
-        } catch { /* ignore */ }
-      });
-
-      // Listen for search settled (watcher found results and won't advance further)
-      es.addEventListener('searchSettled', (e) => {
-        if (!mountedRef.current) return;
-        try {
-          const event = JSON.parse(e.data);
-          // Backend watcher found 1+ successful hotels and confirmed search is done
-          // Mark search as settled so results can be displayed and polling can stop
-          setSearchSettled(true);
-          setShowSearchingWithRelaxation(false);
-          // The phase will be set to 'done' by polling logic once queued/running are both 0
-        } catch { /* ignore */ }
-      });
-
-      es.onerror = () => {
-        // SSE failed — fall back to polling
-        es.close();
-        eventSourceRef.current = null;
-        if (!mountedRef.current) return;
-        startPollingFallback(reqId);
-      };
-    } catch {
-      // EventSource not supported or failed — fall back to polling
-      startPollingFallback(reqId);
-    }
+    // SSE completely disabled - using polling only for stability
+    // Start polling immediately with the request ID
+    startPollingFallback(reqId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchFinalResults]);
 
@@ -471,6 +359,7 @@ export default function AddHotelPage() {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     zeroPollCountRef.current = 0;
     setPollingStartTime(Date.now());
+    isPollingActiveRef.current = true;
 
     const poll = async () => {
       try {
@@ -479,13 +368,20 @@ export default function AddHotelPage() {
 
         // CRITICAL: Also check request status for needs_manual_handling
         // This is the fallback signal when SSE events don't arrive
+        // But only check every 30 seconds to avoid duplicate API calls
         let hasBackendSignal = searchExhausted || searchSettled;
-        if (!hasBackendSignal) {
+        const now = Date.now();
+        if (!hasBackendSignal && (now - lastRequestStatusCheckRef.current) > 30000) {
+          lastRequestStatusCheckRef.current = now;
           try {
             const req = await requestsApi.get(reqId);
             if (req?.status === 'needs_manual_handling') {
               hasBackendSignal = true;
               setSearchExhausted(true);
+              // When backend marks as needs_manual_handling, show the manual request card
+              if (!mountedRef.current) return;
+              setManualRequestOnly(true);
+              setPhase('done');
             }
           } catch {
             // Silently ignore request status fetch errors
@@ -518,8 +414,26 @@ export default function AddHotelPage() {
           }, 1000);
         }
 
+        // Check if we have alternative results - stop loading spinner immediately
+        if (alternativesFetched && alternativesLoading) {
+          const hasAlt = results.some(h => h.searchKind === 'alternative');
+          if (hasAlt) {
+            setAlternativesLoading(false);
+            // Update results immediately when alternatives are found
+            setCompletedResults(results);
+          }
+        }
+
         // Throttle hotel results updates to max once per 1 second
-        if (!hotelUpdateThrottledRef.current && results.length !== lastHotelCountRef.current) {
+        // BUT: Don't throttle when fetching alternatives - show them immediately
+        if (alternativesFetched) {
+          // For alternatives, update immediately without throttling
+          if (results.length !== lastHotelCountRef.current) {
+            lastHotelCountRef.current = results.length;
+            setCompletedResults(results);
+          }
+        } else if (!hotelUpdateThrottledRef.current && results.length !== lastHotelCountRef.current) {
+          // For main search, apply throttling
           lastHotelCountRef.current = results.length;
           setCompletedResults(results);
 
@@ -586,19 +500,9 @@ export default function AddHotelPage() {
     };
 
     poll();
-    // Dynamic polling: every 3 seconds for first 60s, then every 15s after
-    const poll3s = setInterval(() => {
-      const elapsed = Date.now() - pollingStartTime!;
-      if (elapsed > 60000) {
-        // After 60 seconds, switch to slower polling
-        clearInterval(poll3s);
-        setPollingStartTime(null);
-        startPollingFallback(reqId);
-        return;
-      }
-      poll();
-    }, POLL_INTERVAL_MS);
-    pollIntervalRef.current = poll3s;
+    // Polling at fixed interval (5 seconds) - no dynamic changes
+    const pollInterval = setInterval(poll, POLL_INTERVAL_MS);
+    pollIntervalRef.current = pollInterval;
   }, []);
 
   // Check existing search status first, only start new search if needed
@@ -703,7 +607,12 @@ export default function AddHotelPage() {
       return;
     }
 
-    // Check existing search status first
+    // Check existing search status first - but skip if polling is already active
+    // to avoid duplicate simultaneous API calls
+    if (isPollingActiveRef.current) {
+      return;
+    }
+
     try {
       const status = await requestsApi.getHotelSearchStatus(requestId);
       if (!mountedRef.current) return;
@@ -895,16 +804,18 @@ export default function AddHotelPage() {
       });
       if (resp.totalCandidates === 0) {
         toast.error(t.addHotel.noAlternativesFound);
+        setAlternativesLoading(false);
         return;
       }
       setAlternativesFetched(true);
       setAlternativesExpanded(true);
-      // Resume polling to pick up alternative probe results
-      setPhase('polling');
+      // Start polling for alternatives WITHOUT changing main phase
+      // This keeps main results visible while only alternatives section loads
       startPollingFallback(requestId);
+      // Note: Do NOT set phase to 'polling' - keep current phase
+      // so main results/sidebar stay visible
     } catch {
       toast.error('Failed to fetch alternatives');
-    } finally {
       setAlternativesLoading(false);
     }
   }, [requestId, relaxation, request, startPollingFallback, t]);
@@ -1882,13 +1793,8 @@ export default function AddHotelPage() {
                       {/* Expanded content */}
                       {alternativesExpanded && (
                         <div className="space-y-5">
-                          {filteredAltResults.length === 0 && phase === 'done' ? (
-                            // Polling is done and still no alternatives found
-                            <p className="font-montserrat text-[14px] text-sett-text-secondary px-1">
-                              {t.addHotel.noAlternativesFound}
-                            </p>
-                          ) : filteredAltResults.length === 0 && phase === 'polling' ? (
-                            // Still polling for alternatives
+                          {alternativesLoading && filteredAltResults.length === 0 ? (
+                            // Loading alternatives and none found yet
                             <div className="flex items-center gap-2 py-4">
                               <svg className="w-4 h-4 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -1898,6 +1804,11 @@ export default function AddHotelPage() {
                                 {t.addHotel.alternativesLoading}
                               </p>
                             </div>
+                          ) : filteredAltResults.length === 0 ? (
+                            // No alternatives found
+                            <p className="font-montserrat text-[14px] text-sett-text-secondary px-1">
+                              {t.addHotel.noAlternativesFound}
+                            </p>
                           ) : (
                             // Alternatives found
                             filteredAltResults.map((hotel) => (
