@@ -181,7 +181,7 @@ export default function AddHotelPage() {
   const searchParams = useSearchParams();
   const requestId = params.id as string;
   const proposalId = searchParams.get('proposalId') ?? '';
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   const [request, setRequest] = useState<BookingRequest | null>(null);
   const [phase, setPhase] = useState<SearchPhase>('idle');
@@ -525,6 +525,7 @@ export default function AddHotelPage() {
         includeAlternativeStars: true,
         currencyCode: request?.currencyCode || 'EUR',
         nationalityCode: request?.nationalityCode || undefined,
+        lang: locale === 'de' ? 'de' : 'en',
       });
 
       if (!mountedRef.current) return;
@@ -550,6 +551,7 @@ export default function AddHotelPage() {
       // Use totalCandidates (total jobs to process) instead of jobsQueued (jobs waiting in queue)
       // because jobs can be RUNNING even if jobsQueued === 0
       if (resp.totalCandidates === 0) {
+        setManualRequestOnly(true);
         setPhase('done');
         return;
       }
@@ -562,7 +564,7 @@ export default function AddHotelPage() {
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback, t]);
+  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback, locale]);
 
   // Check existing search status first, only start new search if needed
   const runSearch = useCallback(async (destinationId?: number) => {
@@ -747,6 +749,7 @@ export default function AddHotelPage() {
           includeAlternativeStars: true,
           currencyCode: updated.currencyCode || 'EUR',
           nationalityCode: updated.nationalityCode || undefined,
+          lang: locale === 'de' ? 'de' : 'en',
         });
 
         if (!mountedRef.current) return;
@@ -791,7 +794,7 @@ export default function AddHotelPage() {
     } finally {
       setSavingTripDetails(false);
     }
-  }, [editCheckinDate, editCheckoutDate, requestId, startPollingFallback]);
+  }, [editCheckinDate, editCheckoutDate, requestId, startPollingFallback, locale]);
 
   // Show alternatives (relaxed criteria search)
   const handleShowAlternatives = useCallback(async () => {
@@ -801,6 +804,7 @@ export default function AddHotelPage() {
         appliedLevel: relaxation?.level ?? 'exact',
         currencyCode: request?.currencyCode || 'EUR',
         nationalityCode: request?.nationalityCode || undefined,
+        lang: locale === 'de' ? 'de' : 'en',
       });
       if (resp.totalCandidates === 0) {
         toast.error(t.addHotel.noAlternativesFound);
@@ -818,7 +822,7 @@ export default function AddHotelPage() {
       toast.error('Failed to fetch alternatives');
       setAlternativesLoading(false);
     }
-  }, [requestId, relaxation, request, startPollingFallback, t]);
+  }, [requestId, relaxation, request, startPollingFallback, locale, t]);
 
   // Add hotel to offer flow
   const handleAddToOffer = async (hotel: HotelSearchResult) => {

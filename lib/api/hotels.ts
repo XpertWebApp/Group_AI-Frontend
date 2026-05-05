@@ -18,6 +18,8 @@ export interface HotelDetail {
   hotelCode: string;
   name: string;
   description?: string | null;
+  descriptionLanguage?: string | null;
+  descriptionSource?: string | null;
   location?: string | null;
   address?: string | null;
   addressCity?: string | null;
@@ -52,9 +54,12 @@ export const hotelsApi = {
     return data.data.facilities;
   },
 
-  async getDetails(hotelCode: string): Promise<HotelDetail> {
+  async getDetails(hotelCode: string, lang?: string): Promise<HotelDetail> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('code', hotelCode);
+    if (lang) queryParams.append('lang', lang);
     const { data } = await apiClient.get<ApiResponse<HotelDetail>>(
-      `/hotels/details?code=${encodeURIComponent(hotelCode)}`
+      `/hotels/details?${queryParams.toString()}`
     );
     if (!data.success || !data.data) throw new Error('Hotel details not found');
     return data.data;

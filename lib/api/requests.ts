@@ -146,6 +146,7 @@ export const requestsApi = {
       currencyCode?: string;
       nationalityCode?: string;
       facilityIds?: number[];
+      lang?: string;
     }
   ): Promise<HotelSearchInitResponse> {
     const { data } = await apiClient.post<ApiResponse<HotelSearchInitResponse>>(
@@ -177,6 +178,7 @@ export const requestsApi = {
       mealType?: string;
       currencyCode?: string;
       nationalityCode?: string;
+      lang?: string;
     }
   ): Promise<HotelSearchInitResponse> {
     const { data } = await apiClient.post<ApiResponse<HotelSearchInitResponse>>(

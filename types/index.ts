@@ -270,6 +270,8 @@ export interface HotelSearchResult {
   perTypeAllocations?: PerTypeAllocation[];
   note?: string | null;
   description?: string | null;
+  descriptionLanguage?: string | null;
+  descriptionSource?: string | null;
   facilities?: Facility[];
   // Legacy / backward compat fields
   sessionId?: string;
