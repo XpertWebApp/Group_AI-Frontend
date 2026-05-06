@@ -564,7 +564,7 @@ export default function AddHotelPage() {
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback, locale]);
+  }, [requestId, request?.breakfastPreference, request?.currencyCode, request?.nationalityCode, startPollingFallback]);
 
   // Check existing search status first, only start new search if needed
   const runSearch = useCallback(async (destinationId?: number) => {
@@ -1689,37 +1689,45 @@ export default function AddHotelPage() {
               )}
 
               <div className="space-y-5 pb-6 xl:overflow-visible">
-                {/* Main Results Section */}
+                {/* Main Results Section Header */}
                 {filteredMainResults.length > 0 && (
-                  <>
-                    <div>
-                      <div className="flex items-center gap-3 mb-3">
-                        <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase">
-                          {requestedStars ? t.addHotel.starHotelsMatching.replace('{stars}', String(requestedStars)) : t.addHotel.mainResults}
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={handleRestartSearch}
-                          className="p-1 rounded hover:bg-gray-100 transition-colors"
-                          title="Search again"
-                        >
-                          <RotateCcw className="w-4 h-4 text-sett-text-secondary hover:text-sett-text-primary transition-colors" />
-                        </button>
+                  <div className="mb-1">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-sett-primary to-sett-primary-hover shadow-sm">
+                          <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                        </div>
                       </div>
-                      <div className="space-y-5">
-                        {filteredMainResults.map((hotel) => (
-                          <HotelResultCard
-                            key={hotel.hotelCode}
-                            hotel={hotel}
-                            isAdded={addedHotels.has(hotel.hotelCode)}
-                            isAdding={addingHotel === hotel.hotelCode}
-                            onAddToOffer={() => handleAddToOffer(hotel)}
-                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                          />
-                        ))}
+                      <div className="flex-1">
+                        <h2 className="font-montserrat text-[16px] font-bold text-sett-text-primary">
+                          {t.addHotel.hotelsMatchingRequest}
+                        </h2>
+                        <p className="font-montserrat text-[12px] text-sett-text-secondary mt-0.5">
+                          {requestedStars ? `${requestedStars} star hotel${requestedStars !== 1 ? 's' : ''} found` : 'Hotels matching your criteria'}
+                        </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={handleRestartSearch}
+                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                        title="Search again"
+                      >
+                        <RotateCcw className="w-4 h-4 text-sett-text-secondary hover:text-sett-text-primary transition-colors" />
+                      </button>
                     </div>
-                  </>
+                    <div className="space-y-4">
+                      {filteredMainResults.map((hotel) => (
+                        <HotelResultCard
+                          key={hotel.hotelCode}
+                          hotel={hotel}
+                          isAdded={addedHotels.has(hotel.hotelCode)}
+                          isAdding={addingHotel === hotel.hotelCode}
+                          onAddToOffer={() => handleAddToOffer(hotel)}
+                          onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 )}
 
                 {/* Show Alternatives button — computed locally when 1-4 main hotels succeeded */}
@@ -1776,56 +1784,102 @@ export default function AddHotelPage() {
                 {/* True Alternatives Collapsible Section (from alternatives endpoint) */}
                 {alternativesFetched && (
                   <>
-                    {(filteredMainResults.length > 0 || filteredStarMismatchResults.length > 0) && <hr className="border-sett-border-light my-4" />}
-                    <div>
-                      {/* Collapsible header */}
+                    {(filteredMainResults.length > 0 || filteredStarMismatchResults.length > 0) && (
+                      <div className="relative flex items-center gap-4 py-5 my-2">
+                        <div className="flex-1 h-px bg-gradient-to-r from-sett-border-light via-sett-border-light to-transparent" />
+                        <span className="text-sett-text-secondary font-montserrat text-[12px] font-medium uppercase whitespace-nowrap tracking-wider">
+                          More options
+                        </span>
+                        <div className="flex-1 h-px bg-gradient-to-l from-sett-border-light via-sett-border-light to-transparent" />
+                      </div>
+                    )}
+
+                    <div className="bg-gradient-to-br from-blue-50/40 to-transparent border border-blue-100/40 rounded-[14px] p-5 transition-all duration-200"
+                      style={{
+                        background: alternativesExpanded
+                          ? 'linear-gradient(135deg, rgba(219,234,254,0.6) 0%, rgba(240,249,255,0.4) 100%)'
+                          : 'linear-gradient(135deg, rgba(245,249,255,0.4) 0%, transparent 100%)'
+                      }}>
+                      {/* Accordion Header */}
                       <button
                         type="button"
                         onClick={() => setAlternativesExpanded(!alternativesExpanded)}
-                        className="flex items-center gap-2 w-full text-left mb-3"
+                        className="flex items-start gap-3 w-full text-left transition-all duration-200 group"
                       >
-                        {alternativesExpanded ? <ChevronDown className="w-4 h-4 text-sett-text-secondary" /> : <ChevronRight className="w-4 h-4 text-sett-text-secondary" />}
-                        <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase">
-                          {t.addHotel.similarAlternatives}
-                          {' '}
-                          <span className="text-sett-text-secondary font-normal">
-                            ({phase === 'polling' && alternativesFetched ? t.addHotel.alternativesLoading : String(filteredAltResults.length)})
-                          </span>
-                        </h3>
+                        {/* Chevron with rotation */}
+                        <div className={`shrink-0 mt-1 transition-transform duration-300 ${alternativesExpanded ? 'rotate-180' : ''}`}>
+                          <ChevronRight className="w-5 h-5 text-blue-500 group-hover:text-blue-600" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-montserrat text-[14px] font-bold text-sett-text-primary">
+                              {t.addHotel.similarAlternatives}
+                            </h3>
+                            <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-montserrat text-[11px] font-semibold whitespace-nowrap">
+                              {phase === 'polling' && alternativesFetched ? (
+                                <span className="flex items-center gap-1">
+                                  <svg className="w-3 h-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                  Loading
+                                </span>
+                              ) : (
+                                `${filteredAltResults.length} option${filteredAltResults.length !== 1 ? 's' : ''}`
+                              )}
+                            </span>
+                          </div>
+                          <p className="font-montserrat text-[13px] text-sett-text-secondary leading-relaxed">
+                            Hotels with different locations, amenities, or layouts that match your trip dates and budget
+                          </p>
+                        </div>
+
+                        {/* Hover indicator */}
+                        <div className="shrink-0 p-2 rounded-full group-hover:bg-blue-100/60 transition-colors">
+                          <svg className="w-4 h-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                        </div>
                       </button>
 
-                      {/* Expanded content */}
+                      {/* Expanded content with smooth animation */}
                       {alternativesExpanded && (
-                        <div className="space-y-5">
+                        <div className="mt-5 pt-5 border-t border-blue-100/50 animate-in fade-in duration-300">
                           {alternativesLoading && filteredAltResults.length === 0 ? (
                             // Loading alternatives and none found yet
-                            <div className="flex items-center gap-2 py-4">
-                              <svg className="w-4 h-4 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <div className="flex items-center justify-center gap-3 py-8">
+                              <svg className="w-5 h-5 animate-spin text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                               </svg>
                               <p className="font-montserrat text-[14px] text-sett-text-secondary">
-                                {t.addHotel.alternativesLoading}
+                                Searching for alternatives...
                               </p>
                             </div>
                           ) : filteredAltResults.length === 0 ? (
                             // No alternatives found
-                            <p className="font-montserrat text-[14px] text-sett-text-secondary px-1">
-                              {t.addHotel.noAlternativesFound}
-                            </p>
+                            <div className="flex items-center justify-center py-8">
+                              <p className="font-montserrat text-[14px] text-sett-text-secondary text-center">
+                                {t.addHotel.noAlternativesFound}
+                              </p>
+                            </div>
                           ) : (
                             // Alternatives found
-                            filteredAltResults.map((hotel) => (
-                              <HotelResultCard
-                                key={hotel.hotelCode}
-                                hotel={hotel}
-                                alternativeReason={hotel.alternativeReason ? (t.addHotel.alternativeReasons[hotel.alternativeReason] ?? hotel.alternativeReason) : null}
-                                isAdded={addedHotels.has(hotel.hotelCode)}
-                                isAdding={addingHotel === hotel.hotelCode}
-                                onAddToOffer={() => handleAddToOffer(hotel)}
-                                onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                              />
-                            ))
+                            <div className="space-y-4">
+                              {filteredAltResults.map((hotel) => (
+                                <HotelResultCard
+                                  key={hotel.hotelCode}
+                                  hotel={hotel}
+                                  alternativeReason={hotel.alternativeReason ? (t.addHotel.alternativeReasons[hotel.alternativeReason] ?? hotel.alternativeReason) : null}
+                                  isAdded={addedHotels.has(hotel.hotelCode)}
+                                  isAdding={addingHotel === hotel.hotelCode}
+                                  onAddToOffer={() => handleAddToOffer(hotel)}
+                                  onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                                />
+                              ))}
+                            </div>
                           )}
                         </div>
                       )}

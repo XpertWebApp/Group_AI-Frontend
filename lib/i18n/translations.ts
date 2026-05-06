@@ -493,6 +493,7 @@ export const translations = {
       loadingDetails: 'Loading hotel details...',
       detailsError: 'Could not load hotel details.',
       mainResults: 'Main Results',
+      hotelsMatchingRequest: 'Hotels Matching Your Request',
       starHotelsMatching: '{stars} Star Hotels (Matching Your Request)',
       rateBasis: 'Rate Basis',
       mealTypes: {
@@ -1185,6 +1186,7 @@ export const translations = {
       loadingDetails: 'Hoteldetails werden geladen...',
       detailsError: 'Hoteldetails konnten nicht geladen werden.',
       mainResults: 'Hauptergebnisse',
+      hotelsMatchingRequest: 'Hotels, die Ihrer Anfrage entsprechen',
       starHotelsMatching: '{stars}-Sterne-Hotels (Entsprechend Ihrer Anfrage)',
       rateBasis: 'Mahlzeitentyp',
       mealTypes: {
