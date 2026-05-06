@@ -10,7 +10,7 @@ import {
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
-  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, type LucideIcon,
+  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, type LucideIcon,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +18,7 @@ import { PageLoader } from '@/components/ui/Loader';
 import { StarRating } from '@/components/ui/StarRating';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { HotelName } from '@/components/ui/HotelName';
+import { ImageLightbox } from '@/components/ui/ImageLightbox';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
@@ -226,6 +227,7 @@ export default function AddHotelPage() {
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string; sethubDetailsUrl?: string | null } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
 
   // Load request data
   useEffect(() => {
@@ -1724,6 +1726,7 @@ export default function AddHotelPage() {
                           isAdding={addingHotel === hotel.hotelCode}
                           onAddToOffer={() => handleAddToOffer(hotel)}
                           onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                          onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
                         />
                       ))}
                     </div>
@@ -1774,6 +1777,7 @@ export default function AddHotelPage() {
                             isAdding={addingHotel === hotel.hotelCode}
                             onAddToOffer={() => handleAddToOffer(hotel)}
                             onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                            onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
                           />
                         ))}
                       </div>
@@ -1877,6 +1881,7 @@ export default function AddHotelPage() {
                                   isAdding={addingHotel === hotel.hotelCode}
                                   onAddToOffer={() => handleAddToOffer(hotel)}
                                   onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                                  onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
                                 />
                               ))}
                             </div>
@@ -1899,6 +1904,14 @@ export default function AddHotelPage() {
           hotelName={detailHotel.hotelName}
           sethubDetailsUrl={detailHotel.sethubDetailsUrl}
           onClose={() => setDetailHotel(null)}
+        />
+      )}
+
+      {lightboxImage && (
+        <ImageLightbox
+          src={lightboxImage.src}
+          alt={lightboxImage.alt}
+          onClose={() => setLightboxImage(null)}
         />
       )}
 
@@ -2044,6 +2057,7 @@ function HotelResultCard({
   onAddToOffer,
   onViewDetails,
   alternativeReason,
+  onImageClick,
 }: {
   hotel: HotelSearchResult;
   isAdded: boolean;
@@ -2051,6 +2065,7 @@ function HotelResultCard({
   onAddToOffer: () => void;
   onViewDetails: () => void;
   alternativeReason?: string | null;
+  onImageClick?: () => void;
 }) {
   const { t } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
@@ -2094,7 +2109,16 @@ function HotelResultCard({
       {/* ── Top section: Image + Hotel Details + Action ── */}
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
         {/* ── Hotel Image ── */}
-        <div className="w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light">
+        <div
+          className={cn(
+            'w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light',
+            onImageClick ? 'cursor-pointer group' : ''
+          )}
+          onClick={onImageClick}
+          role={onImageClick ? 'button' : undefined}
+          tabIndex={onImageClick ? 0 : undefined}
+          onKeyDown={onImageClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onImageClick(); } : undefined}
+        >
           <img
             src={getImageUrl(hotel.imageUrl)}
             alt={hotel.hotelName}
@@ -2103,6 +2127,16 @@ function HotelResultCard({
               (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
           />
+
+          {/* Hover overlay with zoom icon */}
+          {onImageClick && (
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-black/50 rounded-full p-2">
+                <ZoomIn className="w-5 h-5 text-white" />
+              </div>
+            </div>
+          )}
+
           {(hotel.supplierSplit?.[0]?.supplierCode ?? hotel.bestOption?.supplierCode) && (
             <span className="absolute bottom-0 right-0 rounded-tl-[14px] bg-[#F7F7F7] px-3 py-2 font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
               {hotel.supplierSplit?.[0]?.supplierCode ?? hotel.bestOption?.supplierCode}
@@ -2117,9 +2151,12 @@ function HotelResultCard({
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               {/* Name + Stars on the same row */}
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-montserrat text-[16px] font-semibold text-sett-text-primary leading-tight">
-                  <HotelName hotel={hotel} className="text-sett-text-primary" />
-                </h4>
+                <div className="flex-1 min-w-0">
+                  <HotelName
+                    hotel={hotel}
+                    className="font-montserrat text-[16px] font-semibold leading-tight"
+                  />
+                </div>
                 <StarRating rating={Number(hotel.starRating)} size={18} />
                 {isLimited && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
