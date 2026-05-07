@@ -14,6 +14,7 @@ import { getCurrentUserId } from '@/lib/auth/getCurrentUser';
 import { formatDateEU } from '@/lib/dateFormatter';
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { useRefreshOnNotification } from '@/lib/notifications/useRefreshOnNotification';
 
 const PAGE_SIZE = 6;
 
@@ -122,9 +123,9 @@ export default function BookingRequestsPage() {
   const [currentUserId] = useState(() => getCurrentUserId());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadRequests = useCallback(async () => {
+  const loadRequests = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const result = await requestsApi.list({
         page,
         limit: PAGE_SIZE,
@@ -143,9 +144,16 @@ export default function BookingRequestsPage() {
     } catch {
       // keep empty
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, search, statusFilter]);
+
+  // Auto-refresh when a notification arrives that relates to a booking request
+  // or proposal/offer (a new offer == a new request from this list's POV).
+  useRefreshOnNotification(
+    () => loadRequests(true),
+    { match: /booking|request|proposal|offer/i },
+  );
 
   const handleClaimRequest = useCallback(async (requestId: string) => {
     setClaimingRequestId(requestId);

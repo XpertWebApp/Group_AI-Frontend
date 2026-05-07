@@ -159,8 +159,10 @@ export default function ProposalPage() {
         const proposalData = err.response?.data?.data?.proposal;
         if (proposalData) setProposal(proposalData);
 
-        if (errorCode === 'EMAIL_SEND_FAILED') {
+        if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
           toast.error(emailError || t.toasts.emailSendFailed, { duration: 8000 });
+        } else if (errorCode === 'SMTP_NOT_CONFIGURED') {
+          toast.error(emailError || t.toasts.smtpNotConfigured, { duration: 8000 });
         } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
           toast.error(t.toasts.noRecipientEmail);
         } else if (errorCode === 'PDF_GENERATION_FAILED') {
@@ -170,10 +172,10 @@ export default function ProposalPage() {
         } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE') {
           toast.error(t.toasts.proposalNotModifiable);
         } else {
-          toast.error(err.response?.data?.message || t.toasts.proposalSentNoEmail, { duration: 6000 });
+          toast.error(err.response?.data?.message || t.toasts.emailSendFailed, { duration: 6000 });
         }
       } else {
-        toast.error(t.toasts.proposalSentNoEmail, { duration: 6000 });
+        toast.error(t.toasts.emailSendFailed, { duration: 6000 });
       }
     } finally {
       setActionLoading(false);

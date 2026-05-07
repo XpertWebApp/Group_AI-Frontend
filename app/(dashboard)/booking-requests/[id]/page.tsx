@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   ArrowLeft,
   MapPin,
@@ -130,7 +129,6 @@ export default function RequestDetailPage() {
   const [sendNotes, setSendNotes] = useState('');
   const [sendError, setSendError] = useState('');
   const [sendEmailError, setSendEmailError] = useState('');
-  const [sendEmailFailed, setSendEmailFailed] = useState(false);
   const [approveStepDone, setApproveStepDone] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -523,7 +521,6 @@ export default function RequestDetailPage() {
       setEmailInput('');
       setSendNotes('');
       setSendError('');
-      setSendEmailFailed(false);
       setApproveStepDone(false);
       setSuccessOpen(true);
       toast.success(t.toasts.proposalSent);
@@ -538,9 +535,10 @@ export default function RequestDetailPage() {
         const status = err.response?.status;
         if (proposalData) setProposal((p) => p ? { ...p, ...proposalData } : p);
 
-        if (errorCode === 'EMAIL_SEND_FAILED') {
-          setSendEmailFailed(true);
+        if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
           setSendError(emailError || t.toasts.emailSendFailed);
+        } else if (errorCode === 'SMTP_NOT_CONFIGURED') {
+          setSendError(emailError || t.toasts.smtpNotConfigured);
         } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
           setSendError(t.toasts.noRecipientEmail);
         } else if (errorCode === 'PDF_GENERATION_FAILED') {
@@ -1445,7 +1443,7 @@ export default function RequestDetailPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
+                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
                     className="p-1.5 rounded-lg hover:bg-[#F7F7F7] text-[#686868] transition-colors -mt-1"
                     aria-label="Close"
                   >
@@ -1459,15 +1457,6 @@ export default function RequestDetailPage() {
                       <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
                       <p className="font-montserrat text-[13px] text-red-700">{sendError}</p>
                     </div>
-                    {sendEmailFailed && (
-                      <Link
-                        href="/connect-account"
-                        className="ml-6 font-montserrat text-[13px] font-semibold text-sett-primary underline"
-                        onClick={() => setSendOpen(false)}
-                      >
-                        Connect Google Account →
-                      </Link>
-                    )}
                   </div>
                 )}
 
@@ -1540,7 +1529,7 @@ export default function RequestDetailPage() {
                     variant="secondary"
                     size="sm"
                     className="flex-1"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmailFailed(false); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
+                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
                     {t.common.cancel}

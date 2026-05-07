@@ -6,6 +6,42 @@
   100% { transform: translateX(200%); }
 }
 
+@keyframes toast-in {
+  0%   { opacity: 0; transform: translateX(24px) scale(0.96); }
+  60%  { opacity: 1; transform: translateX(-2px) scale(1.005); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes toast-out {
+  0%   { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(24px) scale(0.96); }
+}
+.animate-toast-in  { animation: toast-in 280ms cubic-bezier(0.21, 1.02, 0.73, 1) both; }
+.animate-toast-out { animation: toast-out 200ms ease-in both; }
+
+/* Bell shake — fires periodically when unread notifications exist.
+   Pivot at the top so it swings like a real bell. */
+@keyframes bell-shake {
+  0%, 70%, 100% { transform: rotate(0); }
+  72% { transform: rotate(14deg); }
+  74% { transform: rotate(-12deg); }
+  76% { transform: rotate(10deg); }
+  78% { transform: rotate(-8deg); }
+  80% { transform: rotate(6deg); }
+  82% { transform: rotate(-4deg); }
+  84% { transform: rotate(2deg); }
+  86% { transform: rotate(0); }
+}
+.animate-bell-shake {
+  transform-origin: 50% 12%;
+  animation: bell-shake 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in,
+  .animate-toast-out,
+  .animate-bell-shake { animation: none; }
+}
+
 /*
  * ═══════════════════════════════════════════════════════════
  *  SETT Hub Brand Theme — CSS Variables & Base Styles

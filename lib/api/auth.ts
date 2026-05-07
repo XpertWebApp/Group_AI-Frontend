@@ -32,29 +32,6 @@ export const authApi = {
   async logout(): Promise<void> {
     await apiClient.post('/auth/logout');
   },
-
-  // Google OAuth / Gmail integration
-  async getGoogleConnectUrl(returnTo?: string): Promise<string> {
-    const { data } = await apiClient.get<ApiResponse<{ url: string }>>('/auth/google/connect', {
-      params: returnTo ? { returnTo } : undefined,
-    });
-    if (!data.success || !data.data?.url) {
-      throw new Error(data.message || 'Failed to get Google connect URL');
-    }
-    return data.data.url;
-  },
-
-  async getGoogleStatus(): Promise<{ connected: boolean; email?: string }> {
-    const { data } = await apiClient.get<ApiResponse<{ connected: boolean; email?: string }>>('/auth/google/status');
-    if (!data.success || !data.data) {
-      return { connected: false };
-    }
-    return data.data;
-  },
-
-  async disconnectGoogle(): Promise<void> {
-    await apiClient.post('/auth/google/disconnect');
-  },
 };
 
 export { getApiError };

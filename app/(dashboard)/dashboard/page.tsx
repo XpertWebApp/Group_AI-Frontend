@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
@@ -13,7 +13,7 @@ import { dashboardApi } from '@/lib/api/dashboard';
 import type { DashboardStatsResponse, RecentOffer } from '@/lib/api/dashboard';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU } from '@/lib/dateFormatter';
-import toast from 'react-hot-toast';
+import { useRefreshOnNotification } from '@/lib/notifications/useRefreshOnNotification';
 
 function formatDate(dateStr: string | null | undefined): string {
   return formatDateEU(dateStr);
@@ -21,7 +21,6 @@ function formatDate(dateStr: string | null | undefined): string {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { t } = useLanguage();
 
   const statusLabel = (status: string): string => {
@@ -50,37 +49,30 @@ export default function DashboardPage() {
     { key: 'declined' as const, label: t.dashboard.declined, icon: '/icons/Icon (1).svg' },
   ];
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [statsData, offersData] = await Promise.all([
-          dashboardApi.getStats(),
-          dashboardApi.getRecentOffers(10),
-        ]);
-        if (statsData) setStats(statsData);
-        setOffers(offersData);
-      } catch {
-        // fallback to empty
-      } finally {
-        setLoading(false);
-      }
+  const loadDashboard = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const [statsData, offersData] = await Promise.all([
+        dashboardApi.getStats(),
+        dashboardApi.getRecentOffers(10),
+      ]);
+      if (statsData) setStats(statsData);
+      setOffers(offersData);
+    } catch {
+      // fallback to empty
+    } finally {
+      if (!silent) setLoading(false);
     }
-    load();
   }, []);
 
   useEffect(() => {
-    const googleParam = searchParams.get('google');
-    if (!googleParam) return;
-    if (googleParam === 'connected') {
-      toast.success(t.dashboard.googleConnect.successToast);
-    } else if (googleParam === 'denied') {
-      toast.error(t.dashboard.googleConnect.deniedToast);
-    }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('google');
-    window.history.replaceState({}, '', url.toString());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+    loadDashboard(false);
+  }, [loadDashboard]);
+
+  useRefreshOnNotification(
+    () => loadDashboard(true),
+    { match: /booking|request|proposal|offer/i },
+  );
 
   return (
     <>
