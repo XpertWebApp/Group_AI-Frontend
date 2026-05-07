@@ -44,6 +44,7 @@ function debugEnabled(): boolean {
   return window.localStorage.getItem(DEBUG_KEY) === '1';
 }
 function dlog(...args: unknown[]) {
+  // eslint-disable-next-line no-console
   if (debugEnabled()) console.log('[notif]', ...args);
 }
 
