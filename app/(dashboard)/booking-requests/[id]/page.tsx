@@ -24,6 +24,7 @@ import {
   X,
   Download,
   AlertTriangle,
+  Check,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -688,12 +689,12 @@ export default function RequestDetailPage() {
           </div>
         )}
 
-        {/* ════════════════════ MAIN CONTENT CARD ════════════════════ */}
-        <div className="bg-white rounded-[14px] border border-[#686868]/40 p-5">
+        {/* ════════════════════ MAIN CONTENT (two stacked cards) ════════════════════ */}
+        <div className="space-y-6">
 
-          {/* ════════════════════ REQUEST SUMMARY ════════════════════ */}
-          <div className="mb-6">
-            {/* Section header with Add Hotels button */}
+          {/* ════════════════════ REQUEST SUMMARY CARD ════════════════════ */}
+          <div className="relative bg-white rounded-[14px] border border-[#686868]/40 p-5">
+            {/* Section header */}
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
@@ -713,29 +714,29 @@ export default function RequestDetailPage() {
                   </p>
                 </div>
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleAddHotelsClick}
-                isLoading={actionLoading}
-                disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
-              >
-                {t.offer.addHotels}
-              </Button>
             </div>
 
-            {/* Collapsible content */}
-            {!summaryCollapsed && (
-              <>
-                {/* ── Trip Details ── */}
-                <div className="mt-6 mb-6">
-                  <div className="flex flex-col xl:flex-row xl:items-center justify-between min-h-[51px] gap-6">
-                    {/* Left: Trip Details label + Location + Date */}
-                    <div className="flex flex-col gap-[14px]">
-                      <h3 className="font-montserrat text-[16px] font-semibold leading-none text-sett-text-primary">
-                        {t.offer.tripDetails}
-                      </h3>
-                      <div className="flex items-center gap-[10px] flex-wrap">
+            {/* ── Trip Details (always visible — collapsed view shows ONLY this) ── */}
+            <div className={summaryCollapsed ? 'mt-6' : 'mt-6 mb-6'}>
+              <div className="flex flex-col xl:flex-row xl:items-center justify-between min-h-[51px] gap-6">
+                {/* Left: Trip Details label + Location + Date */}
+                <div className="flex flex-col gap-[14px]">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-montserrat text-[16px] font-semibold leading-none text-sett-text-primary">
+                      {t.offer.tripDetails}
+                    </h3>
+                    {!['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => setEditRequestOpen(true)}
+                        className="p-0.5 rounded hover:opacity-70 transition-opacity"
+                        aria-label={t.common.edit}
+                      >
+                        <SquarePen className="w-4 h-4 text-sett-primary" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-[10px] flex-wrap">
                         {/* Location */}
                         <div className="flex items-center gap-2">
                           <MapPin className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
@@ -811,18 +812,21 @@ export default function RequestDetailPage() {
                         </>
                       )}
                       {/* Guests */}
-                      <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
-                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
-                          {t.offer.guests}
-                        </p>
-                        <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
-                          {request.groupSize ?? '—'}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                    <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                      {t.offer.guests}
+                    </p>
+                    <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                      {request.groupSize ?? '—'}
+                    </p>
                   </div>
                 </div>
+              </div>
+            </div>
 
+            {/* ── Collapsible: the rest of the request summary ── */}
+            {!summaryCollapsed && (
+              <>
                 <hr className="border-[#686868]/40 mb-6" />
 
                 {/* ── Room & Accommodations ── */}
@@ -1028,21 +1032,18 @@ export default function RequestDetailPage() {
                 </div>
               </>
             )}
-
-            {/* Collapse/Expand toggle */}
-            <div className="flex justify-center mt-4">
-              <button
-                type="button"
-                onClick={() => setSummaryCollapsed(!summaryCollapsed)}
-                className="p-1 rounded-full hover:bg-sett-fill transition-colors text-sett-text-accent hover:text-sett-text-primary"
-                aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
-              >
-                {summaryCollapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
-              </button>
-            </div>
+            {/* Collapse/Expand toggle — sits on the card's bottom edge, half-overlapping */}
+            <button
+              type="button"
+              onClick={() => setSummaryCollapsed(!summaryCollapsed)}
+              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-[#F7F7F7] border border-[#E6EAF0] shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white transition-colors z-10"
+              aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
+            >
+              {summaryCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            </button>
           </div>
 
-          {/* ════════════════════ HOTELS + SIDEBAR ════════════════════ */}
+          {/* ════════════════════ HOTELS + SIDEBAR (no wrapping card) ════════════════════ */}
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Left: Hotels + Services */}
             <div className="flex-1 min-w-0 space-y-6">
@@ -1905,66 +1906,135 @@ function HotelCard({
     : hotel.includedInTotal !== false;
   const canToggle = offerCount > 0 && !['declined', 'cancelled', 'completed'].includes(proposalStatus.toLowerCase());
 
+  const includeTooltip = !canToggle
+    ? t.offer.cannotChangeClosedOffer
+    : isIncluded
+      ? t.offer.excludeFromOfferHint
+      : t.offer.includeInOfferHint;
+
+  // Compose a human-readable location string from whatever address parts the
+  // backend persisted. Returns null if nothing meaningful is available.
+  const locationLine = (() => {
+    const parts = [hotel.address, hotel.addressCity, hotel.addressCountry]
+      .map((s) => (typeof s === 'string' ? s.trim() : ''))
+      .filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : null;
+  })();
+
   return (
-    <div className={`bg-sett-card rounded-card border transition-opacity ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
-      {/* Hotel header — dark navy */}
-      <div className="flex items-center justify-between px-3 sm:px-4 py-3 bg-[#1B2B44] rounded-t-card">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Include in total checkbox — only shown after the first offer has been sent */}
-          {offerCount > 0 && (
-            <label
-              className={`flex items-center shrink-0 ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-              title={canToggle ? (isIncluded ? 'Exclude from total' : 'Include in total') : 'Cannot change on a closed offer'}
-            >
-              <input
-                type="checkbox"
-                checked={isIncluded}
-                disabled={!canToggle}
-                onChange={(e) => onToggleIncluded(e.target.checked)}
-                className="w-4 h-4 accent-sett-primary rounded"
-              />
-            </label>
+    <div className={`bg-sett-card rounded-[16px] border transition-opacity overflow-hidden ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
+      {/* Unified navy header: identity (left) + controls (right) */}
+      <div className="bg-[#1B2B44] rounded-t-[16px] px-3 sm:px-4 py-3 flex items-center gap-3 flex-wrap">
+        {/* Identity: hotel name + stars */}
+        <div className="flex items-center gap-2 min-w-0 flex-1 min-h-[28px]">
+          <h4 className="text-body font-bold text-white truncate">
+            {hotel.hotelName || hotel.hotelCode}
+          </h4>
+          <div
+            className="flex gap-0.5 shrink-0"
+            aria-label={`${hotel.starRating ?? 0} of 5 stars`}
+          >
+            {Array.from({ length: 5 }).map((_, i) => {
+              const filled = i < (hotel.starRating ?? 0);
+              return (
+                <Star
+                  key={i}
+                  className={`w-3.5 h-3.5 ${filled ? 'fill-sett-primary text-sett-primary' : 'text-white/25'}`}
+                />
+              );
+            })}
+          </div>
+          {saving && (
+            <span className="text-caption text-white/70 ml-1 animate-pulse shrink-0">
+              {t.common.loading}
+            </span>
           )}
-          {/* Breakdown selection checkbox */}
+        </div>
+
+        {/* Controls cluster — pill, breakdown toggle, remove */}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {/* Include in offer — pill toggle, only visible after first send */}
+          {offerCount > 0 && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isIncluded}
+              aria-label={includeTooltip}
+              title={includeTooltip}
+              disabled={!canToggle}
+              onClick={() => canToggle && onToggleIncluded(!isIncluded)}
+              className={`
+                inline-flex items-center gap-2 h-7 pl-1.5 pr-3 rounded-full
+                font-montserrat text-[12px] font-semibold transition-all
+                ${isIncluded
+                  ? 'bg-sett-primary/20 text-white ring-1 ring-inset ring-sett-primary/40 hover:bg-sett-primary/30'
+                  : 'bg-white/[0.06] text-white/60 ring-1 ring-inset ring-white/10 hover:bg-white/[0.1] hover:text-white/80'
+                }
+                ${canToggle ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#1B2B44]
+              `}
+            >
+              <span
+                className={`
+                  relative inline-block w-4 h-4 rounded-full transition-colors
+                  ${isIncluded ? 'bg-sett-primary' : 'bg-white/20'}
+                `}
+                aria-hidden
+              >
+                {isIncluded && (
+                  <Check className="absolute inset-0 m-auto w-3 h-3 text-white stroke-[3]" />
+                )}
+              </span>
+              <span>
+                {isIncluded ? t.offer.includeInOffer : t.offer.excludedFromOffer}
+              </span>
+            </button>
+          )}
+
+          {/* Show breakdown — lightweight UI toggle */}
           <label
-            className="flex items-center shrink-0 cursor-pointer"
-            title="Show detailed breakdown in sidebar"
+            className="inline-flex items-center gap-2 h-7 px-2 rounded-md cursor-pointer text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors select-none"
+            title={t.offer.showBreakdown}
           >
             <input
               type="checkbox"
               checked={isSelectedForBreakdown}
               onChange={onToggleBreakdownSelection}
-              className="w-4 h-4 accent-sett-primary rounded"
+              className="w-3.5 h-3.5 accent-sett-primary rounded cursor-pointer"
             />
+            <span className="font-montserrat text-[12px] font-medium">
+              {t.offer.showBreakdown}
+            </span>
           </label>
-          <h4 className="text-body font-bold text-white truncate">
-            {hotel.hotelName || hotel.hotelCode}
-          </h4>
-          <div className="flex gap-0.5 shrink-0">
-            {Array.from({ length: hotel.starRating || 0 }).map((_, i) => (
-              <Star key={i} className="w-3.5 h-3.5 fill-sett-primary text-sett-primary" />
-            ))}
-          </div>
-          {saving && (
-            <span className="text-caption text-white/70 ml-2 animate-pulse shrink-0">{t.common.loading}</span>
-          )}
-          {!isIncluded && (
-            <span className="text-caption text-white/50 ml-1 shrink-0 hidden sm:inline">excluded from total</span>
-          )}
+
+          {/* Remove — divider then icon button */}
+          <span className="w-px h-5 bg-white/15 mx-0.5" aria-hidden />
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={t.common.remove}
+            title={t.common.remove}
+            className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-caption text-white/70 hover:text-white hover:bg-white/10 font-medium transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">{t.common.remove}</span>
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="flex items-center gap-1.5 text-body text-white/80 hover:text-white font-medium transition-colors shrink-0 ml-2"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">{t.common.remove}</span>
-        </button>
       </div>
 
       {/* Room table — desktop */}
       {roomEntries.length > 0 ? (
         <>
+          {/* Location bar — sits above the table column headers (desktop)
+              and above the first room card (mobile) */}
+          {locationLine && (
+            <div className="bg-[#F7F7F7] h-[33px] px-5 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-[#767676] shrink-0" aria-hidden />
+              <span className="font-montserrat text-[14px] font-normal leading-none text-[#767676] truncate">
+                {locationLine}
+              </span>
+            </div>
+          )}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[600px]">
               <thead>

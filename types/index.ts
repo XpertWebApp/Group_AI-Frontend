@@ -173,6 +173,9 @@ export interface ProposalHotel {
   latitude?: number | null;
   longitude?: number | null;
   starRating?: number | null;
+  address?: string | null;
+  addressCity?: string | null;
+  addressCountry?: string | null;
   createdAt: string;
   includedInTotal?: boolean;
 }

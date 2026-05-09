@@ -27,6 +27,9 @@ export interface AddProposalHotelPayload {
   optionDetailsId?: string;
   latitude?: number | null;
   longitude?: number | null;
+  address?: string | null;
+  addressCity?: string | null;
+  addressCountry?: string | null;
 }
 
 export interface AdjustHotelPricingPayload {

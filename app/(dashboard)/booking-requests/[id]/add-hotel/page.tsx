@@ -867,6 +867,9 @@ export default function AddHotelPage() {
         cancelDeadline: hotel.cxlDeadline || null,
         supplierCode,
         rooms: Object.keys(rooms).length > 0 ? rooms : undefined,
+        address: hotel.address ?? null,
+        addressCity: hotel.addressCity ?? null,
+        addressCountry: hotel.addressCountry ?? null,
       });
 
       setAddedHotels((prev) => new Set(prev).add(hotel.hotelCode));
