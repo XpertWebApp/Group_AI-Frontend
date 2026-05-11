@@ -89,6 +89,34 @@
   animation: card-shrink-out 260ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+/* ── GreenWaves (auth pages) — draw-in + perpetual shimmer ── */
+@keyframes sett-wave-draw {
+  0%   { stroke-dashoffset: 900; }
+  100% { stroke-dashoffset: 0; }
+}
+.sett-wave-draw {
+  animation: sett-wave-draw 1600ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* Shimmer — a short bright dash travels along the path. Starts hidden
+   (offset positions the dash off-screen left), then drifts across. */
+@keyframes sett-wave-shimmer {
+  0%   { stroke-dashoffset: 40; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { stroke-dashoffset: -900; opacity: 0; }
+}
+.sett-wave-shimmer {
+  /* 40px bright dash with a gap larger than the full path length so only one
+     bright segment is visible at a time. */
+  stroke-dasharray: 40 900;
+  stroke-dashoffset: 40;
+  /* fill-mode "both" keeps the dashoffset from snapping back between cycles. */
+}
+.sett-wave-shimmer--slow   { animation: sett-wave-shimmer 16s ease-in-out infinite both; }
+.sett-wave-shimmer--medium { animation: sett-wave-shimmer 12s ease-in-out infinite both; }
+.sett-wave-shimmer--fast   { animation: sett-wave-shimmer 8s  ease-in-out infinite both; }
+
 /* ── Step transitions (multi-step forms / wizards) ── */
 @keyframes step-slide-in-right {
   0%   { opacity: 0; transform: translateX(28px); }
@@ -119,7 +147,15 @@
   .animate-value-count-in,
   .animate-step-in-right,
   .animate-step-in-left,
-  .animate-card-shrink-out { animation: none !important; }
+  .animate-card-shrink-out,
+  .sett-wave-draw,
+  .sett-wave-shimmer { animation: none !important; }
+  /* When reduced-motion is on, hide the shimmer overlay entirely (otherwise its
+     "frozen mid-stroke" state would be visible). The base wave paths still show
+     because their stroke-dashoffset would freeze at the initial value (hidden);
+     reset them so the lines remain visible. */
+  .sett-wave-draw    { stroke-dashoffset: 0 !important; }
+  .sett-wave-shimmer { opacity: 0 !important; }
 
   /* Disable sidebar width / margin transitions for users who prefer reduced motion */
   .sett-motion-collapse,
