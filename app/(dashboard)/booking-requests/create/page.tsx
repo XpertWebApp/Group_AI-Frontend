@@ -91,8 +91,8 @@ const defaultFormData: FormData = {
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="flex items-start gap-3 mb-6">
-      <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
-      <div>
+      <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5 animate-sidebar-fade-up" />
+      <div className="animate-sidebar-fade-up" style={{ animationDelay: '80ms' }}>
         <h2 className="text-heading-sm font-bold text-sett-text-primary">{title}</h2>
         <p className="text-body text-sett-text-accent mt-0.5">{subtitle}</p>
       </div>
@@ -114,10 +114,11 @@ function RadioOption({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal transition-colors flex-1',
+        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal flex-1',
+        'transition-all duration-180 ease-sett-out active:scale-[0.97]',
         selected
-          ? 'border-sett-primary/40 bg-sett-light-green-bg text-sett-text-primary'
-          : 'border-sett-border-light bg-white text-sett-text-primary hover:border-sett-primary/40'
+          ? 'border-sett-primary/40 bg-sett-light-green-bg text-sett-text-primary shadow-[0_2px_8px_0_rgba(170,199,55,0.18)]'
+          : 'border-sett-border-light bg-white text-sett-text-primary hover:border-sett-primary/40 hover:bg-sett-light-green-bg/30'
       )}
     >
       {selected ? (
@@ -133,6 +134,76 @@ function RadioOption({
 }
 
 type FieldErrors = Record<string, string>;
+
+/**
+ * Computes 0–1 completion of the current step based on the same required fields
+ * used by validateStep. Kept in lockstep with validateStep so the visual progress
+ * never disagrees with the validator that gates the Next button.
+ */
+function getStepProgress(step: number, data: FormData): number {
+  const checks: boolean[] = [];
+
+  if (step === 0) {
+    const today = new Date().toISOString().split('T')[0];
+    const maxDate = new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0];
+    checks.push(!!data.destination.trim());
+    checks.push(
+      !!data.checkInDate && data.checkInDate >= today && data.checkInDate <= maxDate
+    );
+    checks.push(
+      !!data.checkOutDate &&
+      data.checkOutDate >= today &&
+      data.checkOutDate <= maxDate &&
+      (!data.checkInDate || data.checkOutDate > data.checkInDate)
+    );
+    checks.push(!!data.hotelCategory);
+    checks.push(!!data.groupType);
+    checks.push(!!data.groupSize.trim() && Number(data.groupSize) > 0);
+    const needsAge = data.groupType === 'youth_group' || data.groupType === 'school_group';
+    if (needsAge) {
+      const age = Number(data.averageAge);
+      checks.push(data.averageAge !== '' && data.averageAge != null && age >= 1 && age <= 120);
+    }
+  }
+
+  if (step === 1) {
+    const totalRooms = data.singleRooms + data.doubleRooms + data.tripleRooms + data.quadrupleRooms;
+    checks.push(totalRooms >= 1);
+    if (data.doubleRooms > 0) {
+      checks.push(data.standardDoubleBeds + data.twinBeds === data.doubleRooms);
+    }
+    const guestCapacity =
+      data.singleRooms * 1 +
+      data.standardDoubleBeds * 2 +
+      data.twinBeds * 2 +
+      data.tripleRooms * 3 +
+      data.quadrupleRooms * 4;
+    const groupSize = Number(data.groupSize);
+    if (groupSize > 0) {
+      checks.push(guestCapacity >= groupSize);
+    }
+  }
+
+  if (step === 2) {
+    checks.push(!!data.companyName.trim());
+    checks.push(!!data.firstName.trim());
+    checks.push(!!data.lastName.trim());
+    checks.push(
+      !!data.email.trim() &&
+      /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(data.email)
+    );
+    checks.push(!!data.phone.trim() && data.phone.length >= 7 && data.phone.length <= 15);
+  }
+
+  if (step === 3) {
+    // Policies have sensible defaults — count as fully complete.
+    return 1;
+  }
+
+  if (checks.length === 0) return 0;
+  const passed = checks.filter(Boolean).length;
+  return passed / checks.length;
+}
 
 function validateStep(step: number, data: FormData, t: ReturnType<typeof useLanguage>['t']): FieldErrors {
   const errors: FieldErrors = {};
@@ -267,6 +338,16 @@ function CreateBookingRequestPageInner() {
   const [attempted, setAttempted] = useState(false);
   // When returning from summary page to edit a just-created request
   const [draftRequestId, setDraftRequestId] = useState<string | null>(null);
+
+  // Track step transition direction for the slide animation:
+  // 'forward' (Next) → slides in from right; 'back' (Back) → from left.
+  // Initial mount uses 'forward' so the first step also slides in.
+  const prevStepRef = useRef<number>(currentStep);
+  const stepDirection: 'forward' | 'back' =
+    currentStep >= prevStepRef.current ? 'forward' : 'back';
+  useEffect(() => {
+    prevStepRef.current = currentStep;
+  }, [currentStep]);
 
   useEffect(() => {
     const draft = searchParams.get('draft');
@@ -435,24 +516,47 @@ function CreateBookingRequestPageInner() {
       <Header title={t.createForm.title} />
 
       <div className="p-4 md:p-6 space-y-6">
-      <StepperNav steps={STEPS} currentStep={currentStep} />
+      <div className="animate-card-rise-in">
+        <StepperNav
+          steps={STEPS}
+          currentStep={currentStep}
+          stepProgress={getStepProgress(currentStep, formData)}
+        />
+      </div>
 
-      <div className="bg-white rounded-[14px] border border-sett-border-light p-6">
-        {currentStep === 0 && (
-          <TripDetailsStep formData={formData} updateField={updateField} errors={errors} />
-        )}
-        {currentStep === 1 && (
-          <RoomAccommodationsStep formData={formData} updateField={updateField} errors={errors} />
-        )}
-        {currentStep === 2 && (
-          <CustomerDetailsStep formData={formData} updateField={updateField} errors={errors} />
-        )}
-        {currentStep === 3 && (
-          <PoliciesStep formData={formData} updateField={updateField} />
-        )}
+      <div
+        className="bg-white rounded-[14px] border border-sett-border-light p-6 animate-card-rise-in"
+        style={{ animationDelay: '200ms' }}
+      >
+        {/* Step content — re-keys on step change so the slide animation fires every transition.
+            `relative z-10` is required because the entrance animations on this wrapper and on the
+            bottom buttons row both create stacking contexts. Without this, the buttons (later in
+            DOM order) paint over inline-rendered Select dropdowns inside the step content. */}
+        <div
+          key={`step-${currentStep}`}
+          className={cn(
+            'relative z-10',
+            stepDirection === 'forward'
+              ? 'animate-step-in-right'
+              : 'animate-step-in-left'
+          )}
+        >
+          {currentStep === 0 && (
+            <TripDetailsStep formData={formData} updateField={updateField} errors={errors} />
+          )}
+          {currentStep === 1 && (
+            <RoomAccommodationsStep formData={formData} updateField={updateField} errors={errors} />
+          )}
+          {currentStep === 2 && (
+            <CustomerDetailsStep formData={formData} updateField={updateField} errors={errors} />
+          )}
+          {currentStep === 3 && (
+            <PoliciesStep formData={formData} updateField={updateField} />
+          )}
+        </div>
 
         {submitError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-[14px] text-body mt-4">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-[14px] text-body mt-4 animate-sidebar-fade-up">
             {submitError}
           </div>
         )}
@@ -460,8 +564,13 @@ function CreateBookingRequestPageInner() {
         {/* Horizontal Line */}
         <div className="w-full h-px bg-sett-border-light mt-6" />
 
-        {/* Bottom Actions */}
-        <div className="flex items-center justify-between pt-6">
+        {/* Bottom Actions
+            `relative z-0` keeps this row beneath any inline-rendered Select dropdown above
+            (whose stacking context is on the step content wrapper at z-10). */}
+        <div
+          className="relative z-0 flex items-center justify-between pt-6 animate-sidebar-fade-up"
+          style={{ animationDelay: '520ms' }}
+        >
           <button
             type="button"
             onClick={() => { sessionStorage.removeItem(SESSION_KEY); router.push('/booking-requests'); }}

@@ -85,25 +85,36 @@ export default function DashboardPage() {
           <StatCardSkeleton cards={4} />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {STAT_CARDS.map((card) => {
+            {STAT_CARDS.map((card, index) => {
               const raw = stats?.[card.key] ?? (card.key === 'pending' ? stats?.pendingRequests : undefined);
               // Handle both flat number and nested { value, vsLastMonth } formats
               const value = typeof raw === 'object' && raw !== null && 'value' in raw
                 ? (raw as { value: number }).value
                 : (typeof raw === 'number' ? raw : 0);
 
+              const cardDelay = index * 90;       // cascade: 0, 90, 180, 270ms
+              const badgeDelay = cardDelay + 180; // badge pops as card settles
+              const valueDelay = cardDelay + 220; // number lands after the badge
+
               return (
                 <div
                   key={card.key}
-                  className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] p-5 border border-sett-primary/40 relative"
+                  className="group bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] p-5 border border-sett-primary/40 relative animate-card-rise-in transition-all duration-280 ease-sett-out hover:-translate-y-0.5 hover:shadow-[0_4px_16px_0_rgba(7,28,66,0.10)]"
+                  style={{ animationDelay: `${cardDelay}ms` }}
                 >
-                  <div className="absolute top-4 right-4 flex items-center gap-[10px] p-2 rounded-[10px] border border-sett-primary/40 bg-sett-light-green-bg">
+                  <div
+                    className="absolute top-4 right-4 flex items-center gap-[10px] p-2 rounded-[10px] border border-sett-primary/40 bg-sett-light-green-bg animate-badge-pop-in transition-transform duration-280 ease-sett-spring group-hover:scale-110 group-hover:rotate-3"
+                    style={{ animationDelay: `${badgeDelay}ms` }}
+                  >
                     <Image src={card.icon} alt="" width={16} height={16} />
                   </div>
                   <p className="font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-secondary pr-10 break-words min-h-[2.625rem]">
                     {card.label}
                   </p>
-                  <p className="font-montserrat text-[32px] font-bold leading-normal text-sett-text-primary uppercase mt-1">
+                  <p
+                    className="font-montserrat text-[32px] font-bold leading-normal text-sett-text-primary uppercase mt-1 animate-value-count-in"
+                    style={{ animationDelay: `${valueDelay}ms` }}
+                  >
                     {value}
                   </p>
                 </div>
@@ -114,8 +125,14 @@ export default function DashboardPage() {
 
         {/* Recent Offers Section */}
         <section>
-          <div className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] border border-sett-border-light overflow-hidden">
-            <div className="flex flex-col gap-3 p-5 border-b border-sett-border-light sm:flex-row sm:items-center sm:justify-between">
+          <div
+            className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] border border-sett-border-light overflow-hidden animate-card-rise-in"
+            style={{ animationDelay: '370ms' }}
+          >
+            <div
+              className="flex flex-col gap-3 p-5 border-b border-sett-border-light sm:flex-row sm:items-center sm:justify-between animate-sidebar-fade-up"
+              style={{ animationDelay: '500ms' }}
+            >
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
                 <div>
@@ -156,7 +173,10 @@ export default function DashboardPage() {
 
             {/* Empty state */}
             {!loading && offers.length === 0 && (
-              <div className="px-4 py-8 text-center text-body text-sett-text-accent">
+              <div
+                className="px-4 py-8 text-center text-body text-sett-text-accent animate-sidebar-fade-up"
+                style={{ animationDelay: '600ms' }}
+              >
                 {t.dashboard.noRecentOffers}
               </div>
             )}
@@ -176,14 +196,24 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {offers.map((row) => (
+                    {offers.map((row, i) => (
                       <tr
                         key={row.id}
                         onClick={() => router.push(`/booking-requests/${row.requestId ?? row.id}`)}
-                        className="border-b border-sett-border last:border-0 hover:bg-sett-background/50 cursor-pointer"
+                        className="group border-b border-sett-border last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                        style={{ animationDelay: `${580 + Math.min(i, 6) * 50}ms` }}
                       >
-                        <td className="px-4 py-3 text-body text-sett-text-primary font-medium">
-                          <Link href={`/booking-requests/${row.requestId ?? row.id}`} className="hover:text-sett-primary">
+                        <td className="relative px-4 py-3 text-body text-sett-text-primary font-medium">
+                          {/* Left accent bar — slides in on row hover */}
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
+                          />
+                          <Link
+                            href={`/booking-requests/${row.requestId ?? row.id}`}
+                            className="inline-flex items-center gap-1 transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             #{row.referenceNumber}
                           </Link>
                         </td>
@@ -214,14 +244,15 @@ export default function DashboardPage() {
             {/* Mobile/Tablet card view */}
             {!loading && offers.length > 0 && (
               <div className="xl:hidden p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                {offers.map((row) => (
+                {offers.map((row, i) => (
                   <Link
                     key={row.id}
                     href={`/booking-requests/${row.requestId ?? row.id}`}
-                    className="block p-4 rounded-[14px] border border-sett-border-light hover:bg-sett-background/50 hover:border-sett-primary/30 transition-colors"
+                    className="group block p-4 rounded-[14px] border border-sett-border-light hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 transition-all duration-280 ease-sett-out hover:-translate-y-0.5 hover:shadow-[0_4px_16px_0_rgba(7,28,66,0.08)] active:scale-[0.985] active:translate-y-0 active:shadow-none active:duration-100 animate-card-rise-in"
+                    style={{ animationDelay: `${580 + Math.min(i, 6) * 60}ms` }}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-body font-semibold text-sett-text-primary">
+                      <span className="text-body font-semibold text-sett-text-primary transition-colors duration-180 ease-sett-out group-hover:text-sett-primary">
                         #{row.referenceNumber}
                       </span>
                       <Badge variant={getStatusBadgeVariant(row.status)}>

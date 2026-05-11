@@ -16,7 +16,6 @@ import {
   Eye,
   Save,
   ChevronUp,
-  ChevronDown,
   Trash2,
   SquarePen,
   Send,
@@ -42,6 +41,7 @@ import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU, formatDateTimeEU } from '@/lib/dateFormatter';
 import { formatPriceEU, formatCurrencyEU, formatPercentageEU, formatNumberEU } from '@/lib/numberFormatter';
+import { cn } from '@/lib/utils/cn';
 import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -116,6 +116,38 @@ export default function RequestDetailPage() {
   const [offerHistoryLoading, setOfferHistoryLoading] = useState(false);
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  // While true, the collapsible body keeps rendering with an exit animation
+  // (so the user actually sees it close). Cleared once the animation duration elapses.
+  const [summaryClosing, setSummaryClosing] = useState(false);
+  const summaryCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const toggleSummary = useCallback(() => {
+    // Cancel any in-flight close so rapid clicks stay in sync with state.
+    if (summaryCloseTimerRef.current) {
+      clearTimeout(summaryCloseTimerRef.current);
+      summaryCloseTimerRef.current = null;
+    }
+    if (summaryCollapsed) {
+      // Expand — content will mount and re-trigger the cascade-in animations
+      setSummaryClosing(false);
+      setSummaryCollapsed(false);
+      return;
+    }
+    // Collapse — keep content mounted, play exit, then unmount
+    setSummaryClosing(true);
+    summaryCloseTimerRef.current = setTimeout(() => {
+      setSummaryCollapsed(true);
+      setSummaryClosing(false);
+      summaryCloseTimerRef.current = null;
+    }, 260); // matches .animate-card-shrink-out duration
+  }, [summaryCollapsed]);
+
+  // Clear the timer on unmount
+  useEffect(() => {
+    return () => {
+      if (summaryCloseTimerRef.current) clearTimeout(summaryCloseTimerRef.current);
+    };
+  }, []);
 
   // Modal states
   const [addServiceOpen, setAddServiceOpen] = useState(false);
@@ -636,7 +668,7 @@ export default function RequestDetailPage() {
 
       <div className="p-4 md:p-6 space-y-6 pb-8">
         {/* ── Breadcrumb ── */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 animate-sidebar-fade-up">
           <button
             type="button"
             onClick={() => router.push('/booking-requests')}
@@ -658,7 +690,10 @@ export default function RequestDetailPage() {
 
         {/* ════════════════════ MANUAL HANDLING REQUIRED BANNER ════════════════════ */}
         {request.status === 'needs_manual_handling' && (
-          <div className="flex items-start gap-4 rounded-[14px] border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 px-5 py-4 mb-6">
+          <div
+            className="flex items-start gap-4 rounded-[14px] border border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 px-5 py-4 mb-6 animate-sidebar-fade-up"
+            style={{ animationDelay: '80ms' }}
+          >
             {/* Icon circle */}
             <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center shrink-0 mt-0.5">
               <AlertTriangle className="w-4 h-4 text-white" />
@@ -693,9 +728,15 @@ export default function RequestDetailPage() {
         <div className="space-y-6">
 
           {/* ════════════════════ REQUEST SUMMARY CARD ════════════════════ */}
-          <div className="relative bg-white rounded-[14px] border border-[#686868]/40 p-5">
+          <div
+            className="relative bg-white rounded-[14px] border border-[#686868]/40 p-5 animate-card-rise-in"
+            style={{ animationDelay: '160ms' }}
+          >
             {/* Section header */}
-            <div className="flex items-center justify-between">
+            <div
+              className="flex items-center justify-between animate-sidebar-fade-up"
+              style={{ animationDelay: '440ms' }}
+            >
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
                 <div>
@@ -720,7 +761,10 @@ export default function RequestDetailPage() {
             <div className={summaryCollapsed ? 'mt-6' : 'mt-6 mb-6'}>
               <div className="flex flex-col xl:flex-row xl:items-center justify-between min-h-[51px] gap-6">
                 {/* Left: Trip Details label + Location + Date */}
-                <div className="flex flex-col gap-[14px]">
+                <div
+                  className="flex flex-col gap-[14px] animate-fade-in-right"
+                  style={{ animationDelay: '520ms' }}
+                >
                   <div className="flex items-center gap-2">
                     <h3 className="font-montserrat text-[16px] font-semibold leading-none text-sett-text-primary">
                       {t.offer.tripDetails}
@@ -756,10 +800,13 @@ export default function RequestDetailPage() {
                       </div>
                     </div>
 
-                    {/* Right: Stats */}
+                    {/* Right: Stats — each stat fades up with a staggered delay */}
                     <div className="grid grid-cols-2 md:grid-cols-4 xl:flex xl:items-center gap-5 xl:gap-5 w-full xl:w-auto">
                       {/* Hotel Category */}
-                      <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                      <div
+                        className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
+                        style={{ animationDelay: '600ms' }}
+                      >
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                           {t.offer.hotelCategory}
                         </p>
@@ -774,7 +821,10 @@ export default function RequestDetailPage() {
                       {/* Vertical divider */}
                       <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
                       {/* Budget Range */}
-                      <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                      <div
+                        className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
+                        style={{ animationDelay: '670ms' }}
+                      >
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                           {t.offer.budgetRange}
                         </p>
@@ -785,7 +835,10 @@ export default function RequestDetailPage() {
                       {/* Vertical divider */}
                       <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
                       {/* Group Type */}
-                      <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                      <div
+                        className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
+                        style={{ animationDelay: '740ms' }}
+                      >
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                           {t.offer.groupType}
                         </p>
@@ -799,7 +852,10 @@ export default function RequestDetailPage() {
                       {(request.groupType === 'youth_group' || request.groupType === 'school_group') &&
                         request.averageAge != null && (
                         <>
-                          <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                          <div
+                            className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
+                            style={{ animationDelay: '810ms' }}
+                          >
                             <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                               {t.offer.averageAge}
                             </p>
@@ -812,7 +868,10 @@ export default function RequestDetailPage() {
                         </>
                       )}
                       {/* Guests */}
-                  <div className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center">
+                  <div
+                    className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
+                    style={{ animationDelay: '880ms' }}
+                  >
                     <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
                       {t.offer.guests}
                     </p>
@@ -824,15 +883,20 @@ export default function RequestDetailPage() {
               </div>
             </div>
 
-            {/* ── Collapsible: the rest of the request summary ── */}
-            {!summaryCollapsed && (
-              <>
+            {/* ── Collapsible: the rest of the request summary ──
+                Stays mounted during the close animation (summaryClosing) so the user
+                actually sees the exit motion before the content unmounts. */}
+            {(!summaryCollapsed || summaryClosing) && (
+              <div className={summaryClosing ? 'animate-card-shrink-out' : undefined}>
                 <hr className="border-[#686868]/40 mb-6" />
 
                 {/* ── Room & Accommodations ── */}
                 <div className="flex flex-col gap-5 mb-6">
                   {/* Heading — height:20 */}
-                  <h3 className="font-montserrat text-[16px] font-semibold leading-none text-[#1D1D1D]">
+                  <h3
+                    className="font-montserrat text-[16px] font-semibold leading-none text-[#1D1D1D] animate-sidebar-fade-up"
+                    style={{ animationDelay: '40ms' }}
+                  >
                     {t.offer.roomAccommodations}
                   </h3>
                   {/* Cards grid — Responsive 2x2 or 4x1 */}
@@ -848,10 +912,11 @@ export default function RequestDetailPage() {
                       },
                       { label: t.offer.triple, value: rooms?.triple },
                       { label: t.offer.quadruple, value: rooms?.quadruple },
-                    ].map((room) => (
+                    ].map((room, i) => (
                       <div
                         key={room.label}
-                        className="flex flex-col items-center justify-center gap-2 sm:gap-[14px] border border-[#686868]/40 rounded-[14px] py-4 sm:py-0 sm:h-[86px]"
+                        className="flex flex-col items-center justify-center gap-2 sm:gap-[14px] border border-[#686868]/40 rounded-[14px] py-4 sm:py-0 sm:h-[86px] animate-card-rise-in"
+                        style={{ animationDelay: `${120 + i * 60}ms` }}
                       >
                         <p className="font-montserrat text-[16px] sm:text-[18px] font-bold leading-none text-[#1D1D1D]">
                           {room.value ?? '—'}
@@ -864,7 +929,10 @@ export default function RequestDetailPage() {
                   </div>
 
                   {/* Bed Configuration for Double Room — outer: 14px radius, border #68686866, h:166 */}
-                  <div className="w-full rounded-[14px] border border-[#686868]/40 bg-white p-5">
+                  <div
+                    className="w-full rounded-[14px] border border-[#686868]/40 bg-white p-5 animate-card-rise-in"
+                    style={{ animationDelay: '380ms' }}
+                  >
                     <h4 className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D] mb-5">
                       {t.offer.bedConfiguration}
                     </h4>
@@ -890,20 +958,29 @@ export default function RequestDetailPage() {
                   </div>
 
                   {rooms?.extraRoomsNote && (
-                    <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px]" style={{ minHeight: 57 }}>
+                    <div
+                      className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] animate-sidebar-fade-up"
+                      style={{ minHeight: 57, animationDelay: '460ms' }}
+                    >
                       <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.extras}:</span>
                       <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{rooms.extraRoomsNote}</span>
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-                    <div className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center">
+                    <div
+                      className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
+                      style={{ animationDelay: '520ms' }}
+                    >
                       <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{breakfastLabel}</p>
                       <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                         {t.offer.breakfastPreference}
                       </p>
                     </div>
-                    <div className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center">
+                    <div
+                      className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
+                      style={{ animationDelay: '580ms' }}
+                    >
                       <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{locationLabel}</p>
                       <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                         {t.offer.hotelLocation}
@@ -912,7 +989,10 @@ export default function RequestDetailPage() {
                   </div>
 
                   {request.specialRequirements && (
-                    <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px]" style={{ minHeight: 57 }}>
+                    <div
+                      className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] animate-sidebar-fade-up"
+                      style={{ minHeight: 57, animationDelay: '660ms' }}
+                    >
                       <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
                       <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.specialRequirements}</span>
                     </div>
@@ -923,11 +1003,14 @@ export default function RequestDetailPage() {
 
                 {/* ── Customer Details ── */}
                 <div className="mb-6">
-                  <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">
+                  <h3
+                    className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3 animate-sidebar-fade-up"
+                    style={{ animationDelay: '40ms' }}
+                  >
                     {t.offer.customerDetails}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 mb-3">
-                    <div>
+                    <div className="animate-sidebar-fade-up" style={{ animationDelay: '120ms' }}>
                       <div className="flex items-center gap-1.5 mb-1">
                         <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
                         <span className="text-label text-sett-text-accent uppercase tracking-wide">
@@ -938,7 +1021,7 @@ export default function RequestDetailPage() {
                         {request.companyName || '—'}
                       </p>
                     </div>
-                    <div>
+                    <div className="animate-sidebar-fade-up" style={{ animationDelay: '180ms' }}>
                       <div className="flex items-center gap-1.5 mb-1">
                         <FileText className="w-3.5 h-3.5 text-sett-text-accent" />
                         <span className="text-label text-sett-text-accent uppercase tracking-wide">
@@ -958,7 +1041,7 @@ export default function RequestDetailPage() {
                         <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">—</p>
                       )}
                     </div>
-                    <div>
+                    <div className="animate-sidebar-fade-up" style={{ animationDelay: '240ms' }}>
                       <div className="flex items-center gap-1.5 mb-1">
                         <Users className="w-3.5 h-3.5 text-sett-text-accent" />
                         <span className="text-label text-sett-text-accent uppercase tracking-wide">
@@ -971,7 +1054,7 @@ export default function RequestDetailPage() {
                           '—'}
                       </p>
                     </div>
-                    <div>
+                    <div className="animate-sidebar-fade-up" style={{ animationDelay: '300ms' }}>
                       <div className="flex items-center gap-1.5 mb-1">
                         <Mail className="w-3.5 h-3.5 text-sett-text-accent" />
                         <span className="text-label text-sett-text-accent uppercase tracking-wide">
@@ -980,7 +1063,7 @@ export default function RequestDetailPage() {
                       </div>
                       <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">{request.contactEmail || '—'}</p>
                     </div>
-                    <div>
+                    <div className="animate-sidebar-fade-up" style={{ animationDelay: '360ms' }}>
                       <div className="flex items-center gap-1.5 mb-1">
                         <Phone className="w-3.5 h-3.5 text-sett-text-accent" />
                         <span className="text-label text-sett-text-accent uppercase tracking-wide">
@@ -993,7 +1076,10 @@ export default function RequestDetailPage() {
                     </div>
                   </div>
                   {request.customerNotes && (
-                    <div className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] mt-3" style={{ minHeight: 57 }}>
+                    <div
+                      className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] mt-3 animate-sidebar-fade-up"
+                      style={{ minHeight: 57, animationDelay: '440ms' }}
+                    >
                       <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
                       <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.customerNotes}</span>
                     </div>
@@ -1004,9 +1090,17 @@ export default function RequestDetailPage() {
 
                 {/* ── Policies ── */}
                 <div>
-                  <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3">{t.offer.policies}</h3>
+                  <h3
+                    className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3 animate-sidebar-fade-up"
+                    style={{ animationDelay: '40ms' }}
+                  >
+                    {t.offer.policies}
+                  </h3>
                   {request.termsAndConditions && request.termsAndConditions.replace(/<[^>]*>/g, '').trim() && (
-                    <div className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50">
+                    <div
+                      className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50 animate-card-rise-in"
+                      style={{ animationDelay: '120ms' }}
+                    >
                       <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                         {t.offer.termsConditions}
                       </p>
@@ -1018,7 +1112,10 @@ export default function RequestDetailPage() {
                     </div>
                   )}
                   {request.cancellationConditions && request.cancellationConditions.replace(/<[^>]*>/g, '').trim() && (
-                    <div className="bg-sett-fill rounded-card px-4 py-3 border border-sett-border/50">
+                    <div
+                      className="bg-sett-fill rounded-card px-4 py-3 border border-sett-border/50 animate-card-rise-in"
+                      style={{ animationDelay: '200ms' }}
+                    >
                       <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                         {t.offer.cancellationConditions}
                       </p>
@@ -1030,16 +1127,28 @@ export default function RequestDetailPage() {
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
-            {/* Collapse/Expand toggle — sits on the card's bottom edge, half-overlapping */}
+            {/* Collapse/Expand toggle — sits on the card's bottom edge, half-overlapping.
+                Single icon that rotates 180° to smoothly transition between expanded/collapsed
+                states (instead of icon-swap pop). */}
             <button
               type="button"
-              onClick={() => setSummaryCollapsed(!summaryCollapsed)}
-              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-[#F7F7F7] border border-[#E6EAF0] shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white transition-colors z-10"
+              onClick={toggleSummary}
+              disabled={summaryClosing}
+              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-[#F7F7F7] border border-[#E6EAF0] shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white hover:scale-105 active:scale-95 transition-all duration-280 ease-sett-spring z-10 disabled:cursor-default"
               aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
+              aria-expanded={!summaryCollapsed && !summaryClosing}
             >
-              {summaryCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              <ChevronUp
+                className={cn(
+                  'w-4 h-4 transition-transform duration-320 ease-sett-spring',
+                  // Pre-rotate during the closing animation so the chevron flips
+                  // in sync with the content exiting (instead of waiting until
+                  // the unmount completes).
+                  (summaryCollapsed || summaryClosing) ? 'rotate-180' : 'rotate-0'
+                )}
+              />
             </button>
           </div>
 
@@ -1049,7 +1158,10 @@ export default function RequestDetailPage() {
             <div className="flex-1 min-w-0 space-y-6">
               {/* Hotels */}
               <div>
-                <div className="flex items-center justify-between mb-4">
+                <div
+                  className="flex items-center justify-between mb-4 animate-sidebar-fade-up"
+                  style={{ animationDelay: '320ms' }}
+                >
                   <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.offer.hotels}</h3>
                   <Button
                     variant="primary"
@@ -1063,26 +1175,34 @@ export default function RequestDetailPage() {
                 </div>
 
                 {hotels.length === 0 ? (
-                  <div className="bg-sett-card rounded-card border border-sett-border p-6 text-center">
+                  <div
+                    className="bg-sett-card rounded-card border border-sett-border p-6 text-center animate-sidebar-fade-up"
+                    style={{ animationDelay: '400ms' }}
+                  >
                     <p className="text-body text-sett-text-accent">
                       {t.offer.noHotels}
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {hotels.map((hotel) => (
-                      <HotelCard
+                    {hotels.map((hotel, i) => (
+                      <div
                         key={hotel.id}
-                        hotel={hotel}
-                        proposalId={proposal!.id}
-                        onPricingUpdate={handlePricingUpdate}
-                        onRemove={() => setRemoveHotelTarget(hotel.id)}
-                        onToggleIncluded={(v) => handleToggleHotelIncluded(hotel.id, v)}
-                        proposalStatus={proposal!.status}
-                        offerCount={offerHistory.length}
-                        isSelectedForBreakdown={selectedHotelsForBreakdown.has(hotel.id)}
-                        onToggleBreakdownSelection={() => toggleHotelBreakdownSelection(hotel.id)}
-                      />
+                        className="animate-card-rise-in"
+                        style={{ animationDelay: `${400 + Math.min(i, 5) * 80}ms` }}
+                      >
+                        <HotelCard
+                          hotel={hotel}
+                          proposalId={proposal!.id}
+                          onPricingUpdate={handlePricingUpdate}
+                          onRemove={() => setRemoveHotelTarget(hotel.id)}
+                          onToggleIncluded={(v) => handleToggleHotelIncluded(hotel.id, v)}
+                          proposalStatus={proposal!.status}
+                          offerCount={offerHistory.length}
+                          isSelectedForBreakdown={selectedHotelsForBreakdown.has(hotel.id)}
+                          onToggleBreakdownSelection={() => toggleHotelBreakdownSelection(hotel.id)}
+                        />
+                      </div>
                     ))}
                   </div>
                 )}
@@ -1090,7 +1210,10 @@ export default function RequestDetailPage() {
 
               {/* Additional Services — only show when hotels are added */}
               {hotels.length > 0 && <div>
-                <div className="flex items-center justify-between mb-4">
+                <div
+                  className="flex items-center justify-between mb-4 animate-sidebar-fade-up"
+                  style={{ animationDelay: '560ms' }}
+                >
                   <h3 className="text-heading-sm font-bold text-sett-text-primary">
                     {t.offer.additionalServices}
                   </h3>
@@ -1105,7 +1228,10 @@ export default function RequestDetailPage() {
                 </div>
 
                 {services.length > 0 && (
-                  <div className="bg-sett-card rounded-card border border-sett-border overflow-hidden">
+                  <div
+                    className="bg-sett-card rounded-card border border-sett-border overflow-hidden animate-card-rise-in"
+                    style={{ animationDelay: '640ms' }}
+                  >
                     {/* Desktop table */}
                     <div className="hidden md:block overflow-x-auto">
                       <table className="w-full min-w-[860px]">
@@ -1174,7 +1300,10 @@ export default function RequestDetailPage() {
             {proposal && hotels.length > 0 && (
               <div className="w-full lg:w-72 shrink-0 space-y-4">
                 {/* Offer History */}
-                <div className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden">
+                <div
+                  className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden animate-card-rise-in"
+                  style={{ animationDelay: '480ms' }}
+                >
                   <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-sett-border-light">
                     <div className="w-1 h-5 bg-sett-primary rounded-full" />
                     <h4 className="font-montserrat text-[15px] font-semibold text-sett-text-primary">
@@ -1275,7 +1404,10 @@ export default function RequestDetailPage() {
                 </div>
 
                 {/* Room Breakdown */}
-                <div className="bg-white flex flex-col" style={{ borderRadius: 14, border: '1px solid #D1D5DB' }}>
+                <div
+                  className="bg-white flex flex-col animate-card-rise-in"
+                  style={{ borderRadius: 14, border: '1px solid #D1D5DB', animationDelay: '560ms' }}
+                >
                   {/* Title */}
                   <div className="px-5 pt-5 pb-5">
                     <h4 className="font-montserrat font-semibold text-[18px] leading-none tracking-normal text-[#1D1D1D]">
@@ -1326,7 +1458,10 @@ export default function RequestDetailPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+                <div
+                  className="grid grid-cols-2 lg:grid-cols-1 gap-3 animate-sidebar-fade-up"
+                  style={{ animationDelay: '640ms' }}
+                >
                   <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
                     <Eye className="w-4 h-4" />
                     {t.offer.previewPdf}

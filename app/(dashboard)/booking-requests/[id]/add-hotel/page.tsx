@@ -703,7 +703,12 @@ export default function AddHotelPage() {
     setEditCheckinDate(isoToDate(request.checkinDate ?? ''));
     setEditCheckoutDate(isoToDate(request.checkoutDate ?? ''));
     setEditingTripDetails(true);
+    // The sidebar (which holds Trip Details) is hidden by default below xl
+    // (1280px). Force it open so the edit form is actually visible when the
+    // user clicks "Edit Trip Details" on the no-hotels-available screen.
+    setFiltersOpen(true);
     // Scroll sidebar into view with a small delay to ensure state is updated
+    // and the sidebar has had time to render.
     setTimeout(() => {
       sidebarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);

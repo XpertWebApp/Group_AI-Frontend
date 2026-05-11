@@ -13,6 +13,7 @@ import {
   User,
   Building2,
   Loader2,
+  ChevronLeft,
 } from 'lucide-react';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -22,6 +23,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { requestsApi } from '@/lib/api/requests';
 import type { BookingRequest } from '@/types';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
+import { useAppLayout } from '@/app/(dashboard)/AppLayoutContext';
 
 function formatStatus(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -38,6 +40,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
   const { t } = useLanguage();
+  const { sidebarCollapsed, toggleSidebar, setSidebarCollapsed } = useAppLayout();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookingRequest[]>([]);
@@ -138,134 +141,171 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
     return null;
   };
 
+  // Click handler for the collapsed-state search button:
+  // expand the sidebar then focus the input on the next frame.
+  const expandAndFocusSearch = () => {
+    setSidebarCollapsed(false);
+    requestAnimationFrame(() => {
+      setTimeout(() => inputRef.current?.focus(), 320);
+    });
+  };
+
   const content = (
     <>
       <div className="flex flex-col h-full">
         {/* Logo */}
-        <div className="h-[68px] flex items-center px-6 border-b border-sett-sidebar-border">
-          <Link href="/dashboard" className="block" onClick={onMobileClose}>
+        <div
+          className={cn(
+            'h-[68px] flex items-center border-b border-sett-sidebar-border transition-[padding] duration-320 ease-sett-in-out',
+            'animate-sidebar-fade-up',
+            sidebarCollapsed ? 'px-3 justify-center' : 'px-6'
+          )}
+          style={{ animationDelay: '120ms' }}
+        >
+          <Link
+            href="/dashboard"
+            onClick={onMobileClose}
+            className={cn(
+              'block overflow-hidden transition-all duration-320 ease-sett-in-out',
+              sidebarCollapsed ? 'w-[36px]' : 'w-[140px]'
+            )}
+            aria-label="SETT Home"
+          >
             <Image
               src="/icons/sett_logo.svg"
               alt="SETT Logo"
               width={140}
               height={40}
-              className="h-auto w-auto"
+              className="h-auto max-w-none w-[140px]"
+              priority
             />
           </Link>
         </div>
 
         {/* Search */}
-        <div className="p-3 border-b border-sett-sidebar-border">
-          <div ref={searchWrapperRef} className="relative">
-            {searchLoading ? (
-              <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 animate-spin" />
-            ) : (
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
-            )}
-            <input
-              ref={inputRef}
-              type="search"
-              placeholder={t.nav.searchAnything}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
-              className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-sett-primary"
-              autoComplete="off"
+        <div
+          className={cn(
+            'border-b border-sett-sidebar-border transition-[padding] duration-320 ease-sett-in-out',
+            'animate-sidebar-fade-up',
+            sidebarCollapsed ? 'p-3' : 'p-3'
+          )}
+          style={{ animationDelay: '200ms' }}
+        >
+          {sidebarCollapsed ? (
+            <SidebarIconButton
+              label={t.nav.searchAnything}
+              onClick={expandAndFocusSearch}
+              icon={Search}
             />
+          ) : (
+            <div ref={searchWrapperRef} className="relative animate-fade-in-right">
+              {searchLoading ? (
+                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 animate-spin" />
+              ) : (
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
+              )}
+              <input
+                ref={inputRef}
+                type="search"
+                placeholder={t.nav.searchAnything}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-sett-primary"
+                autoComplete="off"
+              />
 
-            {/* Results dropdown */}
-            {searchOpen && (
-              <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[9999] bg-white rounded-[14px] shadow-[0_8px_32px_0_rgba(0,0,0,0.18)] border border-sett-border-light overflow-hidden">
-                {searchResults.length === 0 ? (
-                  <div className="px-4 py-5 text-center">
-                    <p className="font-montserrat text-[13px] text-sett-text-secondary">No requests found</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="px-3 pt-2.5 pb-1">
-                      <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wider text-sett-text-accent">
-                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
-                      </p>
+              {/* Results dropdown */}
+              {searchOpen && (
+                <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[9999] bg-white rounded-[14px] shadow-[0_8px_32px_0_rgba(0,0,0,0.18)] border border-sett-border-light overflow-hidden">
+                  {searchResults.length === 0 ? (
+                    <div className="px-4 py-5 text-center">
+                      <p className="font-montserrat text-[13px] text-sett-text-secondary">No requests found</p>
                     </div>
-                    <ul>
-                      {searchResults.map((r, i) => {
-                        const name = customerName(r);
-                        return (
-                          <li key={r.id}>
-                            <button
-                              type="button"
-                              onMouseDown={(e) => { e.preventDefault(); handleSelect(r); }}
-                              onMouseEnter={() => setActiveIndex(i)}
-                              className={cn(
-                                'w-full text-left px-3 py-2.5 flex items-start gap-3 transition-colors',
-                                i === activeIndex ? 'bg-sett-fill' : 'hover:bg-sett-fill/60'
+                  ) : (
+                    <>
+                      <div className="px-3 pt-2.5 pb-1">
+                        <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wider text-sett-text-accent">
+                          {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <ul>
+                        {searchResults.map((r, i) => {
+                          const name = customerName(r);
+                          return (
+                            <li key={r.id}>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); handleSelect(r); }}
+                                onMouseEnter={() => setActiveIndex(i)}
+                                className={cn(
+                                  'w-full text-left px-3 py-2.5 flex items-start gap-3 transition-colors',
+                                  i === activeIndex ? 'bg-sett-fill' : 'hover:bg-sett-fill/60'
+                                )}
+                              >
+                                <span className="shrink-0 mt-0.5 font-montserrat text-[12px] font-semibold text-sett-primary bg-sett-light-green-bg px-1.5 py-0.5 rounded-[6px]">
+                                  #{r.referenceNumber ?? r.id.slice(0, 4)}
+                                </span>
+
+                                <div className="flex-1 min-w-0">
+                                  {name && (
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                      <User className="w-3 h-3 text-sett-text-accent shrink-0" />
+                                      <span className="font-montserrat text-[13px] font-semibold text-sett-text-primary truncate">{name}</span>
+                                    </div>
+                                  )}
+                                  {r.companyName && name !== r.companyName && (
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                      <Building2 className="w-3 h-3 text-sett-text-accent shrink-0" />
+                                      <span className="font-montserrat text-[12px] text-sett-text-secondary truncate">{r.companyName}</span>
+                                    </div>
+                                  )}
+                                  {r.destinationName && (
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-sett-text-accent shrink-0" />
+                                      <span className="font-montserrat text-[12px] text-sett-text-secondary truncate">{r.destinationName}</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <Badge variant={getStatusBadgeVariant(r.status)} className="shrink-0 text-[11px] px-2 py-0.5">
+                                  {formatStatus(r.status)}
+                                </Badge>
+                              </button>
+                              {i < searchResults.length - 1 && (
+                                <div className="mx-3 h-px bg-sett-border-light" />
                               )}
-                            >
-                              {/* Reference badge */}
-                              <span className="shrink-0 mt-0.5 font-montserrat text-[12px] font-semibold text-sett-primary bg-sett-light-green-bg px-1.5 py-0.5 rounded-[6px]">
-                                #{r.referenceNumber ?? r.id.slice(0, 4)}
-                              </span>
-
-                              {/* Details */}
-                              <div className="flex-1 min-w-0">
-                                {name && (
-                                  <div className="flex items-center gap-1 mb-0.5">
-                                    <User className="w-3 h-3 text-sett-text-accent shrink-0" />
-                                    <span className="font-montserrat text-[13px] font-semibold text-sett-text-primary truncate">{name}</span>
-                                  </div>
-                                )}
-                                {r.companyName && name !== r.companyName && (
-                                  <div className="flex items-center gap-1 mb-0.5">
-                                    <Building2 className="w-3 h-3 text-sett-text-accent shrink-0" />
-                                    <span className="font-montserrat text-[12px] text-sett-text-secondary truncate">{r.companyName}</span>
-                                  </div>
-                                )}
-                                {r.destinationName && (
-                                  <div className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3 text-sett-text-accent shrink-0" />
-                                    <span className="font-montserrat text-[12px] text-sett-text-secondary truncate">{r.destinationName}</span>
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Status */}
-                              <Badge variant={getStatusBadgeVariant(r.status)} className="shrink-0 text-[11px] px-2 py-0.5">
-                                {formatStatus(r.status)}
-                              </Badge>
-                            </button>
-                            {i < searchResults.length - 1 && (
-                              <div className="mx-3 h-px bg-sett-border-light" />
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <div className="px-3 py-2 border-t border-sett-border-light">
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          router.push(`/booking-requests?search=${encodeURIComponent(searchQuery.trim())}`);
-                          setSearchQuery('');
-                          setSearchOpen(false);
-                          onMobileClose?.();
-                        }}
-                        className="w-full font-montserrat text-[12px] font-semibold text-sett-primary hover:underline text-center py-0.5"
-                      >
-                        View all results for &ldquo;{searchQuery.trim()}&rdquo;
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <div className="px-3 py-2 border-t border-sett-border-light">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            router.push(`/booking-requests?search=${encodeURIComponent(searchQuery.trim())}`);
+                            setSearchQuery('');
+                            setSearchOpen(false);
+                            onMobileClose?.();
+                          }}
+                          className="w-full font-montserrat text-[12px] font-semibold text-sett-primary hover:underline text-center py-0.5"
+                        >
+                          View all results for &ldquo;{searchQuery.trim()}&rdquo;
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-2 space-y-0.5">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {navItems.map(({ href, label, icon: Icon }, idx) => {
             const matchingHref = navItems
               .filter(
                 (n) => pathname === n.href || pathname.startsWith(n.href + '/')
@@ -274,34 +314,50 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             const isActive = matchingHref === href;
 
             return (
-              <Link
+              <SidebarNavItem
                 key={href}
                 href={href}
-                onClick={onMobileClose}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-sett-sidebar-active text-white'
-                    : 'text-white/90 hover:bg-white/10 hover:text-white'
-                )}
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {label}
-              </Link>
+                label={label}
+                Icon={Icon}
+                isActive={isActive}
+                collapsed={sidebarCollapsed}
+                onMobileClose={onMobileClose}
+                index={idx}
+              />
             );
           })}
         </nav>
 
         {/* User card */}
-        <div className="px-5 pb-4 pt-4 border-t border-b border-sett-sidebar-border">
-          <div className="rounded-[17px] bg-sett-sidebar-border px-[14px] py-[12px]">
-            <div className="flex items-center gap-[10px]">
+        <div
+          className={cn(
+            'pb-4 pt-4 border-t border-b border-sett-sidebar-border transition-[padding] duration-320 ease-sett-in-out',
+            'animate-sidebar-fade-up',
+            sidebarCollapsed ? 'px-3' : 'px-5'
+          )}
+          style={{ animationDelay: '560ms' }}
+        >
+          <div
+            className={cn(
+              'rounded-[17px] bg-sett-sidebar-border transition-all duration-320 ease-sett-in-out',
+              sidebarCollapsed ? 'px-[7px] py-[7px]' : 'px-[14px] py-[12px]'
+            )}
+            title={sidebarCollapsed ? `${displayName} · ${user?.role ?? 'User'}` : undefined}
+          >
+            <div className={cn('flex items-center', sidebarCollapsed ? 'justify-center' : 'gap-[10px]')}>
               <div className="w-[30px] h-[30px] shrink-0 rounded-[10px] bg-[#667F00] flex items-center justify-center text-white font-semibold text-[12px] font-montserrat">
                 {displayName.slice(0, 2).toUpperCase()}
               </div>
-              <div className="min-w-0 flex-1 space-y-[2px]">
-                <p className="font-montserrat text-[12px] font-semibold leading-normal text-white truncate">{displayName}</p>
-                <p className="font-montserrat text-[10px] font-normal leading-normal text-white/60 truncate">{user?.role ?? 'User'}</p>
+              <div
+                className={cn(
+                  'min-w-0 flex-1 space-y-[2px] overflow-hidden transition-all duration-280 ease-sett-out',
+                  sidebarCollapsed
+                    ? 'w-0 opacity-0 ml-0 pointer-events-none'
+                    : 'w-auto opacity-100'
+                )}
+              >
+                <p className="font-montserrat text-[12px] font-semibold leading-normal text-white truncate whitespace-nowrap">{displayName}</p>
+                <p className="font-montserrat text-[10px] font-normal leading-normal text-white/60 truncate whitespace-nowrap">{user?.role ?? 'User'}</p>
               </div>
             </div>
           </div>
@@ -314,20 +370,177 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
     <>
       <aside
         className={cn(
-          'fixed top-0 left-0 z-40 w-sidebar h-screen bg-sett-sidebar flex flex-col transition-transform lg:translate-x-0',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+          'sett-motion-collapse fixed top-0 left-0 z-40 h-screen bg-sett-sidebar flex flex-col',
+          'transition-[width,transform] duration-320 ease-sett-in-out lg:translate-x-0',
+          // One-time entrance — only on desktop where the sidebar is always visible.
+          // (Mobile uses the existing translate-x drawer behavior.)
+          'lg:animate-sidebar-slide-in',
+          sidebarCollapsed ? 'w-sidebar-collapsed' : 'w-sidebar',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full',
+          // On mobile we always want the full width — collapse only applies on lg+
+          'max-lg:!w-sidebar'
         )}
       >
         {content}
+
+        {/* Collapse toggle — only on lg+ (no value on mobile, where the
+            sidebar is a drawer with a backdrop) */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!sidebarCollapsed}
+          className={cn(
+            'hidden lg:flex absolute top-[26px] -right-3 z-50 items-center justify-center',
+            'w-6 h-6 rounded-full bg-sett-sidebar-active text-white shadow-md',
+            'ring-2 ring-sett-sidebar hover:bg-sett-primary hover:text-sett-navy',
+            'transition-all duration-280 ease-sett-spring',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sett-sidebar'
+          )}
+        >
+          <ChevronLeft
+            className={cn(
+              'w-3.5 h-3.5 transition-transform duration-320 ease-sett-spring',
+              sidebarCollapsed ? 'rotate-180' : 'rotate-0'
+            )}
+          />
+        </button>
       </aside>
       <div
         className={cn(
-          'fixed inset-0 z-30 bg-black/50 lg:hidden',
-          isMobileOpen ? 'block' : 'hidden'
+          'fixed inset-0 z-30 bg-black/50 lg:hidden transition-opacity duration-280 ease-sett-out',
+          isMobileOpen ? 'opacity-100 block' : 'opacity-0 hidden'
         )}
         onClick={onMobileClose}
         aria-hidden
       />
     </>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+ * Subcomponents
+ * ──────────────────────────────────────────────────────────── */
+
+interface SidebarNavItemProps {
+  href: string;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+  collapsed: boolean;
+  onMobileClose?: () => void;
+  index: number;
+}
+
+function SidebarNavItem({
+  href,
+  label,
+  Icon,
+  isActive,
+  collapsed,
+  onMobileClose,
+  index,
+}: SidebarNavItemProps) {
+  // Cascading entrance — start after logo + search have begun appearing.
+  const enterDelay = 280 + index * 60;
+
+  return (
+    <div
+      className="relative group animate-sidebar-item-in"
+      style={{ animationDelay: `${enterDelay}ms` }}
+    >
+      <Link
+        href={href}
+        onClick={onMobileClose}
+        className={cn(
+          'flex items-center rounded-lg text-sm font-medium overflow-hidden',
+          'transition-[background-color,color,padding] duration-280 ease-sett-out',
+          collapsed ? 'justify-center px-0 py-2.5 h-10' : 'gap-3 px-3 py-2.5',
+          isActive
+            ? 'bg-sett-sidebar-active text-white'
+            : 'text-white/90 hover:bg-white/10 hover:text-white'
+        )}
+        aria-label={collapsed ? label : undefined}
+      >
+        <Icon className="w-5 h-5 shrink-0" />
+        <span
+          className={cn(
+            'whitespace-nowrap transition-all duration-280 ease-sett-out',
+            collapsed
+              ? 'w-0 opacity-0 -translate-x-1 pointer-events-none'
+              : 'w-auto opacity-100 translate-x-0'
+          )}
+          style={{
+            transitionDelay: collapsed ? '0ms' : `${index * 30}ms`,
+          }}
+        >
+          {label}
+        </span>
+      </Link>
+
+      {/* Tooltip — only visible when collapsed, on hover/focus */}
+      {collapsed && (
+        <span
+          role="tooltip"
+          className={cn(
+            'pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50',
+            'whitespace-nowrap rounded-md bg-sett-navy text-white text-xs font-medium',
+            'px-2.5 py-1.5 shadow-lg ring-1 ring-white/10',
+            'opacity-0 -translate-x-1 transition-all duration-180 ease-sett-out',
+            'group-hover:opacity-100 group-hover:translate-x-0',
+            'group-focus-within:opacity-100 group-focus-within:translate-x-0'
+          )}
+        >
+          {label}
+          <span
+            aria-hidden
+            className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-sett-navy"
+          />
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface SidebarIconButtonProps {
+  label: string;
+  onClick: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+function SidebarIconButton({ label, onClick, icon: Icon }: SidebarIconButtonProps) {
+  return (
+    <div className="relative group">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        className={cn(
+          'flex items-center justify-center w-full h-10 rounded-lg',
+          'bg-white/10 border border-white/20 text-white/80 hover:text-white hover:bg-white/15',
+          'transition-colors duration-180 ease-sett-out',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary'
+        )}
+      >
+        <Icon className="w-4 h-4" />
+      </button>
+      <span
+        role="tooltip"
+        className={cn(
+          'pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50',
+          'whitespace-nowrap rounded-md bg-sett-navy text-white text-xs font-medium',
+          'px-2.5 py-1.5 shadow-lg ring-1 ring-white/10',
+          'opacity-0 -translate-x-1 transition-all duration-180 ease-sett-out',
+          'group-hover:opacity-100 group-hover:translate-x-0',
+          'group-focus-within:opacity-100 group-focus-within:translate-x-0'
+        )}
+      >
+        {label}
+        <span
+          aria-hidden
+          className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-sett-navy"
+        />
+      </span>
+    </div>
   );
 }

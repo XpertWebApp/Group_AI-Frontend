@@ -243,9 +243,12 @@ export default function BookingRequestsPage() {
 
       <div className="p-4 md:p-6 space-y-6">
         {/* Card with filters + table */}
-        <div className="bg-white rounded-[14px] border border-sett-border">
+        <div className="bg-white rounded-[14px] border border-sett-border animate-card-rise-in">
           {/* Filter bar with refresh button — no overflow-hidden here so Select dropdowns are never clipped */}
-          <div className="relative z-10 p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div
+            className="relative z-10 p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-sidebar-fade-up"
+            style={{ animationDelay: '120ms' }}
+          >
             <div className="flex-1 min-w-0">
               <BookingRequestFilters
                 search={search}
@@ -260,7 +263,7 @@ export default function BookingRequestsPage() {
               type="button"
               onClick={handleRefresh}
               disabled={loading || isRefreshing}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill hover:border-sett-primary/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
               title={t.requests.refresh || 'Refresh requests'}
             >
               <RefreshCw className={`w-4 h-4 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -282,7 +285,10 @@ export default function BookingRequestsPage() {
 
           {/* Empty state */}
           {!loading && filtered.length === 0 && (
-            <div className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border">
+            <div
+              className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border animate-sidebar-fade-up"
+              style={{ animationDelay: '320ms' }}
+            >
               {t.requests.noRequests}
             </div>
           )}
@@ -307,18 +313,28 @@ export default function BookingRequestsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => {
+                  {rows.map((row, i) => {
                     const rooms = totalRooms(row.rooms);
                     const { totalSell, margin } = getProposalTotals(row);
 
                     return (
                       <tr
                         key={row.id}
-                        className="border-b border-sett-border last:border-0 hover:bg-sett-fill/50 cursor-pointer transition-colors"
+                        className="group border-b border-sett-border last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                        style={{ animationDelay: `${320 + Math.min(i, 6) * 50}ms` }}
                         onClick={() => router.push(`/booking-requests/${row.id}`)}
                       >
-                        <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary">
-                          <Link href={`/booking-requests/${row.id}`} className="hover:text-sett-primary">
+                        <td className="relative px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary">
+                          {/* Left accent bar — slides in on row hover */}
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
+                          />
+                          <Link
+                            href={`/booking-requests/${row.id}`}
+                            className="inline-flex items-center gap-1 transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             #{row.referenceNumber ?? row.id.slice(0, 4)}
                           </Link>
                         </td>
@@ -395,7 +411,7 @@ export default function BookingRequestsPage() {
           {/* ── Mobile/Tablet Card View (below xl) ── */}
           {!loading && rows.length > 0 && (
             <div className="xl:hidden divide-y divide-sett-border border-t border-sett-border overflow-hidden">
-              {rows.map((row) => {
+              {rows.map((row, i) => {
                 const rooms = totalRooms(row.rooms);
                 const { totalSell, margin } = getProposalTotals(row);
 
@@ -403,11 +419,17 @@ export default function BookingRequestsPage() {
                   <Link
                     key={row.id}
                     href={`/booking-requests/${row.id}`}
-                    className="block p-4 hover:bg-sett-fill/50 transition-colors"
+                    className="group relative block p-4 transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                    style={{ animationDelay: `${320 + Math.min(i, 6) * 60}ms` }}
                   >
+                    {/* Left accent bar — slides in on hover */}
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
+                    />
                     {/* Top row: ID + Status */}
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-body font-semibold text-sett-text-primary">
+                      <span className="text-body font-semibold text-sett-text-primary transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5">
                         #{row.referenceNumber ?? row.id.slice(0, 4)}
                       </span>
                       <Badge variant={getStatusBadgeVariant(row.status)}>
@@ -465,7 +487,10 @@ export default function BookingRequestsPage() {
 
         {/* Pagination */}
         {!loading && filtered.length > 0 && (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 animate-sidebar-fade-up"
+            style={{ animationDelay: '720ms' }}
+          >
             <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
               {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, totalItems)} {t.requests.of}{' '}
               {totalItems} {t.requests.requestsLabel}
@@ -475,7 +500,7 @@ export default function BookingRequestsPage() {
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={safeCurrentPage <= 1}
-                className="px-2 sm:px-2.5 h-8 rounded-lg text-sm sm:text-body font-medium text-sett-text-accent disabled:opacity-40"
+                className="px-2 sm:px-2.5 h-8 rounded-lg text-sm sm:text-body font-medium text-sett-text-accent transition-all duration-180 ease-sett-out hover:text-sett-primary active:scale-95 disabled:opacity-40 disabled:hover:text-sett-text-accent"
               >
                 {t.requests.prev}
               </button>
@@ -492,9 +517,9 @@ export default function BookingRequestsPage() {
                     key={p}
                     type="button"
                     onClick={() => setPage(p as number)}
-                    className={`w-8 h-8 rounded-lg text-sm sm:text-body ${p === safeCurrentPage
-                      ? 'bg-sett-primary text-white font-bold'
-                      : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-background'
+                    className={`w-8 h-8 rounded-lg text-sm sm:text-body transition-all duration-180 ease-sett-out active:scale-90 ${p === safeCurrentPage
+                      ? 'bg-sett-primary text-white font-bold shadow-[0_2px_6px_0_rgba(170,199,55,0.35)]'
+                      : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary'
                       }`}
                   >
                     {p}
@@ -505,7 +530,7 @@ export default function BookingRequestsPage() {
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={safeCurrentPage >= totalPages}
-                className="px-2 sm:px-2.5 h-8 rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary disabled:opacity-40 hover:bg-sett-background"
+                className="px-2 sm:px-2.5 h-8 rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary transition-all duration-180 ease-sett-out hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-sett-text-secondary"
               >
                 {t.requests.next}
               </button>
