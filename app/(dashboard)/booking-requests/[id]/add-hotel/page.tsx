@@ -991,7 +991,7 @@ export default function AddHotelPage() {
         }}
       >
         {/* Breadcrumb */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:shrink-0 animate-sidebar-fade-up">
           <button
             type="button"
             onClick={() => router.push(`/booking-requests/${requestId}`)}
@@ -1020,7 +1020,10 @@ export default function AddHotelPage() {
             : 0;
           const remaining = searchSummary ? Math.max(0, searchSummary.total - searchSummary.completed) : 0;
           return (
-            <div className="bg-white rounded-[14px] border border-sett-border-light px-5 py-4 relative overflow-hidden">
+            <div
+              className="bg-white rounded-[14px] border border-sett-border-light px-5 py-4 relative overflow-hidden animate-card-rise-in"
+              style={{ animationDelay: '120ms' }}
+            >
               {/* Subtle left-side glow */}
               <div
                 className="absolute inset-y-0 left-0 w-32 pointer-events-none"
@@ -1228,7 +1231,7 @@ export default function AddHotelPage() {
 
         {/* Error phase */}
         {phase === 'error' && (
-          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+          <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center animate-card-rise-in">
             <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
             <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">{t.addHotel.searchFailed}</h3>
             <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">{errorMsg}</p>
@@ -1240,7 +1243,7 @@ export default function AddHotelPage() {
 
         {/* Searching with relaxed criteria message */}
         {phase === 'polling' && showSearchingWithRelaxation && (
-          <div className="bg-blue-50 rounded-[14px] border-l-4 border-l-blue-400 border border-blue-200 px-5 py-4 mb-4">
+          <div className="bg-blue-50 rounded-[14px] border-l-4 border-l-blue-400 border border-blue-200 px-5 py-4 mb-4 animate-sidebar-fade-up">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center shrink-0">
                 <svg className="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1287,7 +1290,10 @@ export default function AddHotelPage() {
               'xl:w-[300px] shrink-0 xl:overflow-y-auto',
               filtersOpen ? 'block' : 'hidden xl:block'
             )}>
-              <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+              <div
+                className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-card-rise-in"
+                style={{ animationDelay: '160ms' }}
+              >
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
                 {editingTripDetails && (
                   <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
@@ -1679,7 +1685,10 @@ export default function AddHotelPage() {
 
             {/* ── Right: Hotel Results ── */}
             <div ref={hotelListRef} className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1">
-              <p className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0">
+              <p
+                className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0 animate-sidebar-fade-up"
+                style={{ animationDelay: '220ms' }}
+              >
                 {filteredResults.length < deduplicatedResults.length
                   ? t.addHotel.hotelsShowing
                     .replace('{shown}', String(filteredResults.length))
@@ -1691,7 +1700,10 @@ export default function AddHotelPage() {
               </p>
 
               {filteredResults.length === 0 && (
-                <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center">
+                <div
+                  className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center animate-card-rise-in"
+                  style={{ animationDelay: '280ms' }}
+                >
                   <p className="font-montserrat text-[14px] text-sett-text-accent">
                     {t.addHotel.noHotelsMatch}
                   </p>
@@ -1702,7 +1714,10 @@ export default function AddHotelPage() {
                 {/* Main Results Section Header */}
                 {filteredMainResults.length > 0 && (
                   <div className="mb-1">
-                    <div className="flex items-center gap-2 mb-4">
+                    <div
+                      className="flex items-center gap-2 mb-4 animate-sidebar-fade-up"
+                      style={{ animationDelay: '280ms' }}
+                    >
                       <div className="flex-shrink-0">
                         <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-sett-primary to-sett-primary-hover shadow-sm">
                           <Check className="w-4 h-4 text-white" strokeWidth={3} />
@@ -1726,16 +1741,27 @@ export default function AddHotelPage() {
                       </button>
                     </div>
                     <div className="space-y-4">
-                      {filteredMainResults.map((hotel) => (
-                        <HotelResultCard
+                      {filteredMainResults.map((hotel, i) => (
+                        // Wrapper applies the entrance animation per-card.
+                        // `key` on the wrapper stays stable so already-mounted cards
+                        // don't re-animate on poll updates — only newly-mounted
+                        // cards play the animation. Stagger is bounded with `i % 5`
+                        // so late-arriving polled cards still feel lively without
+                        // queueing long delays.
+                        <div
                           key={hotel.hotelCode}
-                          hotel={hotel}
-                          isAdded={addedHotels.has(hotel.hotelCode)}
-                          isAdding={addingHotel === hotel.hotelCode}
-                          onAddToOffer={() => handleAddToOffer(hotel)}
-                          onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                          onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
-                        />
+                          className="animate-card-rise-in"
+                          style={{ animationDelay: `${340 + (i % 5) * 60}ms` }}
+                        >
+                          <HotelResultCard
+                            hotel={hotel}
+                            isAdded={addedHotels.has(hotel.hotelCode)}
+                            isAdding={addingHotel === hotel.hotelCode}
+                            onAddToOffer={() => handleAddToOffer(hotel)}
+                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                            onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -1743,7 +1769,7 @@ export default function AddHotelPage() {
 
                 {/* Show Alternatives button — computed locally when 1-4 main hotels succeeded */}
                 {shouldShowAlternativesButton && (
-                  <div className="flex justify-center py-3">
+                  <div className="flex justify-center py-3 animate-sidebar-fade-up">
                     <button
                       type="button"
                       onClick={handleShowAlternatives}
@@ -1773,20 +1799,25 @@ export default function AddHotelPage() {
                   <>
                     {filteredMainResults.length > 0 && <hr className="border-sett-border-light my-4" />}
                     <div>
-                      <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-3 uppercase">
+                      <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-3 uppercase animate-sidebar-fade-up">
                         Other Star Ratings
                       </h3>
                       <div className="space-y-5">
-                        {filteredStarMismatchResults.map((hotel) => (
-                          <HotelResultCard
+                        {filteredStarMismatchResults.map((hotel, i) => (
+                          <div
                             key={hotel.hotelCode}
-                            hotel={hotel}
-                            isAdded={addedHotels.has(hotel.hotelCode)}
-                            isAdding={addingHotel === hotel.hotelCode}
-                            onAddToOffer={() => handleAddToOffer(hotel)}
-                            onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                            onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
-                          />
+                            className="animate-card-rise-in"
+                            style={{ animationDelay: `${80 + (i % 5) * 60}ms` }}
+                          >
+                            <HotelResultCard
+                              hotel={hotel}
+                              isAdded={addedHotels.has(hotel.hotelCode)}
+                              isAdding={addingHotel === hotel.hotelCode}
+                              onAddToOffer={() => handleAddToOffer(hotel)}
+                              onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                              onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
@@ -1880,17 +1911,22 @@ export default function AddHotelPage() {
                           ) : (
                             // Alternatives found
                             <div className="space-y-4">
-                              {filteredAltResults.map((hotel) => (
-                                <HotelResultCard
+                              {filteredAltResults.map((hotel, i) => (
+                                <div
                                   key={hotel.hotelCode}
-                                  hotel={hotel}
-                                  alternativeReason={hotel.alternativeReason ? (t.addHotel.alternativeReasons[hotel.alternativeReason] ?? hotel.alternativeReason) : null}
-                                  isAdded={addedHotels.has(hotel.hotelCode)}
-                                  isAdding={addingHotel === hotel.hotelCode}
-                                  onAddToOffer={() => handleAddToOffer(hotel)}
-                                  onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                                  onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
-                                />
+                                  className="animate-card-rise-in"
+                                  style={{ animationDelay: `${(i % 5) * 60}ms` }}
+                                >
+                                  <HotelResultCard
+                                    hotel={hotel}
+                                    alternativeReason={hotel.alternativeReason ? (t.addHotel.alternativeReasons[hotel.alternativeReason] ?? hotel.alternativeReason) : null}
+                                    isAdded={addedHotels.has(hotel.hotelCode)}
+                                    isAdding={addingHotel === hotel.hotelCode}
+                                    onAddToOffer={() => handleAddToOffer(hotel)}
+                                    onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
+                                    onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
+                                  />
+                                </div>
                               ))}
                             </div>
                           )}
@@ -2108,10 +2144,13 @@ function HotelResultCard({
   return (
     <div
       className={cn(
-        'bg-white rounded-[14px] border overflow-hidden p-5',
+        'group/card bg-white rounded-[14px] border overflow-hidden p-5',
+        // Soft hover lift — gives the card a "live" feel as the user scans the list
+        'transition-[box-shadow,transform,border-color] duration-280 ease-sett-out',
+        'hover:-translate-y-px hover:shadow-[0_6px_20px_-6px_rgba(7,28,66,0.12)]',
         isLimited
-          ? 'border-amber-300'
-          : 'border-sett-border-light'
+          ? 'border-amber-300 hover:border-amber-400'
+          : 'border-sett-border-light hover:border-sett-primary/30'
       )}
     >
       {/* ── Top section: Image + Hotel Details + Action ── */}
@@ -2130,7 +2169,9 @@ function HotelResultCard({
           <img
             src={getImageUrl(hotel.imageUrl)}
             alt={hotel.hotelName}
-            className="w-full h-full object-cover"
+            // group-hover/card on the outer card scales the image when the user
+            // hovers anywhere on the card (not just the image itself).
+            className="w-full h-full object-cover transition-transform duration-500 ease-sett-out group-hover/card:scale-[1.04]"
             onError={(e) => {
               (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
             }}
@@ -2146,7 +2187,7 @@ function HotelResultCard({
           )}
 
           {(hotel.supplierSplit?.[0]?.supplierCode ?? hotel.bestOption?.supplierCode) && (
-            <span className="absolute bottom-0 right-0 rounded-tl-[14px] bg-[#F7F7F7] px-3 py-2 font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+            <span className="absolute bottom-0 right-0 rounded-tl-[14px] bg-[#F7F7F7] px-3 py-2 font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D] z-10">
               {hotel.supplierSplit?.[0]?.supplierCode ?? hotel.bestOption?.supplierCode}
             </span>
           )}
@@ -2158,11 +2199,14 @@ function HotelResultCard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex-1 min-w-0 flex flex-col gap-2">
               {/* Name + Stars on the same row */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div
+                className="flex items-center gap-2 flex-wrap animate-sidebar-fade-up"
+                style={{ animationDelay: '80ms' }}
+              >
                 <div className="flex-1 min-w-0">
                   <HotelName
                     hotel={hotel}
-                    className="font-montserrat text-[16px] font-semibold leading-tight"
+                    className="font-montserrat text-[16px] font-semibold leading-tight transition-colors duration-180 ease-sett-out group-hover/card:text-sett-primary"
                   />
                 </div>
                 <StarRating rating={Number(hotel.starRating)} size={18} />
@@ -2180,7 +2224,10 @@ function HotelResultCard({
               </div>
               {/* Location */}
               {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
-                <div className="flex items-center gap-1.5">
+                <div
+                  className="flex items-center gap-1.5 animate-fade-in-right"
+                  style={{ animationDelay: '140ms' }}
+                >
                   <MapPin className="w-4 h-4 text-sett-text-accent shrink-0" />
                   <span className="font-montserrat text-[14px] text-sett-text-secondary">
                     {hotel.address ||
@@ -2191,12 +2238,13 @@ function HotelResultCard({
               {/* Description */}
               {hotel.description && (
                 <p
-                  className="font-montserrat text-[14px] text-sett-text-secondary leading-snug"
+                  className="font-montserrat text-[14px] text-sett-text-secondary leading-snug animate-sidebar-fade-up"
                   style={{
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden',
+                    animationDelay: '200ms',
                   }}
                 >
                   {hotel.description}
@@ -2205,7 +2253,10 @@ function HotelResultCard({
             </div>
 
             {/* Action area — primary CTA only */}
-            <div className="shrink-0 flex flex-col items-end gap-2">
+            <div
+              className="shrink-0 flex flex-col items-end gap-2 animate-fade-in-right"
+              style={{ animationDelay: '80ms' }}
+            >
               {isAdded ? (
                 <span className="flex items-center gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
                   <Check className="w-4 h-4" strokeWidth={2.5} /> {t.addHotel.added}
@@ -2240,12 +2291,15 @@ function HotelResultCard({
           {/* Facility tags */}
           {hotel.facilities && hotel.facilities.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
-              {hotel.facilities.map((facility) => {
+              {hotel.facilities.map((facility, i) => {
                 const AmenityIcon = getAmenityIcon(facility.name);
                 return (
                   <span
                     key={facility.id}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20"
+                    // Each chip pops in with a small stagger (capped at 8 so cards
+                    // with 20+ facilities don't drag the cascade out)
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in"
+                    style={{ animationDelay: `${240 + Math.min(i, 7) * 30}ms` }}
                   >
                     {AmenityIcon && <AmenityIcon className="w-3 h-3" />}
                     {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
@@ -2256,7 +2310,10 @@ function HotelResultCard({
           )}
 
           {/* ── Room Table (desktop) ── */}
-          <div className="hidden xl:block mt-4 overflow-x-auto">
+          <div
+            className="hidden xl:block mt-4 overflow-x-auto animate-sidebar-fade-up"
+            style={{ animationDelay: '320ms' }}
+          >
             <div className="border border-sett-border-light rounded-[14px] overflow-hidden">
               <table className="w-full">
                 <thead>
@@ -2314,7 +2371,10 @@ function HotelResultCard({
           </div>
 
           {/* ── Room cards (mobile) ── */}
-          <div className="xl:hidden mt-4 space-y-2">
+          <div
+            className="xl:hidden mt-4 space-y-2 animate-sidebar-fade-up"
+            style={{ animationDelay: '320ms' }}
+          >
             {roomTypes.map((rt, i) => (
               <div key={i} className="border border-sett-border-light rounded-[10px] p-4 bg-[#FAFAFA]/50">
                 <div className="grid grid-cols-2 gap-y-4 gap-x-2">
@@ -2353,7 +2413,10 @@ function HotelResultCard({
 
           {/* Notes */}
           {hotel.note && (
-            <div className="mt-3">
+            <div
+              className="mt-3 animate-sidebar-fade-up"
+              style={{ animationDelay: '380ms' }}
+            >
               <p className="font-montserrat text-[12px] text-amber-600 bg-amber-50 px-2 py-1 rounded">
                 {hotel.note}
               </p>
@@ -2361,7 +2424,10 @@ function HotelResultCard({
           )}
 
           {/* ── Footer: View Details ── */}
-          <div className="flex items-center justify-end pt-3 mt-1 border-t border-sett-border-light">
+          <div
+            className="flex items-center justify-end pt-3 mt-1 border-t border-sett-border-light animate-sidebar-fade-up"
+            style={{ animationDelay: '420ms' }}
+          >
             <button
               type="button"
               onClick={onViewDetails}
