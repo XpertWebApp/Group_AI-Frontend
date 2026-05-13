@@ -22,12 +22,14 @@ interface SelectProps {
   onChange?: (e: { target: { value: string } }) => void;
   variant?: 'default' | 'filter';
   className?: string;
+  style?: React.CSSProperties;
   disabled?: boolean;
   name?: string;
 }
 
 export function Select({
   className,
+  style,
   label,
   error,
   options,
@@ -178,13 +180,13 @@ export function Select({
   }, [onChange, positionMode]);
 
   return (
-    <div ref={containerRef} className={cn('relative', className)}>
+    <div ref={containerRef} className={cn('relative', className)} style={style}>
       {label && (
         <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
           {label.endsWith('*') ? (
             <>
               {label.slice(0, -1).trimEnd()}{' '}
-              <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
+              <span className="text-sett-destructive">*</span>
             </>
           ) : (
             label

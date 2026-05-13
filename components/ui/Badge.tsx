@@ -22,16 +22,16 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  pending: 'bg-[#f7f7f7] border border-sett-border-light text-sett-text-primary',
-  draft: 'bg-[#f7f7f7] border border-sett-border-light text-sett-text-primary',
-  processing: 'bg-blue-50 border border-blue-200 text-blue-700',
+  pending: 'bg-sett-light-green-bg border border-sett-primary text-sett-green-dark font-semibold',
+  draft: 'bg-sett-fill border border-sett-border text-sett-text-secondary',
+  processing: 'bg-transparent border border-sett-primary text-sett-primary font-semibold animate-badge-pulse',
   ai_generated: 'bg-sett-navy text-sett-primary border border-sett-navy',
   completed: 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00]',
   sent: 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00] opacity-60',
   approved: 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00] opacity-60',
   declined: 'bg-[#ffeaeb] border border-[#feb1b5] text-[#fb2c36]',
   cancelled: 'bg-[#f7f7f7] border border-sett-border-light text-sett-text-secondary',
-  needs_manual_handling: 'bg-amber-50 border border-amber-300 text-amber-700 font-semibold',
+  needs_manual_handling: 'bg-sett-navy text-sett-primary border border-sett-primary font-semibold',
   default: 'bg-sett-border text-sett-text-secondary border border-sett-border',
 };
 

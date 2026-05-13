@@ -33,7 +33,7 @@ import { EditRequestModal } from '@/components/forms/EditRequestModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
-import { PageLoader } from '@/components/ui/Loader';
+import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import type { Attachment, BookingRequest, OfferHistoryEntry, Proposal, ProposalHotel, ProposalService } from '@/types';
@@ -628,7 +628,12 @@ export default function RequestDetailPage() {
   };
 
   if (loading) {
-    return <PageLoader message={t.offer.loadingOffer} />;
+    return (
+      <>
+        <Header title={t.createForm.title} />
+        <RequestSummarySkeleton />
+      </>
+    );
   }
 
   if (!request) {

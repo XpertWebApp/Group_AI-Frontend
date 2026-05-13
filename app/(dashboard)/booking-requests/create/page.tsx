@@ -787,7 +787,14 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
         subtitle={t.createForm.tripDetailsSubtitle}
       />
       <div className="space-y-4">
-        <div ref={destWrapperRef} className="relative">
+        {/* Destination — wrapper needs z-30 so its absolute dropdown floats above
+            the sibling field wrappers (each of which creates its own stacking
+            context via animate-card-rise-in's transform). */}
+        <div
+          ref={destWrapperRef}
+          className="relative z-30 group animate-card-rise-in"
+          style={{ animationDelay: '120ms' }}
+        >
           <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.destination} <span className="text-sett-destructive">*</span>
           </label>
@@ -797,15 +804,19 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             value={destQuery}
             onChange={(e) => handleDestinationInputChange(e.target.value)}
             onFocus={() => { if (destResults.length > 0) setDestOpen(true); }}
-            className={inputClass(!!errors.destination)}
+            className={cn(
+              inputClass(!!errors.destination),
+              'transition-all duration-200 ease-sett-out focus:scale-[1.005]'
+            )}
           />
           {destOpen && destResults.length > 0 && (
             <ul className="absolute z-50 w-full mt-1 bg-white border border-sett-border rounded-input shadow-lg max-h-60 overflow-y-auto">
-              {destResults.map((dest) => (
+              {destResults.map((dest, i) => (
                 <li
                   key={dest.id}
                   onClick={() => handleDestinationSelect(dest)}
-                  className="px-3 py-2 text-body cursor-pointer hover:bg-sett-fill"
+                  className="px-3 py-2 text-body cursor-pointer hover:bg-sett-fill transition-colors duration-150 animate-fade-in-right"
+                  style={{ animationDelay: `${i * 30}ms` }}
                 >
                   {dest.name} ({getCountryName(dest.countryCode)})
                 </li>
@@ -813,7 +824,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </ul>
           )}
           {destLoading && (
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-2 mt-1.5 animate-sidebar-fade-up">
               <Spinner size="sm" />
               <span className="text-caption text-sett-text-muted">{t.createForm.searching}</span>
             </div>
@@ -821,12 +832,13 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           <FieldError message={errors.destination} />
         </div>
 
+        {/* Check-in / Check-out */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="animate-card-rise-in" style={{ animationDelay: '180ms' }}>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkInDate} <span className="text-sett-destructive">*</span>
             </label>
-            <div className="sett-datepicker">
+            <div className="sett-datepicker transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]">
               <DatePicker
                 selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
                 onChange={(date: Date | null) => updateField('checkInDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
@@ -844,11 +856,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </div>
             <FieldError message={errors.checkInDate} />
           </div>
-          <div>
+          <div className="animate-card-rise-in" style={{ animationDelay: '220ms' }}>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkOutDate} <span className="text-sett-destructive">*</span>
             </label>
-            <div className="sett-datepicker">
+            <div className="sett-datepicker transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]">
               <DatePicker
                 selected={formData.checkOutDate ? new Date(formData.checkOutDate) : null}
                 onChange={(date: Date | null) => updateField('checkOutDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
@@ -868,6 +880,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
         </div>
 
+        {/* Hotel Category / Budget */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label={`${t.createForm.hotelCategory} *`}
@@ -876,6 +889,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             onChange={(e) => updateField('hotelCategory', e.target.value)}
             placeholder={t.createForm.selectHotelCategory}
             error={errors.hotelCategory}
+            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            style={{ animationDelay: '280ms' }}
           />
           <Select
             label={`${t.createForm.budgetRange} ${t.createForm.optional}`}
@@ -883,9 +898,12 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             value={formData.budgetRange}
             onChange={(e) => updateField('budgetRange', e.target.value)}
             placeholder={t.createForm.selectBudgetRange}
+            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            style={{ animationDelay: '320ms' }}
           />
         </div>
 
+        {/* Group Type / Group Size */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label={`${t.createForm.groupType} *`}
@@ -900,46 +918,56 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             }}
             placeholder={t.createForm.selectGroupType}
             error={errors.groupType}
+            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            style={{ animationDelay: '380ms' }}
           />
-          <Input
-            label={`${t.createForm.groupSize} *`}
-            type="number"
-            min="1"
-            placeholder={t.createForm.groupSizePlaceholder}
-            value={formData.groupSize}
-            onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9]/g, '');
-              if (val === '' || Number(val) >= 0) updateField('groupSize', val);
-            }}
-            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
-            onWheel={(e) => (e.target as HTMLInputElement).blur()}
-            error={errors.groupSize}
-          />
-        </div>
-
-        {(formData.groupType === 'youth_group' || formData.groupType === 'school_group') && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            style={{ animationDelay: '420ms' }}
+          >
             <Input
-              label={`${t.createForm.averageAge} *`}
+              label={`${t.createForm.groupSize} *`}
               type="number"
               min="1"
-              max="120"
-              placeholder={t.createForm.averageAgePlaceholder}
-              value={formData.averageAge === '' ? '' : String(formData.averageAge)}
+              placeholder={t.createForm.groupSizePlaceholder}
+              value={formData.groupSize}
               onChange={(e) => {
-                const val = e.target.value;
-                if (val === '') {
-                  updateField('averageAge', '');
-                } else {
-                  const num = Number(val);
-                  if (num >= 0) {
-                    updateField('averageAge', num);
-                  }
-                }
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                if (val === '' || Number(val) >= 0) updateField('groupSize', val);
               }}
+              onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
-              error={errors.averageAge}
+              error={errors.groupSize}
             />
+          </div>
+        </div>
+
+        {/* Average Age — conditional, slides in only for youth/school groups */}
+        {(formData.groupType === 'youth_group' || formData.groupType === 'school_group') && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]">
+              <Input
+                label={`${t.createForm.averageAge} *`}
+                type="number"
+                min="1"
+                max="120"
+                placeholder={t.createForm.averageAgePlaceholder}
+                value={formData.averageAge === '' ? '' : String(formData.averageAge)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    updateField('averageAge', '');
+                  } else {
+                    const num = Number(val);
+                    if (num >= 0) {
+                      updateField('averageAge', num);
+                    }
+                  }
+                }}
+                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                error={errors.averageAge}
+              />
+            </div>
           </div>
         )}
       </div>
