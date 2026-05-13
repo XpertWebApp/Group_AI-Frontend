@@ -11,7 +11,7 @@ export function LanguageToggle() {
     <button
       type="button"
       onClick={() => setLocale(isDe ? 'en' : 'de')}
-      className="relative flex items-center w-[72px] h-[32px] rounded-full p-0.5 border border-sett-border bg-sett-fill cursor-pointer"
+      className="relative flex items-center w-[72px] h-[32px] rounded-full p-0.5 border border-white/15 bg-white/10 hover:bg-white/15 transition-colors cursor-pointer"
     >
       {/* Sliding pill */}
       <span
@@ -24,7 +24,7 @@ export function LanguageToggle() {
       <span
         className={cn(
           'relative z-10 flex-1 text-center text-xs font-semibold transition-colors duration-400',
-          !isDe ? 'text-white' : 'text-sett-text-secondary'
+          !isDe ? 'text-sett-navy' : 'text-white/75'
         )}
       >
         EN
@@ -32,7 +32,7 @@ export function LanguageToggle() {
       <span
         className={cn(
           'relative z-10 flex-1 text-center text-xs font-semibold transition-colors duration-400',
-          isDe ? 'text-white' : 'text-sett-text-secondary'
+          isDe ? 'text-sett-navy' : 'text-white/75'
         )}
       >
         DE

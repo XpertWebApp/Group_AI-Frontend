@@ -9,6 +9,7 @@ interface AppLayoutContextValue {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  openMobileSidebar: () => void;
 }
 
 const AppLayoutContext = createContext<AppLayoutContextValue>({
@@ -16,6 +17,7 @@ const AppLayoutContext = createContext<AppLayoutContextValue>({
   sidebarCollapsed: false,
   toggleSidebar: () => {},
   setSidebarCollapsed: () => {},
+  openMobileSidebar: () => {},
 });
 
 export function useAppLayout() {

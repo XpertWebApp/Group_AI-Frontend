@@ -729,7 +729,7 @@ export default function RequestDetailPage() {
 
           {/* ════════════════════ REQUEST SUMMARY CARD ════════════════════ */}
           <div
-            className="relative bg-white rounded-[14px] border border-[#686868]/40 p-5 animate-card-rise-in"
+            className="relative bg-white rounded-[14px] border border-sett-border p-5 animate-card-rise-in"
             style={{ animationDelay: '160ms' }}
           >
             {/* Section header */}
@@ -750,7 +750,7 @@ export default function RequestDetailPage() {
                       </button>
                     )}
                   </div>
-                  <p className="font-montserrat text-[14px] font-normal leading-none text-[#4A4A4A] mt-0.5">
+                  <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-secondary mt-0.5">
                     {t.offer.bookingDetails}
                   </p>
                 </div>
@@ -784,16 +784,16 @@ export default function RequestDetailPage() {
                         {/* Location */}
                         <div className="flex items-center gap-2">
                           <MapPin className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
-                          <span className="font-montserrat text-[14px] font-medium leading-none text-[#4A4A4A]">
+                          <span className="font-montserrat text-[14px] font-medium leading-none text-sett-text-secondary">
                             {request.destinationName || '—'}
                           </span>
                         </div>
                         {/* Dot separator */}
-                        <div className="w-1 h-1 rounded-[18px] bg-[#E6EAF0] shrink-0 hidden sm:block" />
+                        <div className="w-1 h-1 rounded-[18px] bg-sett-border-light shrink-0 hidden sm:block" />
                         {/* Date */}
                         <div className="flex items-center gap-2">
                           <Calendar className="w-[14px] h-[14px] text-sett-text-accent shrink-0" />
-                          <span className="font-montserrat text-[14px] font-medium leading-none text-[#4A4A4A]">
+                          <span className="font-montserrat text-[14px] font-medium leading-none text-sett-text-secondary">
                             {formatDate(request.checkinDate)} - {formatDate(request.checkoutDate)}
                           </span>
                         </div>
@@ -807,47 +807,47 @@ export default function RequestDetailPage() {
                         className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
                         style={{ animationDelay: '600ms' }}
                       >
-                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                           {t.offer.hotelCategory}
                         </p>
                         {/* value row */}
                         <div className="flex items-center gap-2 flex-nowrap">
-                          <span className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D] whitespace-nowrap">
+                          <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary whitespace-nowrap">
                             ({request.starRating}-Star)
                           </span>
                           {request.starRating && <StarRating rating={request.starRating} />}
                         </div>
                       </div>
                       {/* Vertical divider */}
-                      <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+                      <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />
                       {/* Budget Range */}
                       <div
                         className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
                         style={{ animationDelay: '670ms' }}
                       >
-                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                           {t.offer.budgetRange}
                         </p>
-                        <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                        <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary">
                           {request.budgetRange ? request.budgetRange.charAt(0).toUpperCase() + request.budgetRange.slice(1) : '—'}
                         </p>
                       </div>
                       {/* Vertical divider */}
-                      <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+                      <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />
                       {/* Group Type */}
                       <div
                         className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
                         style={{ animationDelay: '740ms' }}
                       >
-                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                        <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                           {t.offer.groupType}
                         </p>
-                        <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                        <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary">
                           {formatGroupType(request.groupType)}
                         </p>
                       </div>
                       {/* Vertical divider */}
-                      <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+                      <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />
                       {/* Average Age - conditionally shown */}
                       {(request.groupType === 'youth_group' || request.groupType === 'school_group') &&
                         request.averageAge != null && (
@@ -856,15 +856,15 @@ export default function RequestDetailPage() {
                             className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
                             style={{ animationDelay: '810ms' }}
                           >
-                            <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                            <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                               {t.offer.averageAge}
                             </p>
-                            <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                            <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary">
                               {request.averageAge}
                             </p>
                           </div>
                           {/* Vertical divider */}
-                          <div className="hidden xl:block w-px h-[46px] bg-[#E6EAF0] shrink-0" />
+                          <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />
                         </>
                       )}
                       {/* Guests */}
@@ -872,10 +872,10 @@ export default function RequestDetailPage() {
                     className="flex flex-col gap-2 xl:gap-[14px] items-start xl:items-center animate-card-rise-in"
                     style={{ animationDelay: '880ms' }}
                   >
-                    <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-[#686868]">
+                    <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                       {t.offer.guests}
                     </p>
-                    <p className="font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
+                    <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary">
                       {request.groupSize ?? '—'}
                     </p>
                   </div>
@@ -888,13 +888,13 @@ export default function RequestDetailPage() {
                 actually sees the exit motion before the content unmounts. */}
             {(!summaryCollapsed || summaryClosing) && (
               <div className={summaryClosing ? 'animate-card-shrink-out' : undefined}>
-                <hr className="border-[#686868]/40 mb-6" />
+                <hr className="border-sett-border-light mb-6" />
 
                 {/* ── Room & Accommodations ── */}
                 <div className="flex flex-col gap-5 mb-6">
                   {/* Heading — height:20 */}
                   <h3
-                    className="font-montserrat text-[16px] font-semibold leading-none text-[#1D1D1D] animate-sidebar-fade-up"
+                    className="font-montserrat text-[16px] font-semibold leading-none text-sett-text-primary animate-sidebar-fade-up"
                     style={{ animationDelay: '40ms' }}
                   >
                     {t.offer.roomAccommodations}
@@ -915,10 +915,10 @@ export default function RequestDetailPage() {
                     ].map((room, i) => (
                       <div
                         key={room.label}
-                        className="flex flex-col items-center justify-center gap-2 sm:gap-[14px] border border-[#686868]/40 rounded-[14px] py-4 sm:py-0 sm:h-[86px] animate-card-rise-in"
+                        className="flex flex-col items-center justify-center gap-2 sm:gap-[14px] border border-sett-border rounded-[14px] py-4 sm:py-0 sm:h-[86px] animate-card-rise-in"
                         style={{ animationDelay: `${120 + i * 60}ms` }}
                       >
-                        <p className="font-montserrat text-[16px] sm:text-[18px] font-bold leading-none text-[#1D1D1D]">
+                        <p className="font-montserrat text-[16px] sm:text-[18px] font-bold leading-none text-sett-text-primary">
                           {room.value ?? '—'}
                         </p>
                         <p className="font-montserrat text-[10px] sm:text-[12px] font-semibold leading-none uppercase text-sett-text-accent">
@@ -928,12 +928,12 @@ export default function RequestDetailPage() {
                     ))}
                   </div>
 
-                  {/* Bed Configuration for Double Room — outer: 14px radius, border #68686866, h:166 */}
+                  {/* Bed Configuration for Double Room — outer: 14px radius, border sett-border, h:166 */}
                   <div
-                    className="w-full rounded-[14px] border border-[#686868]/40 bg-white p-5 animate-card-rise-in"
+                    className="w-full rounded-[14px] border border-sett-border bg-white p-5 animate-card-rise-in"
                     style={{ animationDelay: '380ms' }}
                   >
-                    <h4 className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D] mb-5">
+                    <h4 className="font-montserrat text-[14px] font-semibold leading-none text-sett-text-primary mb-5">
                       {t.offer.bedConfiguration}
                     </h4>
                     {/* Inner cards grid — gap:20px, responsive */}
@@ -944,9 +944,9 @@ export default function RequestDetailPage() {
                       ].map((bed) => (
                         <div
                           key={bed.label}
-                          className="flex flex-col items-center justify-center gap-2 sm:gap-[14px] border border-[#686868]/40 rounded-[14px] py-4 sm:py-0 sm:h-[86px]"
+                          className="flex flex-col items-center justify-center gap-2 sm:gap-[14px] border border-sett-border rounded-[14px] py-4 sm:py-0 sm:h-[86px]"
                         >
-                          <p className="font-montserrat text-[16px] sm:text-[18px] font-bold leading-none text-[#1D1D1D]">
+                          <p className="font-montserrat text-[16px] sm:text-[18px] font-bold leading-none text-sett-text-primary">
                             {bed.value ?? '—'}
                           </p>
                           <p className="font-montserrat text-[10px] sm:text-[12px] font-semibold leading-none uppercase text-sett-text-accent text-center px-2">
@@ -959,17 +959,17 @@ export default function RequestDetailPage() {
 
                   {rooms?.extraRoomsNote && (
                     <div
-                      className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] animate-sidebar-fade-up"
+                      className="w-full rounded-[14px] bg-sett-navy/10 px-5 py-5 flex items-center gap-[10px] animate-sidebar-fade-up"
                       style={{ minHeight: 57, animationDelay: '460ms' }}
                     >
-                      <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.extras}:</span>
-                      <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{rooms.extraRoomsNote}</span>
+                      <span className="font-montserrat text-[14px] font-semibold leading-none text-sett-navy">{t.offer.extras}:</span>
+                      <span className="font-montserrat text-[14px] font-normal leading-none text-sett-navy">{rooms.extraRoomsNote}</span>
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                     <div
-                      className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
+                      className="border border-sett-border rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
                       style={{ animationDelay: '520ms' }}
                     >
                       <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{breakfastLabel}</p>
@@ -978,7 +978,7 @@ export default function RequestDetailPage() {
                       </p>
                     </div>
                     <div
-                      className="border border-[#686868]/40 rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
+                      className="border border-sett-border rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
                       style={{ animationDelay: '580ms' }}
                     >
                       <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{locationLabel}</p>
@@ -990,16 +990,16 @@ export default function RequestDetailPage() {
 
                   {request.specialRequirements && (
                     <div
-                      className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] animate-sidebar-fade-up"
+                      className="w-full rounded-[14px] bg-sett-navy/10 px-5 py-5 flex items-center gap-[10px] animate-sidebar-fade-up"
                       style={{ minHeight: 57, animationDelay: '660ms' }}
                     >
-                      <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
-                      <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.specialRequirements}</span>
+                      <span className="font-montserrat text-[14px] font-semibold leading-none text-sett-navy">{t.offer.specialRequirement}:</span>
+                      <span className="font-montserrat text-[14px] font-normal leading-none text-sett-navy">{request.specialRequirements}</span>
                     </div>
                   )}
                 </div>
 
-                <hr className="border-[#686868]/40 mb-6" />
+                <hr className="border-sett-border-light mb-6" />
 
                 {/* ── Customer Details ── */}
                 <div className="mb-6">
@@ -1017,7 +1017,7 @@ export default function RequestDetailPage() {
                           {t.offer.companyName}
                         </span>
                       </div>
-                      <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+                      <p className="font-montserrat text-[14px] font-semibold leading-none text-sett-text-primary">
                         {request.companyName || '—'}
                       </p>
                     </div>
@@ -1038,7 +1038,7 @@ export default function RequestDetailPage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">—</p>
+                        <p className="font-montserrat text-[14px] font-semibold leading-none text-sett-text-primary">—</p>
                       )}
                     </div>
                     <div className="animate-sidebar-fade-up" style={{ animationDelay: '240ms' }}>
@@ -1048,7 +1048,7 @@ export default function RequestDetailPage() {
                           {t.offer.contactPerson}
                         </span>
                       </div>
-                      <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+                      <p className="font-montserrat text-[14px] font-semibold leading-none text-sett-text-primary">
                         {[request.firstName, request.lastName].filter(Boolean).join(' ') ||
                           request.contactName ||
                           '—'}
@@ -1061,7 +1061,7 @@ export default function RequestDetailPage() {
                           {t.offer.emailAddress}
                         </span>
                       </div>
-                      <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">{request.contactEmail || '—'}</p>
+                      <p className="font-montserrat text-[14px] font-semibold leading-none text-sett-text-primary">{request.contactEmail || '—'}</p>
                     </div>
                     <div className="animate-sidebar-fade-up" style={{ animationDelay: '360ms' }}>
                       <div className="flex items-center gap-1.5 mb-1">
@@ -1070,23 +1070,23 @@ export default function RequestDetailPage() {
                           {t.offer.phoneNumber}
                         </span>
                       </div>
-                      <p className="font-montserrat text-[14px] font-semibold leading-none text-[#1D1D1D]">
+                      <p className="font-montserrat text-[14px] font-semibold leading-none text-sett-text-primary">
                         {formatPhone(request.contactPhoneCountryCode, request.contactPhone)}
                       </p>
                     </div>
                   </div>
                   {request.customerNotes && (
                     <div
-                      className="w-full rounded-[14px] bg-[#071C42]/[0.10] px-5 py-5 flex items-center gap-[10px] mt-3 animate-sidebar-fade-up"
+                      className="w-full rounded-[14px] bg-sett-navy/10 px-5 py-5 flex items-center gap-[10px] mt-3 animate-sidebar-fade-up"
                       style={{ minHeight: 57, animationDelay: '440ms' }}
                     >
-                      <span className="font-montserrat text-[14px] font-semibold leading-none text-[#071C42]">{t.offer.specialRequirement}:</span>
-                      <span className="font-montserrat text-[14px] font-normal leading-none text-[#071C42]">{request.customerNotes}</span>
+                      <span className="font-montserrat text-[14px] font-semibold leading-none text-sett-navy">{t.offer.specialRequirement}:</span>
+                      <span className="font-montserrat text-[14px] font-normal leading-none text-sett-navy">{request.customerNotes}</span>
                     </div>
                   )}
                 </div>
 
-                <hr className="border-[#686868]/40 mb-6" />
+                <hr className="border-sett-border-light mb-6" />
 
                 {/* ── Policies ── */}
                 <div>
@@ -1105,7 +1105,7 @@ export default function RequestDetailPage() {
                         {t.offer.termsConditions}
                       </p>
                       <div
-                        className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]"
+                        className="font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
                         dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
                       />
@@ -1120,7 +1120,7 @@ export default function RequestDetailPage() {
                         {t.offer.cancellationConditions}
                       </p>
                       <div
-                        className="font-montserrat text-[14px] font-semibold text-[#1D1D1D]"
+                        className="font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
                         dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
                       />
@@ -1136,7 +1136,7 @@ export default function RequestDetailPage() {
               type="button"
               onClick={toggleSummary}
               disabled={summaryClosing}
-              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-[#F7F7F7] border border-[#E6EAF0] shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white hover:scale-105 active:scale-95 transition-all duration-280 ease-sett-spring z-10 disabled:cursor-default"
+              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-sett-fill border border-sett-border-light shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white hover:scale-105 active:scale-95 transition-all duration-280 ease-sett-spring z-10 disabled:cursor-default"
               aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
               aria-expanded={!summaryCollapsed && !summaryClosing}
             >

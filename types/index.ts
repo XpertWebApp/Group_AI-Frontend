@@ -391,6 +391,8 @@ export interface HotelSearchJobStatus {
   resultJson?: HotelSearchResult | null;
 }
 
+export type HotelSearchPhase = 'in_progress' | 'settled' | 'exhausted';
+
 export interface HotelSearchStatusResponse {
   requestId: string;
   summary: {
@@ -400,6 +402,9 @@ export interface HotelSearchStatusResponse {
     completed: number;
     skipped: number;
     failed: number;
+    // Added by backend pagination work — NULL/absent on historical rows or pre-deploy backends.
+    // Treat absent or null as 'in_progress' for safety.
+    phase?: HotelSearchPhase | null;
   };
   jobs: HotelSearchJobStatus[];
 }

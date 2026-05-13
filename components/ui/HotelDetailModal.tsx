@@ -132,9 +132,12 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
   const heroSrc = images.length > 0 ? imageUrl(images[activeImage]) : PLACEHOLDER;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-modal-overlay-in"
+      onClick={onClose}
+    >
       <div
-        className="bg-white rounded-[14px] w-full max-w-3xl max-h-[90vh] flex flex-col shadow-xl overflow-hidden"
+        className="bg-white rounded-[14px] w-full max-w-3xl max-h-[90vh] flex flex-col shadow-xl overflow-hidden animate-modal-pop-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -164,8 +167,11 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
         >
           {loading && (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-sett-primary border-t-transparent rounded-full animate-spin" />
+            <div className="flex items-center justify-center py-16 animate-card-rise-in">
+              <div className="relative inline-flex items-center justify-center">
+                <span className="absolute w-10 h-10 rounded-full border border-sett-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
+                <div className="relative w-6 h-6 border-2 border-sett-primary border-t-transparent rounded-full animate-spin" />
+              </div>
               <span className="ml-3 font-montserrat text-[14px] text-sett-text-secondary">
                 {t.addHotel.loadingDetails}
               </span>
@@ -173,7 +179,7 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
           )}
 
           {error && !loading && (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center py-16 animate-card-rise-in">
               <span className="font-montserrat text-[14px] text-sett-text-secondary">
                 {t.addHotel.detailsError}
               </span>
@@ -184,15 +190,17 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
             <>
               {/* Image Gallery */}
               {images.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 animate-card-rise-in" style={{ animationDelay: '60ms' }}>
                   {/* Hero image */}
                   <div className="relative w-full h-[220px] sm:h-[300px] rounded-[14px] overflow-hidden bg-[#F7F7F7]">
-                    <LazyImage
-                      src={heroSrc}
-                      alt={detail.name}
-                      eager
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
+                    <div key={activeImage} className="absolute inset-0 animate-modal-image-fade">
+                      <LazyImage
+                        src={heroSrc}
+                        alt={detail.name}
+                        eager
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    </div>
                     {images.length > 1 && (
                       <>
                         <button
@@ -225,9 +233,12 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
                           type="button"
                           onClick={() => setActiveImage(i)}
                           className={cn(
-                            'shrink-0 w-16 h-16 rounded-[8px] overflow-hidden border-2 transition-colors',
-                            i === activeImage ? 'border-sett-primary' : 'border-transparent hover:border-sett-border-light'
+                            'shrink-0 w-16 h-16 rounded-[8px] overflow-hidden border-2 transition-all duration-200 animate-sidebar-fade-up',
+                            i === activeImage
+                              ? 'border-sett-primary scale-105'
+                              : 'border-transparent hover:border-sett-border-light hover:scale-105'
                           )}
+                          style={{ animationDelay: `${120 + i * 40}ms` }}
                         >
                           <LazyImage
                             src={imageUrl(key)}
@@ -242,7 +253,7 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
               )}
 
               {/* Info row: stars + address + contact */}
-              <div className="space-y-2">
+              <div className="space-y-2 animate-card-rise-in" style={{ animationDelay: '140ms' }}>
                 {/* Stars */}
                 {detail.starRating && detail.starRating > 0 && (
                   <StarRating rating={detail.starRating} />
@@ -294,7 +305,7 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
 
               {/* Description */}
               {(detail.description || detail.location) && (
-                <div>
+                <div className="animate-card-rise-in" style={{ animationDelay: '220ms' }}>
                   <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase tracking-wide mb-2">
                     {t.addHotel.hotelDescription}
                   </h3>
@@ -313,21 +324,22 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
 
               {/* Facilities grouped by category */}
               {detail.hotelFacilities && detail.hotelFacilities.length > 0 && (
-                <div>
+                <div className="animate-card-rise-in" style={{ animationDelay: '300ms' }}>
                   <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase tracking-wide mb-3">
                     {t.addHotel.hotelFacilities}
                   </h3>
                   <div className="space-y-4">
-                    {detail.hotelFacilities.map((group) => (
+                    {detail.hotelFacilities.map((group, groupIdx) => (
                       <div key={group.Category}>
                         <p className="font-montserrat text-[12px] font-semibold text-sett-text-accent uppercase tracking-wide mb-1.5">
                           {group.Category}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                          {group.Facilities.map((f) => (
+                          {group.Facilities.map((f, fIdx) => (
                             <span
                               key={f}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20"
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in transition-transform hover:scale-105"
+                              style={{ animationDelay: `${340 + groupIdx * 60 + fIdx * 20}ms` }}
                             >
                               {f}
                             </span>

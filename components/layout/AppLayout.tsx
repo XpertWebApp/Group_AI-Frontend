@@ -8,7 +8,6 @@ import toast from 'react-hot-toast';
 import { authApi } from '@/lib/api/auth';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { logout as logoutAction } from '@/lib/store/slices/authSlice';
-import { Menu } from 'lucide-react';
 import { AppLayoutProvider } from '@/app/(dashboard)/AppLayoutContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { cn } from '@/lib/utils/cn';
@@ -85,6 +84,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         sidebarCollapsed,
         toggleSidebar,
         setSidebarCollapsed,
+        openMobileSidebar: () => setMobileOpen(true),
       }}
     >
       <div className="w-screen h-screen flex flex-col overflow-hidden">
@@ -100,16 +100,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               sidebarMarginClass
             )}
           >
-            <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-3 bg-sett-card border-b border-sett-border lg:hidden shrink-0">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(true)}
-                className="p-2 rounded-lg hover:bg-sett-border/50"
-                aria-label="Open menu"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-            </div>
             <main className="flex-1 bg-sett-background overflow-y-auto overflow-x-hidden min-h-0">
               {children}
             </main>
@@ -117,15 +107,19 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
         <footer
           className={cn(
-            'w-full h-[39px] flex items-center px-[14px] shrink-0',
+            'w-full shrink-0',
             'transition-[margin-left] duration-320 ease-sett-in-out sett-motion-collapse',
             sidebarMarginClass
           )}
-          style={{ background: '#0A0A0A', borderTop: '1px solid #E6EAF0' }}
         >
-          <span className="font-montserrat text-[12px] font-medium" style={{ color: '#A3A3A3' }}>
-            2026 S-E-T-T &nbsp;|&nbsp; All Rights Reserved
-          </span>
+          {/* Copyright band (black) */}
+          <div className="h-[32px] flex items-center px-[14px] bg-sett-black">
+            <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">
+              © 2026 S-E-T-T &nbsp;|&nbsp; All Rights Reserved
+            </span>
+          </div>
+          {/* §8.2 Green Bottom Bar — the brand's visual anchor */}
+          <div aria-hidden className="h-[8px] bg-sett-primary" />
         </footer>
       </div>
       <LogoutModal

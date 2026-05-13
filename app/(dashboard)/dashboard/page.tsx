@@ -8,7 +8,7 @@ import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { StatCardSkeleton, TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Eye, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, Plus } from 'lucide-react';
 import { dashboardApi } from '@/lib/api/dashboard';
 import type { DashboardStatsResponse, RecentOffer } from '@/lib/api/dashboard';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -91,32 +91,59 @@ export default function DashboardPage() {
               const value = typeof raw === 'object' && raw !== null && 'value' in raw
                 ? (raw as { value: number }).value
                 : (typeof raw === 'number' ? raw : 0);
+              const trend = typeof raw === 'object' && raw !== null && 'vsLastMonth' in raw
+                ? (raw as { vsLastMonth: number }).vsLastMonth
+                : null;
 
               const cardDelay = index * 90;       // cascade: 0, 90, 180, 270ms
               const badgeDelay = cardDelay + 180; // badge pops as card settles
               const valueDelay = cardDelay + 220; // number lands after the badge
 
+              const trendPositive = trend != null && trend > 0;
+              const trendNegative = trend != null && trend < 0;
+
               return (
                 <div
                   key={card.key}
-                  className="group bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] p-5 border border-sett-primary/40 relative animate-card-rise-in transition-all duration-280 ease-sett-out hover:-translate-y-0.5 hover:shadow-[0_4px_16px_0_rgba(7,28,66,0.10)]"
+                  className="group relative bg-white rounded-[14px] shadow-card p-5 border border-sett-border animate-card-rise-in transition-all duration-280 ease-sett-out hover:-translate-y-0.5 hover:shadow-[0_4px_16px_0_rgba(7,28,66,0.10)]"
                   style={{ animationDelay: `${cardDelay}ms` }}
                 >
+                  {/* §5.3 optional green left-border accent */}
+                  <span aria-hidden className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-sett-primary" />
+
                   <div
                     className="absolute top-4 right-4 flex items-center gap-[10px] p-2 rounded-[10px] border border-sett-primary/40 bg-sett-light-green-bg animate-badge-pop-in transition-transform duration-280 ease-sett-spring group-hover:scale-110 group-hover:rotate-3"
                     style={{ animationDelay: `${badgeDelay}ms` }}
                   >
                     <Image src={card.icon} alt="" width={16} height={16} />
                   </div>
-                  <p className="font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-secondary pr-10 break-words min-h-[2.625rem]">
+                  {/* §7.3 Label: Grey, Montserrat 400, 12–14px */}
+                  <p className="font-montserrat text-[13px] font-normal leading-normal uppercase tracking-[0.08em] text-sett-text-secondary pr-10 break-words min-h-[2.625rem]">
                     {card.label}
                   </p>
+                  {/* §7.3 Big number: Navy, Montserrat 800, 28–36px */}
                   <p
-                    className="font-montserrat text-[32px] font-bold leading-normal text-sett-text-primary uppercase mt-1 animate-value-count-in"
+                    className="font-montserrat text-[32px] font-extrabold leading-tight text-sett-text-primary mt-1 animate-value-count-in tabular-nums"
                     style={{ animationDelay: `${valueDelay}ms` }}
                   >
                     {value}
                   </p>
+                  {/* §7.3 Trend: Green (↑) positive, Red (↓) negative */}
+                  {trend != null && trend !== 0 && (
+                    <p
+                      className={`mt-1 inline-flex items-center gap-1 font-montserrat text-[12px] font-semibold tabular-nums ${
+                        trendPositive ? 'text-sett-primary' : 'text-sett-destructive'
+                      }`}
+                    >
+                      {trendPositive ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+                      {trendPositive ? '+' : ''}{trend}% {t.dashboard.vsLastMonth}
+                    </p>
+                  )}
+                  {trendNegative === false && trend === 0 && (
+                    <p className="mt-1 font-montserrat text-[12px] font-medium text-sett-text-accent">
+                      — {t.dashboard.vsLastMonth}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -136,7 +163,7 @@ export default function DashboardPage() {
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
                 <div>
-                  <h2 className="font-montserrat text-[18px] font-semibold leading-normal text-sett-text-primary">
+                  <h2 className="font-montserrat text-[22px] font-extrabold leading-tight text-sett-text-primary">
                     {t.dashboard.recentOffers}
                   </h2>
                   <p className="font-montserrat text-[14px] font-normal leading-normal text-sett-text-secondary mt-0.5">
@@ -186,13 +213,14 @@ export default function DashboardPage() {
               <div className="hidden xl:block overflow-x-auto">
                 <table className="w-full min-w-[900px]">
                   <thead>
-                    <tr className="h-[57px] border-t border-b border-sett-border-light">
-                      <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.offerId}</th>
-                      <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.customer}</th>
-                      <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.destination}</th>
-                      <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.checkInOut}</th>
-                      <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.status}</th>
-                      <th className="text-left font-montserrat text-[14px] font-semibold leading-normal uppercase text-sett-text-accent px-4 py-3">{t.requests.createdOn}</th>
+                    {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
+                    <tr className="h-[48px] bg-sett-navy">
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.offerId}</th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.customer}</th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.destination}</th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.checkInOut}</th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.status}</th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.createdOn}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -200,7 +228,10 @@ export default function DashboardPage() {
                       <tr
                         key={row.id}
                         onClick={() => router.push(`/booking-requests/${row.requestId ?? row.id}`)}
-                        className="group border-b border-sett-border last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                        className={`group border-b border-sett-border-light last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in ${
+                          // §5.2 Alternating row: #F8F9FA
+                          i % 2 === 1 ? 'bg-sett-table-alt-row' : 'bg-white'
+                        }`}
                         style={{ animationDelay: `${580 + Math.min(i, 6) * 50}ms` }}
                       >
                         <td className="relative px-4 py-3 text-body text-sett-text-primary font-medium">

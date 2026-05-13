@@ -117,6 +117,38 @@
 .sett-wave-shimmer--medium { animation: sett-wave-shimmer 12s ease-in-out infinite both; }
 .sett-wave-shimmer--fast   { animation: sett-wave-shimmer 8s  ease-in-out infinite both; }
 
+/* ── Modal (dialog) entrance ──
+   Backdrop fades in, panel rises + scales up. Used by full-screen modals
+   like the Hotel Details dialog. */
+@keyframes modal-overlay-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes modal-pop-in {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.94); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modal-image-fade {
+  0%   { opacity: 0; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-modal-overlay-in { animation: modal-overlay-in 220ms ease-out both; }
+.animate-modal-pop-in     { animation: modal-pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-modal-image-fade { animation: modal-image-fade 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Indeterminate progress bar ──
+   Used during the inter-batch lull on hotel search: a thin band slides
+   left→right across an otherwise-empty track to signal "still working,
+   no precise progress yet". */
+@keyframes indeterminate-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.animate-indeterminate-slide {
+  animation: indeterminate-slide 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
 /* ── Step transitions (multi-step forms / wizards) ── */
 @keyframes step-slide-in-right {
   0%   { opacity: 0; transform: translateX(28px); }
@@ -148,6 +180,10 @@
   .animate-step-in-right,
   .animate-step-in-left,
   .animate-card-shrink-out,
+  .animate-modal-overlay-in,
+  .animate-modal-pop-in,
+  .animate-modal-image-fade,
+  .animate-indeterminate-slide,
   .sett-wave-draw,
   .sett-wave-shimmer { animation: none !important; }
   /* When reduced-motion is on, hide the shimmer overlay entirely (otherwise its

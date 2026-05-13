@@ -298,18 +298,19 @@ export default function BookingRequestsPage() {
             <div className="hidden xl:block overflow-x-auto overflow-hidden">
               <table className="w-full min-w-[950px] 2xl:min-w-[1100px]">
                 <thead>
-                  <tr className="border-y border-sett-border">
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.offerId}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.customer}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.destination}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.checkInOut}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.rooms}</th>
-                    <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.totalSell}</th>
-                    <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.margin}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.owner}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.status}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.createdOn}</th>
-                    <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-3 2xl:px-5 py-4 font-semibold">{t.requests.lastUpdated}</th>
+                  {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
+                  <tr className="bg-sett-navy">
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.offerId}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.customer}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.destination}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.checkInOut}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.rooms}</th>
+                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.totalSell}</th>
+                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.margin}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.owner}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.status}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.createdOn}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.lastUpdated}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -320,7 +321,10 @@ export default function BookingRequestsPage() {
                     return (
                       <tr
                         key={row.id}
-                        className="group border-b border-sett-border last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                        className={`group border-b border-sett-border-light last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in ${
+                          // §5.2 Alternating row: #F8F9FA
+                          i % 2 === 1 ? 'bg-sett-table-alt-row' : 'bg-white'
+                        }`}
                         style={{ animationDelay: `${320 + Math.min(i, 6) * 50}ms` }}
                         onClick={() => router.push(`/booking-requests/${row.id}`)}
                       >
@@ -356,7 +360,7 @@ export default function BookingRequestsPage() {
                         <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary text-right">
                           {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </td>
-                        <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-olive text-right">
+                        <td className="px-3 2xl:px-5 py-4 text-body font-semibold text-sett-primary text-right">
                           {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </td>
                         <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
@@ -376,11 +380,11 @@ export default function BookingRequestsPage() {
                                 handleClaimRequest(row.id);
                               }}
                               disabled={claimingRequestId === row.id}
-                              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white bg-sett-primary rounded-md hover:bg-sett-primary/90 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150"
+                              className="inline-flex items-center px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-sett-navy bg-sett-primary rounded-button hover:bg-sett-green-dark hover:text-white active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150"
                             >
                               {claimingRequestId === row.id ? (
                                 <>
-                                  <span className="inline-block w-3 h-3 mr-1.5 border-2 border-transparent border-t-white rounded-full animate-spin" />
+                                  <span className="inline-block w-3 h-3 mr-1.5 border-2 border-transparent border-t-sett-navy rounded-full animate-spin" />
                                   {t.requests.claim}
                                 </>
                               ) : (
@@ -465,7 +469,7 @@ export default function BookingRequestsPage() {
                       </div>
                       <div>
                         <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.margin}</span>
-                        <p className="text-sett-olive font-medium mt-0.5">
+                        <p className="text-sett-primary font-semibold mt-0.5">
                           {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </p>
                       </div>
@@ -518,7 +522,7 @@ export default function BookingRequestsPage() {
                     type="button"
                     onClick={() => setPage(p as number)}
                     className={`w-8 h-8 rounded-lg text-sm sm:text-body transition-all duration-180 ease-sett-out active:scale-90 ${p === safeCurrentPage
-                      ? 'bg-sett-primary text-white font-bold shadow-[0_2px_6px_0_rgba(170,199,55,0.35)]'
+                      ? 'bg-sett-primary text-sett-navy font-bold shadow-[0_2px_6px_0_rgba(170,199,55,0.35)]'
                       : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary'
                       }`}
                   >

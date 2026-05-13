@@ -153,10 +153,10 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const content = (
     <>
       <div className="flex flex-col h-full">
-        {/* Logo */}
+        {/* Logo — height matches Header (64px) so the green strip below aligns across the top */}
         <div
           className={cn(
-            'h-[68px] flex items-center border-b border-sett-sidebar-border transition-[padding] duration-320 ease-sett-in-out',
+            'h-[64px] flex items-center transition-[padding] duration-320 ease-sett-in-out',
             'animate-sidebar-fade-up',
             sidebarCollapsed ? 'px-3 justify-center' : 'px-6'
           )}
@@ -181,6 +181,9 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             />
           </Link>
         </div>
+
+        {/* §8.2 green strip — runs continuously with the Header's underline across the top of the page */}
+        <div aria-hidden className="h-[2px] bg-sett-primary shrink-0" />
 
         {/* Search */}
         <div
@@ -331,7 +334,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
         {/* User card */}
         <div
           className={cn(
-            'pb-4 pt-4 border-t border-b border-sett-sidebar-border transition-[padding] duration-320 ease-sett-in-out',
+            'pb-4 pt-4 border-t border-sett-sidebar-border transition-[padding] duration-320 ease-sett-in-out',
             'animate-sidebar-fade-up',
             sidebarCollapsed ? 'px-3' : 'px-5'
           )}
@@ -339,13 +342,13 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
         >
           <div
             className={cn(
-              'rounded-[17px] bg-sett-sidebar-border transition-all duration-320 ease-sett-in-out',
+              'rounded-[17px] bg-white/[0.06] border border-white/10 transition-all duration-320 ease-sett-in-out',
               sidebarCollapsed ? 'px-[7px] py-[7px]' : 'px-[14px] py-[12px]'
             )}
             title={sidebarCollapsed ? `${displayName} · ${user?.role ?? 'User'}` : undefined}
           >
             <div className={cn('flex items-center', sidebarCollapsed ? 'justify-center' : 'gap-[10px]')}>
-              <div className="w-[30px] h-[30px] shrink-0 rounded-[10px] bg-[#667F00] flex items-center justify-center text-white font-semibold text-[12px] font-montserrat">
+              <div className="w-[30px] h-[30px] shrink-0 rounded-[10px] bg-sett-primary flex items-center justify-center text-sett-navy font-bold text-[12px] font-montserrat">
                 {displayName.slice(0, 2).toUpperCase()}
               </div>
               <div
@@ -371,6 +374,9 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
       <aside
         className={cn(
           'sett-motion-collapse fixed top-0 left-0 z-40 h-screen bg-sett-sidebar flex flex-col',
+          // Subtle vertical seam against the navy header — a tinted-white hairline so the
+          // sidebar reads as a distinct column instead of one merged navy block.
+          'border-r border-white/[0.06]',
           'transition-[width,transform] duration-320 ease-sett-in-out lg:translate-x-0',
           // One-time entrance — only on desktop where the sidebar is always visible.
           // (Mobile uses the existing translate-x drawer behavior.)
@@ -392,8 +398,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
           aria-expanded={!sidebarCollapsed}
           className={cn(
             'hidden lg:flex absolute top-[26px] -right-3 z-50 items-center justify-center',
-            'w-6 h-6 rounded-full bg-sett-sidebar-active text-white shadow-md',
-            'ring-2 ring-sett-sidebar hover:bg-sett-primary hover:text-sett-navy',
+            'w-6 h-6 rounded-full bg-sett-primary text-sett-navy shadow-md',
+            'ring-2 ring-sett-sidebar hover:bg-sett-green-dark hover:text-white',
             'transition-all duration-280 ease-sett-spring',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sett-sidebar'
           )}
@@ -453,15 +459,22 @@ function SidebarNavItem({
         href={href}
         onClick={onMobileClose}
         className={cn(
-          'flex items-center rounded-lg text-sm font-medium overflow-hidden',
+          'relative flex items-center rounded-lg text-sm font-medium overflow-hidden',
           'transition-[background-color,color,padding] duration-280 ease-sett-out',
           collapsed ? 'justify-center px-0 py-2.5 h-10' : 'gap-3 px-3 py-2.5',
           isActive
-            ? 'bg-sett-sidebar-active text-white'
-            : 'text-white/90 hover:bg-white/10 hover:text-white'
+            ? 'bg-white/[0.04] text-white'
+            : 'text-white/85 hover:bg-white/[0.06] hover:text-white'
         )}
         aria-label={collapsed ? label : undefined}
       >
+        {/* §5.4 Active item: 3px green left-border */}
+        {isActive && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-[60%] w-[3px] rounded-r-full bg-sett-primary shadow-[0_0_8px_rgba(170,199,55,0.45)]"
+          />
+        )}
         <Icon className="w-5 h-5 shrink-0" />
         <span
           className={cn(

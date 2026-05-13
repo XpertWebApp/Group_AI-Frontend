@@ -26,6 +26,7 @@ import { formatDateEU } from '@/lib/dateFormatter';
 import { cn } from '@/lib/utils/cn';
 import type {
   HotelSearchResult,
+  HotelSearchPhase,
   BookingRequest,
   Facility,
   HotelSearchInitResponse,
@@ -187,7 +188,14 @@ export default function AddHotelPage() {
   const [request, setRequest] = useState<BookingRequest | null>(null);
   const [phase, setPhase] = useState<SearchPhase>('idle');
   const [completedResults, setCompletedResults] = useState<HotelSearchResult[]>([]);
-  const [searchSummary, setSearchSummary] = useState<{ total: number; completed: number; hotelsFound: number; queued: number; running: number } | null>(null);
+  const [searchSummary, setSearchSummary] = useState<{
+    total: number;
+    completed: number;
+    hotelsFound: number;
+    queued: number;
+    running: number;
+    phase: HotelSearchPhase | null;
+  } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [addedHotels, setAddedHotels] = useState<Set<string>>(new Set());
   const [addingHotel, setAddingHotel] = useState<string | null>(null);
@@ -202,6 +210,7 @@ export default function AddHotelPage() {
   const [pollingStartTime, setPollingStartTime] = useState<number | null>(null);
   const [searchExhausted, setSearchExhausted] = useState(false);
   const [searchSettled, setSearchSettled] = useState(false);
+  const [searchingWiderArea, setSearchingWiderArea] = useState(false);
 
   // Alternatives feature
   const [hasAlternativesAvailable, setHasAlternativesAvailable] = useState(false);
@@ -216,6 +225,8 @@ export default function AddHotelPage() {
   const summaryUpdateThrottledRef = useRef(false);
   const lastHotelCountRef = useRef(0);
   const hotelUpdateThrottledRef = useRef(false);
+  const previousTotalRef = useRef(0);
+  const widerAreaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestStatusCheckRef = useRef(0);
   const isPollingActiveRef = useRef(false);
 
@@ -305,6 +316,7 @@ export default function AddHotelPage() {
     return () => {
       mountedRef.current = false;
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -328,6 +340,7 @@ export default function AddHotelPage() {
         hotelsFound: status.summary.completed,
         queued: 0,
         running: 0,
+        phase: status.summary.phase ?? null,
       });
       // Only show manual request card if zero successful results AND all probes are terminal
       if (finalHotels.length === 0) {
@@ -397,6 +410,7 @@ export default function AddHotelPage() {
           hotelsFound: status.summary.completed,
           queued: status.summary.queued,
           running: status.summary.running,
+          phase: status.summary.phase ?? null,
         };
 
         const results = status.jobs
@@ -415,6 +429,21 @@ export default function AddHotelPage() {
             summaryUpdateThrottledRef.current = false;
           }, 1000);
         }
+
+        // Detect a new batch starting after the first one has already produced hotels.
+        // Backend probes in batches of 200, so the total jumps up when a fresh batch is queued.
+        if (
+          newSummary.total > previousTotalRef.current + 50 &&
+          previousTotalRef.current > 0 &&
+          newSummary.hotelsFound > 0
+        ) {
+          setSearchingWiderArea(true);
+          if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
+          widerAreaTimerRef.current = setTimeout(() => {
+            setSearchingWiderArea(false);
+          }, 8000);
+        }
+        previousTotalRef.current = newSummary.total;
 
         // Check if we have alternative results - stop loading spinner immediately
         if (alternativesFetched && alternativesLoading) {
@@ -446,14 +475,33 @@ export default function AddHotelPage() {
           }, 1000);
         }
 
-        // CORRECT RULE (per backend developer):
-        // Three terminal signals:
-        // 1. searchExhausted: watcher exhausted all levels with zero results
-        // 2. searchSettled: watcher found 1+ results and confirmed done
-        // 3. request.status === 'needs_manual_handling': fallback signal (polling-only clients)
-        const isSearchTerminal = status.summary.queued === 0 && status.summary.running === 0;
-        const isSearchDone = hasBackendSignal;
-        const showEmptyState = isSearchTerminal && status.summary.completed === 0 && (searchExhausted || hasBackendSignal);
+        // Terminal-state detection.
+        //
+        // The backend paginates probes in batches of up to 200 (up to 5 batches), so
+        // queued === 0 && running === 0 is transiently true between batches and is NOT
+        // a reliable "search done" signal anymore.
+        //
+        // Authoritative signal: summary.phase from the status response.
+        //   'in_progress' — keep polling
+        //   'settled'     — terminal, hotels found
+        //   'exhausted'   — terminal, no viable hotels (also sets request.status = needs_manual_handling)
+        //
+        // Fallback for pre-deploy backends / NULL on historical rows: phase is absent →
+        // fall back to the legacy combined signal so existing requests don't hang.
+        const backendPhase = status.summary.phase ?? null;
+        const phaseSettled = backendPhase === 'settled';
+        const phaseExhausted = backendPhase === 'exhausted' || searchExhausted;
+        const phaseTerminal = phaseSettled || phaseExhausted;
+
+        // Legacy fallback: only used when the backend hasn't provided a phase field.
+        // Same shape as before, kept conservative — only treats "no work + has results" as done.
+        const legacyTerminal = backendPhase == null &&
+          status.summary.queued === 0 &&
+          status.summary.running === 0 &&
+          (hasBackendSignal || results.length > 0);
+
+        const isSearchDone = phaseTerminal || legacyTerminal;
+        const showEmptyState = (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
 
         if (status.summary.total === 0) {
           // No jobs queued yet — keep polling
@@ -465,29 +513,24 @@ export default function AddHotelPage() {
             setManualRequestOnly(true);
             setPhase('done');
           }
-        } else if (isSearchTerminal && (isSearchDone || results.length > 0)) {
-          // Search is terminal when: queued === 0 AND running === 0 AND either:
-          // - We got SSE signals (searchExhausted OR searchSettled), OR
-          // - We have results to show (even without signals, poll timeout or results indicate done)
-          // This handles the case where SSE events don't arrive but probes completed
+        } else if (isSearchDone) {
+          // Terminal: backend has confirmed the full multi-batch search is finished.
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           zeroPollCountRef.current = 0;
           setShowSearchingWithRelaxation(false);
+          setSearchingWiderArea(false);
+          if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
 
           // Only show "No Hotels Found" if search exhausted with zero results
           if (showEmptyState) {
             setManualRequestOnly(true);
           }
           setPhase('done');
-        } else if (isSearchTerminal && !isSearchDone && results.length === 0) {
-          // Probes finished but watcher is still advancing (searchRelaxed events incoming)
-          // AND we have no results yet
-          // Keep polling until searchExhausted OR searchSettled === true OR results appear
-          zeroPollCountRef.current = 0;
-          // Continue polling — don't stop yet
         } else {
-          // Search still in progress: queued > 0 OR running > 0
-          // Keep polling and showing "Searching…" regardless of current results
+          // Not terminal yet — keep polling. This covers:
+          //  - Active probes (queued > 0 OR running > 0)
+          //  - The brief gap between batches (queued/running both 0 but phase still in_progress)
+          //  - Watcher still advancing via searchRelaxed events
           zeroPollCountRef.current = 0;
           setShowSearchingWithRelaxation(false);
           setManualRequestOnly(false);
@@ -579,6 +622,9 @@ export default function AddHotelPage() {
     setErrorMsg('');
     setCompletedResults([]);
     setSearchSummary(null);
+    setSearchingWiderArea(false);
+    previousTotalRef.current = 0;
+    if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
     // Reset alternatives state on new search
     setHasAlternativesAvailable(false);
     setAlternativesFetched(false);
@@ -639,6 +685,7 @@ export default function AddHotelPage() {
           hotelsFound: completedHotels.length,
           queued: status.summary.queued,
           running: status.summary.running,
+          phase: status.summary.phase ?? null,
         });
 
         // Detect if alternatives have already been fetched
@@ -970,11 +1017,11 @@ export default function AddHotelPage() {
     !manualRequestOnly;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col min-h-full xl:h-full xl:overflow-hidden">
       <Header title={t.createForm.title} />
 
       <div
-        className="p-4 md:p-6 flex-1 min-h-0 flex flex-col gap-6"
+        className="p-4 md:p-6 flex-1 xl:min-h-0 flex flex-col gap-6"
         onWheel={(e) => {
           if (!hotelListRef.current) return;
           const target = e.target as Node;
@@ -1019,6 +1066,14 @@ export default function AddHotelPage() {
             ? Math.round((searchSummary.completed / searchSummary.total) * 100)
             : 0;
           const remaining = searchSummary ? Math.max(0, searchSummary.total - searchSummary.completed) : 0;
+          // Inter-batch lull: backend is paginating but no jobs are in flight yet.
+          // The numeric % stops being meaningful here (it'll plateau near 100%), so we
+          // switch to an indeterminate "still searching" bar until the next batch enqueues.
+          const isBetweenBatches = !!searchSummary
+            && (searchSummary.phase === 'in_progress' || searchSummary.phase === null)
+            && searchSummary.queued === 0
+            && searchSummary.running === 0
+            && searchSummary.total > 0;
           return (
             <div
               className="bg-white rounded-[14px] border border-sett-border-light px-5 py-4 relative overflow-hidden animate-card-rise-in"
@@ -1048,17 +1103,24 @@ export default function AddHotelPage() {
                       {t.addHotel.searchingHotels}
                     </p>
                     {!searchSummary && (
-                      <div className="flex items-center gap-1 mt-1">
-                        {[0, 1, 2].map((i) => (
-                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-sett-primary/50 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
-                        ))}
-                      </div>
+                      <>
+                        <p className="font-montserrat text-[12px] text-sett-text-accent leading-tight mt-0.5">
+                          {t.addHotel.searchingHotelsHint}
+                        </p>
+                        <div className="flex items-center gap-1 mt-1">
+                          {[0, 1, 2].map((i) => (
+                            <span key={i} className="w-1.5 h-1.5 rounded-full bg-sett-primary/50 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
+                          ))}
+                        </div>
+                      </>
                     )}
                     {searchSummary && (
                       <p className="font-montserrat text-[13px] text-sett-text-accent leading-tight mt-0.5">
-                        {t.addHotel.hotelsChecked
-                          .replace('{completed}', String(searchSummary.completed))
-                          .replace('{total}', String(searchSummary.total))}
+                        {isBetweenBatches
+                          ? t.addHotel.searchingWiderTitle
+                          : t.addHotel.hotelsChecked
+                              .replace('{completed}', String(searchSummary.completed))
+                              .replace('{total}', String(searchSummary.total))}
                       </p>
                     )}
                   </div>
@@ -1067,22 +1129,40 @@ export default function AddHotelPage() {
                 {/* Divider */}
                 <div className="hidden sm:block w-px self-stretch bg-sett-border-light shrink-0" />
 
-                {/* Centre: progress bar */}
+                {/* Centre: progress bar — switches to indeterminate between batches */}
                 {searchSummary && (
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-montserrat text-[13px] text-sett-text-accent">{t.addHotel.searchProgress}</span>
-                      <span className="font-montserrat text-[14px] font-bold text-sett-primary tabular-nums">{pct}%</span>
+                      {isBetweenBatches ? (
+                        <span className="font-montserrat text-[13px] font-semibold text-sett-primary">
+                          {t.addHotel.queuingNextBatch}
+                        </span>
+                      ) : (
+                        <span className="font-montserrat text-[14px] font-bold text-sett-primary tabular-nums">{pct}%</span>
+                      )}
                     </div>
-                    <div className="w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'rgba(170,199,55,0.15)' }}>
-                      <div
-                        className="h-2 rounded-full transition-all duration-700 ease-out"
-                        style={{
-                          width: `${pct}%`,
-                          background: 'linear-gradient(90deg, #8FA82B 0%, #AAC737 100%)',
-                          boxShadow: '0 0 6px rgba(170,199,55,0.5)',
-                        }}
-                      />
+                    <div className="relative w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'rgba(170,199,55,0.15)' }}>
+                      {isBetweenBatches ? (
+                        // Indeterminate band — sliding 30%-wide bar that loops left→right
+                        <div
+                          aria-hidden
+                          className="absolute top-0 left-0 h-2 w-[30%] rounded-full animate-indeterminate-slide"
+                          style={{
+                            background: 'linear-gradient(90deg, transparent 0%, #AAC737 50%, transparent 100%)',
+                            boxShadow: '0 0 6px rgba(170,199,55,0.5)',
+                          }}
+                        />
+                      ) : (
+                        <div
+                          className="h-2 rounded-full transition-all duration-700 ease-out"
+                          style={{
+                            width: `${pct}%`,
+                            background: 'linear-gradient(90deg, #8FA82B 0%, #AAC737 100%)',
+                            boxShadow: '0 0 6px rgba(170,199,55,0.5)',
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 )}
@@ -1093,9 +1173,11 @@ export default function AddHotelPage() {
                 {/* Right: stat pills */}
                 {searchSummary && (
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* Remaining */}
-                    <div className="flex flex-col items-center px-3 py-2 rounded-[10px] border border-[#E8EDF0] min-w-[52px]" style={{ background: '#F7F9FB' }}>
-                      <span className="font-montserrat text-[18px] font-bold text-sett-text-primary leading-none">{remaining}</span>
+                    {/* Remaining — show "—" between batches since the count is meaningless there */}
+                    <div className="flex flex-col items-center px-3 py-2 rounded-[10px] border border-sett-border-light min-w-[52px] bg-sett-fill">
+                      <span className="font-montserrat text-[18px] font-bold text-sett-text-primary leading-none tabular-nums">
+                        {isBetweenBatches ? '—' : remaining}
+                      </span>
                       <span className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent mt-0.5">{t.addHotel.searchRemaining}</span>
                     </div>
 
@@ -1238,6 +1320,24 @@ export default function AddHotelPage() {
             <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
               {t.addHotel.retrySearch}
             </Button>
+          </div>
+        )}
+
+        {/* Searching wider area — a new probe batch was queued after the first one settled */}
+        {(phase === 'searching' || phase === 'polling') && searchingWiderArea && (
+          <div className="bg-sett-primary/5 rounded-[14px] border-l-4 border-l-sett-primary border border-sett-primary/20 px-5 py-4 animate-sidebar-fade-up">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-sett-primary flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{t.addHotel.searchingWiderTitle}</p>
+                <p className="font-montserrat text-[13px] text-sett-text-accent mt-0.5">{t.addHotel.searchingWiderMsg}</p>
+              </div>
+            </div>
           </div>
         )}
 
