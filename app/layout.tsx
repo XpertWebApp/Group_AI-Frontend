@@ -32,6 +32,9 @@ export default function RootLayout({
           <AuthHydration>{children}</AuthHydration>
           <ToastProvider />
         </StoreProvider>
+        {/* Portal target for react-datepicker poppers — keeps the calendar above
+            any CSS stacking context created by parent transforms (e.g. card-rise-in). */}
+        <div id="sett-datepicker-portal" />
       </body>
     </html>
   );

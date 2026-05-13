@@ -137,6 +137,19 @@
 .animate-modal-pop-in     { animation: modal-pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-modal-image-fade { animation: modal-image-fade 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* ── Form-field fade-in ──
+   Opacity-only entrance for form fields. No transform = no CSS stacking context,
+   which means absolute/portal'd dropdowns above/below the field can render
+   correctly on top of all siblings. Use this on any wrapper that contains a
+   Select/DatePicker/dropdown menu instead of card-rise-in. */
+@keyframes field-fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.animate-field-fade-in {
+  animation: field-fade-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* ── Badge pulse ──
    Gentle opacity pulse for "in-motion" status badges (e.g. Processing).
    Slow + subtle so multiple badges in a list don't strobe. */
@@ -196,6 +209,7 @@
   .animate-modal-image-fade,
   .animate-indeterminate-slide,
   .animate-badge-pulse,
+  .animate-field-fade-in,
   .sett-wave-draw,
   .sett-wave-shimmer { animation: none !important; }
   /* When reduced-motion is on, hide the shimmer overlay entirely (otherwise its

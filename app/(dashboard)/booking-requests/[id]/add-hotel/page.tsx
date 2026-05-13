@@ -229,6 +229,14 @@ export default function AddHotelPage() {
   const widerAreaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestStatusCheckRef = useRef(0);
   const isPollingActiveRef = useRef(false);
+  // Mirror alternatives state into refs so the long-lived poll closure (created
+  // once with [] deps) reads the latest values instead of stale ones from when
+  // the closure was first captured. Without this, clicking "Show Alternatives"
+  // never updates the UI because the poll's check is permanently false.
+  const alternativesFetchedRef = useRef(false);
+  const alternativesLoadingRef = useRef(false);
+  useEffect(() => { alternativesFetchedRef.current = alternativesFetched; }, [alternativesFetched]);
+  useEffect(() => { alternativesLoadingRef.current = alternativesLoading; }, [alternativesLoading]);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -445,19 +453,28 @@ export default function AddHotelPage() {
         }
         previousTotalRef.current = newSummary.total;
 
-        // Check if we have alternative results - stop loading spinner immediately
-        if (alternativesFetched && alternativesLoading) {
+        // Read alternatives state from refs (not closure state) because this
+        // poll closure was created with [] deps and would otherwise see stale
+        // values from the initial render.
+        const altFetched = alternativesFetchedRef.current;
+        const altLoading = alternativesLoadingRef.current;
+        // Stream alternative hotels into the UI as they arrive — but keep the
+        // "loading" spinner up until ALL alternative probes have drained, so the
+        // user understands more results may still be coming. (Previously we
+        // cleared the spinner on the first alternative, then polling terminated
+        // before the rest arrived.)
+        if (altFetched && altLoading) {
+          const altsProbesDone = status.summary.queued === 0 && status.summary.running === 0;
           const hasAlt = results.some(h => h.searchKind === 'alternative');
-          if (hasAlt) {
+          if (hasAlt && altsProbesDone) {
             setAlternativesLoading(false);
-            // Update results immediately when alternatives are found
             setCompletedResults(results);
           }
         }
 
         // Throttle hotel results updates to max once per 1 second
         // BUT: Don't throttle when fetching alternatives - show them immediately
-        if (alternativesFetched) {
+        if (altFetched) {
           // For alternatives, update immediately without throttling
           if (results.length !== lastHotelCountRef.current) {
             lastHotelCountRef.current = results.length;
@@ -500,8 +517,29 @@ export default function AddHotelPage() {
           status.summary.running === 0 &&
           (hasBackendSignal || results.length > 0);
 
-        const isSearchDone = phaseTerminal || legacyTerminal;
-        const showEmptyState = (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
+        // Terminal logic depends on which search mode we're in:
+        //
+        // ── Alternatives mode (altFetched === true) ──
+        //   The main search's `phase` may still be 'settled' from before the user
+        //   clicked Show Alternatives — that doesn't mean alternatives are done.
+        //   The only reliable "alternatives finished" signal is: no more probes
+        //   queued or running AND at least one alternative has actually arrived.
+        //   We ignore `phase` here entirely because the watcher's phase value is
+        //   tied to the main search lifecycle, not alternatives.
+        //
+        // ── Main search mode ──
+        //   Use `summary.phase` per backend's handover ('settled' / 'exhausted'
+        //   are terminal; 'in_progress' keeps polling).
+        const hasAlternativeInResults = results.some(h => h.searchKind === 'alternative');
+        const altsProbesDrained = status.summary.queued === 0 && status.summary.running === 0;
+
+        const isSearchDone = altFetched
+          // Alternatives mode: terminal = probes drained AND at least one alt visible
+          ? altsProbesDrained && hasAlternativeInResults
+          // Main mode: rely on backend phase signal (with legacy fallback)
+          : (phaseTerminal || legacyTerminal);
+
+        const showEmptyState = !altFetched && (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
 
         if (status.summary.total === 0) {
           // No jobs queued yet — keep polling
@@ -870,8 +908,14 @@ export default function AddHotelPage() {
       // Start polling for alternatives WITHOUT changing main phase
       // This keeps main results visible while only alternatives section loads
       startPollingFallback(requestId);
-      // Note: Do NOT set phase to 'polling' - keep current phase
-      // so main results/sidebar stay visible
+      // Safety: if alternatives never arrive within 90s, stop the spinner so the
+      // user isn't stuck staring at it forever (rare backend-stall edge case).
+      setTimeout(() => {
+        if (alternativesLoadingRef.current) {
+          setAlternativesLoading(false);
+          toast.error(t.addHotel.noAlternativesFound);
+        }
+      }, 90000);
     } catch {
       toast.error('Failed to fetch alternatives');
       setAlternativesLoading(false);
@@ -2211,10 +2255,13 @@ function HotelResultCard({
   alternativeReason?: string | null;
   onImageClick?: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
   const hasCancellation = !!hotel.cxlDeadline;
   const isLimited = hotel.capacityStatus === 'LIMITED';
+  // Translation availability — true if backend returned content in the user's
+  // requested language. When false, hotel.description is still shown but tagged.
+  const translationStale = !!hotel.descriptionLanguage && hotel.descriptionLanguage !== locale;
 
   // Build room type list from perTypeAllocations, enriched with meal plan data from bestOption/supplierSplit
   const mealName: string = (hotel.supplierSplit?.[0]?.mealName as string | undefined) ?? hotel.bestOption?.mealName ?? '';
@@ -2337,18 +2384,27 @@ function HotelResultCard({
               )}
               {/* Description */}
               {hotel.description && (
-                <p
-                  className="font-montserrat text-[14px] text-sett-text-secondary leading-snug animate-sidebar-fade-up"
-                  style={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    animationDelay: '200ms',
-                  }}
-                >
-                  {hotel.description}
-                </p>
+                <div className="animate-sidebar-fade-up" style={{ animationDelay: '200ms' }}>
+                  <p
+                    className="font-montserrat text-[14px] text-sett-text-secondary leading-snug"
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {hotel.description}
+                  </p>
+                  {translationStale && (
+                    <span
+                      className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-sett-fill text-sett-text-accent border border-sett-border-light"
+                      title={t.addHotel.translationUnavailableTooltip}
+                    >
+                      {t.addHotel.translationUnavailable}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 

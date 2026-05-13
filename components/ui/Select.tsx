@@ -180,7 +180,16 @@ export function Select({
   }, [onChange, positionMode]);
 
   return (
-    <div ref={containerRef} className={cn('relative', className)} style={style}>
+    <div
+      ref={containerRef}
+      // When the dropdown is open AND we're in absolute (inline) mode, the
+      // container needs a high z-index so the dropdown's stacking context can
+      // float above sibling form fields lower in the page. Without this, the
+      // inline dropdown is trapped within the container's natural paint order
+      // and renders behind later siblings.
+      className={cn('relative', open && positionMode === 'absolute' && 'z-[9999]', className)}
+      style={style}
+    >
       {label && (
         <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
           {label.endsWith('*') ? (

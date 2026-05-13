@@ -787,12 +787,17 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
         subtitle={t.createForm.tripDetailsSubtitle}
       />
       <div className="space-y-4">
-        {/* Destination — wrapper needs z-30 so its absolute dropdown floats above
-            the sibling field wrappers (each of which creates its own stacking
-            context via animate-card-rise-in's transform). */}
+        {/* Destination — animate-field-fade-in uses opacity only (no transform),
+            so neither this wrapper nor its siblings create a CSS stacking context.
+            When the suggestions dropdown is open, the wrapper itself needs a high
+            z-index so the absolute <ul> can float above sibling form fields below
+            (same pattern as the shared Select component). */}
         <div
           ref={destWrapperRef}
-          className="relative z-30 group animate-card-rise-in"
+          className={cn(
+            'relative group animate-field-fade-in',
+            destOpen && destResults.length > 0 && 'z-[9999]'
+          )}
           style={{ animationDelay: '120ms' }}
         >
           <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
@@ -804,10 +809,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             value={destQuery}
             onChange={(e) => handleDestinationInputChange(e.target.value)}
             onFocus={() => { if (destResults.length > 0) setDestOpen(true); }}
-            className={cn(
-              inputClass(!!errors.destination),
-              'transition-all duration-200 ease-sett-out focus:scale-[1.005]'
-            )}
+            className={inputClass(!!errors.destination)}
           />
           {destOpen && destResults.length > 0 && (
             <ul className="absolute z-50 w-full mt-1 bg-white border border-sett-border rounded-input shadow-lg max-h-60 overflow-y-auto">
@@ -834,11 +836,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
 
         {/* Check-in / Check-out */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="animate-card-rise-in" style={{ animationDelay: '180ms' }}>
+          <div className="animate-field-fade-in" style={{ animationDelay: '180ms' }}>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkInDate} <span className="text-sett-destructive">*</span>
             </label>
-            <div className="sett-datepicker transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]">
+            <div className="sett-datepicker">
               <DatePicker
                 selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
                 onChange={(date: Date | null) => updateField('checkInDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
@@ -848,6 +850,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 placeholderText="DD.MM.YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
+                portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
                 todayButton="Today"
                 showPopperArrow={false}
@@ -856,11 +859,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </div>
             <FieldError message={errors.checkInDate} />
           </div>
-          <div className="animate-card-rise-in" style={{ animationDelay: '220ms' }}>
+          <div className="animate-field-fade-in" style={{ animationDelay: '220ms' }}>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.checkOutDate} <span className="text-sett-destructive">*</span>
             </label>
-            <div className="sett-datepicker transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]">
+            <div className="sett-datepicker">
               <DatePicker
                 selected={formData.checkOutDate ? new Date(formData.checkOutDate) : null}
                 onChange={(date: Date | null) => updateField('checkOutDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
@@ -870,6 +873,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 placeholderText="DD.MM.YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
+                portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
                 todayButton="Today"
                 showPopperArrow={false}
@@ -889,7 +893,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             onChange={(e) => updateField('hotelCategory', e.target.value)}
             placeholder={t.createForm.selectHotelCategory}
             error={errors.hotelCategory}
-            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            className="animate-field-fade-in"
             style={{ animationDelay: '280ms' }}
           />
           <Select
@@ -898,7 +902,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             value={formData.budgetRange}
             onChange={(e) => updateField('budgetRange', e.target.value)}
             placeholder={t.createForm.selectBudgetRange}
-            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            className="animate-field-fade-in"
             style={{ animationDelay: '320ms' }}
           />
         </div>
@@ -918,13 +922,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             }}
             placeholder={t.createForm.selectGroupType}
             error={errors.groupType}
-            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
+            className="animate-field-fade-in"
             style={{ animationDelay: '380ms' }}
           />
-          <div
-            className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]"
-            style={{ animationDelay: '420ms' }}
-          >
+          <div className="animate-field-fade-in" style={{ animationDelay: '420ms' }}>
             <Input
               label={`${t.createForm.groupSize} *`}
               type="number"
@@ -945,7 +946,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
         {/* Average Age — conditional, slides in only for youth/school groups */}
         {(formData.groupType === 'youth_group' || formData.groupType === 'school_group') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="animate-card-rise-in transition-transform duration-200 ease-sett-out focus-within:scale-[1.005]">
+            <div className="animate-field-fade-in">
               <Input
                 label={`${t.createForm.averageAge} *`}
                 type="number"
