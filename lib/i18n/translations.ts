@@ -545,8 +545,15 @@ export const translations = {
 
     // ── Login / Forgot Password ──
     login: {
-      welcomeBack: 'Welcome back',
-      signInSubtitle: 'Sign in to access GroupHub',
+      eyebrow: 'SETT Hub Access',
+      welcomeBack: 'Sign in to SETT Hub',
+      signInSubtitle: 'Access your group booking workspace and proposals.',
+      heroTitle: 'Group hotel booking for travel professionals.',
+      heroSubtitle: 'The B2B reservation platform trusted by travel agencies worldwide. Built for confident, reliable group bookings at scale.',
+      statAgencies: 'Travel agency partners',
+      statCountries: 'Countries served',
+      statResponse: 'Group offer turnaround',
+      confidential: 'Confidential — for authorized agency partners only.',
       email: 'EMAIL',
       emailPlaceholder: 'Enter email',
       password: 'PASSWORD',
@@ -1240,8 +1247,15 @@ export const translations = {
 
     // ── Login / Forgot Password ──
     login: {
-      welcomeBack: 'Willkommen zurück',
-      signInSubtitle: 'Melden Sie sich an, um auf GroupHub zuzugreifen',
+      eyebrow: 'SETT Hub Zugang',
+      welcomeBack: 'Anmeldung bei SETT Hub',
+      signInSubtitle: 'Greifen Sie auf Ihren Gruppenbuchungs-Arbeitsplatz und Angebote zu.',
+      heroTitle: 'Gruppenhotelbuchungen für Reiseprofis.',
+      heroSubtitle: 'Die B2B-Reservierungsplattform, der Reisebüros weltweit vertrauen. Entwickelt für zuverlässige Gruppenbuchungen im großen Maßstab.',
+      statAgencies: 'Reisebüro-Partner',
+      statCountries: 'Länder weltweit',
+      statResponse: 'Bearbeitungszeit für Gruppenangebote',
+      confidential: 'Vertraulich — nur für autorisierte Agenturpartner.',
       email: 'E-MAIL',
       emailPlaceholder: 'E-Mail eingeben',
       password: 'PASSWORT',

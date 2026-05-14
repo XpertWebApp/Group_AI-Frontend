@@ -7,6 +7,7 @@ import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { AlertTriangle } from 'lucide-react';
 import { authApi } from '@/lib/api/auth';
 import { getApiError } from '@/lib/api/auth';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
@@ -14,7 +15,6 @@ import { setUser } from '@/lib/store/slices/authSlice';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
-import Image from 'next/image';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 type LoginFormValues = {
@@ -63,75 +63,107 @@ export default function LoginPage() {
       const apiErr = getApiError(err);
       const message = apiErr.message || 'Invalid credentials';
       setSubmitError(message);
-      // Keep error visible — clear only on next successful submit
     }
   };
 
   return (
-    <div className="w-full max-w-md bg-sett-card rounded-card shadow-card p-8 mx-4">
-      <div className="text-center mb-8">
-        <Image
-          src="/icons/sett_logo.svg"
-          alt="SETT Logo"
-          width={180}
-          height={60}
-          className="mx-auto h-auto w-auto"
-        />
+    <div>
+      {/* Page heading — true H1 per §3 (weight 800, 28–36px range) */}
+      <div className="mb-8 sm:mb-10">
+        <p
+          className="font-montserrat text-[12px] font-semibold tracking-[0.12em] uppercase text-sett-primary mb-3 animate-sidebar-fade-up"
+          style={{ animationDelay: '60ms' }}
+        >
+          {t.login.eyebrow}
+        </p>
+        <h2
+          className="font-montserrat text-[28px] sm:text-[32px] font-extrabold leading-tight text-sett-text-primary animate-sidebar-fade-up"
+          style={{ animationDelay: '120ms' }}
+        >
+          {t.login.welcomeBack}
+        </h2>
+        <p
+          className="mt-2 font-montserrat text-[15px] font-normal text-sett-text-secondary leading-relaxed animate-sidebar-fade-up"
+          style={{ animationDelay: '200ms' }}
+        >
+          {t.login.signInSubtitle}
+        </p>
       </div>
-      <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary text-center leading-normal mb-1">
-        {t.login.welcomeBack}
-      </h2>
-      <p className="text-body text-sett-text-secondary text-center mb-6">
-        {t.login.signInSubtitle}
-      </p>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        <Input
-          label={t.login.email}
-          placeholder={t.login.emailPlaceholder}
-          type="text"
-          error={errors.email?.message}
-          className="placeholder:!text-sett-text-accent placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
-          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-sett-text-primary uppercase"
-          {...register('email')}
-        />
-        <Input
-          label={t.login.password}
-          placeholder={t.login.passwordPlaceholder}
-          isPassword
-          error={errors.password?.message}
-          className="placeholder:!text-sett-text-accent placeholder:font-montserrat placeholder:!text-[14px] placeholder:font-normal placeholder:leading-normal"
-          labelClassName="font-montserrat !text-[14px] font-medium leading-normal tracking-normal text-sett-text-primary uppercase"
-          {...register('password')}
-        />
-        <div className="flex items-center justify-between">
-          <Checkbox label={t.login.rememberMe} labelClassName="font-montserrat !text-[14px] font-medium leading-normal text-sett-text-secondary" {...register('rememberMe')} />
+
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        <div className="animate-sidebar-fade-up" style={{ animationDelay: '260ms' }}>
+          <Input
+            label={t.login.email}
+            placeholder={t.login.emailPlaceholder}
+            type="email"
+            autoComplete="email"
+            error={errors.email?.message}
+            {...register('email')}
+          />
+        </div>
+
+        <div className="animate-sidebar-fade-up" style={{ animationDelay: '320ms' }}>
+          <Input
+            label={t.login.password}
+            placeholder={t.login.passwordPlaceholder}
+            isPassword
+            autoComplete="current-password"
+            error={errors.password?.message}
+            {...register('password')}
+          />
+        </div>
+
+        <div
+          className="flex items-center justify-between animate-sidebar-fade-up"
+          style={{ animationDelay: '380ms' }}
+        >
+          <Checkbox
+            label={t.login.rememberMe}
+            labelClassName="font-montserrat text-[13px] font-medium text-sett-text-secondary"
+            {...register('rememberMe')}
+          />
           <Link
             href="/forgot-password"
-            className="font-montserrat text-[14px] font-medium leading-normal text-[#667F00] hover:underline"
+            className="font-montserrat text-[13px] font-semibold text-sett-primary hover:text-sett-green-dark hover:underline transition-colors"
           >
             {t.login.forgotPassword}
           </Link>
         </div>
+
         {submitError && (
-          <p className="text-caption text-red-500">{submitError}</p>
+          <div
+            role="alert"
+            className="flex items-start gap-2 px-3 py-2.5 rounded-button border border-sett-destructive/30 bg-sett-destructive/10 animate-sidebar-fade-up"
+          >
+            <AlertTriangle className="w-4 h-4 text-sett-destructive shrink-0 mt-0.5" />
+            <p className="font-montserrat text-[13px] font-medium text-sett-destructive leading-snug">
+              {submitError}
+            </p>
+          </div>
         )}
-        <Button
-          type="submit"
-          variant="primary"
-          fullWidth
-          isLoading={isSubmitting}
-          className="mt-4"
-        >
-          {t.login.signIn}
-        </Button>
+
+        <div className="animate-sidebar-fade-up pt-2" style={{ animationDelay: '440ms' }}>
+          <Button
+            type="submit"
+            variant="primary"
+            fullWidth
+            isLoading={isSubmitting}
+          >
+            {t.login.signIn}
+          </Button>
+        </div>
       </form>
-      <p className="text-center font-montserrat text-[12px] font-normal leading-[14px] text-sett-text-secondary mt-6">
+
+      <p
+        className="mt-8 text-center font-montserrat text-[13px] font-normal text-sett-text-secondary animate-sidebar-fade-up"
+        style={{ animationDelay: '520ms' }}
+      >
         {t.login.needHelp}{' '}
         <a
-          href="mailto:support@sett.ai"
-          className="font-montserrat text-[12px] font-medium leading-[14px] text-[#667F00] hover:underline"
+          href="mailto:support@s-e-t-t.com"
+          className="font-montserrat text-[13px] font-semibold text-sett-primary hover:text-sett-green-dark hover:underline transition-colors"
         >
-          support@sett.ai
+          support@s-e-t-t.com
         </a>
       </p>
     </div>
