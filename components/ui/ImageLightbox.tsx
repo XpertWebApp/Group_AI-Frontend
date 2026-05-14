@@ -1,15 +1,24 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
+const PLACEHOLDER = '/icons/placeholder-hotel.svg';
+
 interface ImageLightboxProps {
-  src: string;
+  /** Single URL. Use for one-off images where no fallback chain exists. */
+  src?: string;
+  /** Ordered fallback chain (best → worst). Tried in order on <img> error. */
+  srcs?: string[];
   alt: string;
   onClose: () => void;
 }
 
-export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
+export function ImageLightbox({ src, srcs, alt, onClose }: ImageLightboxProps) {
+  // Resolve the active chain. Prefer `srcs` if provided; otherwise wrap `src`.
+  const chain: string[] = srcs && srcs.length > 0 ? srcs : (src ? [src] : []);
+  const [idx, setIdx] = useState(0);
+
   useEffect(() => {
     // Prevent body scroll when lightbox is open
     const originalOverflow = document.body.style.overflow;
@@ -26,6 +35,8 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
       document.removeEventListener('keydown', handleEscape);
     };
   }, [onClose]);
+
+  const resolvedSrc = idx < chain.length ? chain[idx] : PLACEHOLDER;
 
   return (
     <div
@@ -51,9 +62,13 @@ export function ImageLightbox({ src, alt, onClose }: ImageLightboxProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <img
-          src={src}
+          src={resolvedSrc}
           alt={alt}
           className="max-w-full max-h-full object-contain rounded-[8px] shadow-2xl animate-in fade-in duration-300"
+          onError={() => {
+            // Try next URL in the chain. Final fallback is PLACEHOLDER (shown when idx >= chain.length).
+            if (idx < chain.length) setIdx(idx + 1);
+          }}
         />
       </div>
     </div>

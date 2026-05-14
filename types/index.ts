@@ -257,6 +257,10 @@ export interface HotelSearchResult {
   hotelName: string;
   starRating: number;
   imageUrl?: string | null;
+  // Ordered fallback list of image URLs (best to worst). GIATA categorised first,
+  // then WBE image keys in displayOrder. The FE tries each on <img> error until
+  // one loads; the placeholder is only shown if every URL fails.
+  imageUrls?: string[];
   sethubDetailsUrl?: string | null;
   address?: string | null;
   addressCity?: string | null;

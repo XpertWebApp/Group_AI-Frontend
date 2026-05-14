@@ -136,12 +136,31 @@ const DateInputComponent = forwardRef<HTMLInputElement, DateInputProps>(
 );
 DateInputComponent.displayName = 'DateInputComponent';
 
+const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
+
 // Helper to construct proper image URL for both CDN and proxy paths
 function getImageUrl(imageUrl: string | null | undefined): string {
-  if (!imageUrl) return '/icons/placeholder-hotel.svg';
+  if (!imageUrl) return PLACEHOLDER_IMAGE;
   if (imageUrl.startsWith('http') || imageUrl.startsWith('/api/')) return imageUrl;
   const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
   return `${API_BASE}${imageUrl}`;
+}
+
+// Build the FE's ordered fallback list of image URLs for a hotel.
+// Prefers the new backend-provided `imageUrls[]` (GIATA categorised → WBE displayOrder),
+// falls back to the legacy single `imageUrl`, then to the placeholder.
+function getHotelImageChain(hotel: { imageUrls?: string[]; imageUrl?: string | null }): string[] {
+  const chain: string[] = [];
+  if (Array.isArray(hotel.imageUrls) && hotel.imageUrls.length > 0) {
+    for (const u of hotel.imageUrls) {
+      if (u) chain.push(getImageUrl(u));
+    }
+  }
+  if (hotel.imageUrl) {
+    const legacy = getImageUrl(hotel.imageUrl);
+    if (!chain.includes(legacy)) chain.push(legacy);
+  }
+  return chain;
 }
 
 // Known API room type names → human-readable labels
@@ -246,7 +265,7 @@ export default function AddHotelPage() {
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string; sethubDetailsUrl?: string | null } | null>(null);
-  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ srcs: string[]; alt: string } | null>(null);
 
   // Load request data
   useEffect(() => {
@@ -1903,7 +1922,7 @@ export default function AddHotelPage() {
                             isAdding={addingHotel === hotel.hotelCode}
                             onAddToOffer={() => handleAddToOffer(hotel)}
                             onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                            onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
+                            onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
                           />
                         </div>
                       ))}
@@ -1959,7 +1978,7 @@ export default function AddHotelPage() {
                               isAdding={addingHotel === hotel.hotelCode}
                               onAddToOffer={() => handleAddToOffer(hotel)}
                               onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                              onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
+                              onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
                             />
                           </div>
                         ))}
@@ -2063,7 +2082,7 @@ export default function AddHotelPage() {
                                     isAdding={addingHotel === hotel.hotelCode}
                                     onAddToOffer={() => handleAddToOffer(hotel)}
                                     onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
-                                    onImageClick={() => setLightboxImage({ src: getImageUrl(hotel.imageUrl), alt: hotel.hotelName })}
+                                    onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
                                   />
                                 </div>
                               ))}
@@ -2092,7 +2111,7 @@ export default function AddHotelPage() {
 
       {lightboxImage && (
         <ImageLightbox
-          src={lightboxImage.src}
+          srcs={lightboxImage.srcs}
           alt={lightboxImage.alt}
           onClose={() => setLightboxImage(null)}
         />
@@ -2236,6 +2255,42 @@ function ManualRequestCard({ requestRef, onSent, onEditTripDetails }: { requestR
 
 /* ─────────────── Hotel Result Card ─────────────── */
 
+/**
+ * Renders a hotel image with backend-provided fallback chain. Walks through
+ * `urls` on each load error; final fallback is the local placeholder SVG.
+ * Resets to index 0 when the chain identity changes (e.g. card recycled to a
+ * different hotel during list re-render).
+ */
+function HotelImageWithFallback({
+  urls,
+  alt,
+  className,
+}: {
+  urls: string[];
+  alt: string;
+  className?: string;
+}) {
+  const [idx, setIdx] = useState(0);
+  // Reset when the chain changes (different hotel re-using same DOM node).
+  // urls.join is cheap here — chains are short (typically <20 entries).
+  const chainKey = urls.join('|');
+  useEffect(() => { setIdx(0); }, [chainKey]);
+
+  const exhausted = idx >= urls.length;
+  const src = exhausted ? PLACEHOLDER_IMAGE : urls[idx];
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => {
+        if (!exhausted) setIdx((i) => i + 1);
+      }}
+    />
+  );
+}
+
 
 function HotelResultCard({
   hotel,
@@ -2292,7 +2347,9 @@ function HotelResultCard({
     actualDescriptions: rt.actualDescriptions ? rt.actualDescriptions.filter((desc, idx, arr) => arr.indexOf(desc) === idx) : undefined,
   }));
 
-  const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
+  // Build the ordered fallback chain — try each URL on error, fall back to
+  // placeholder only if every URL fails.
+  const imageChain = getHotelImageChain(hotel);
 
   return (
     <div
@@ -2319,15 +2376,12 @@ function HotelResultCard({
           tabIndex={onImageClick ? 0 : undefined}
           onKeyDown={onImageClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onImageClick(); } : undefined}
         >
-          <img
-            src={getImageUrl(hotel.imageUrl)}
+          <HotelImageWithFallback
+            urls={imageChain}
             alt={hotel.hotelName}
             // group-hover/card on the outer card scales the image when the user
             // hovers anywhere on the card (not just the image itself).
             className="w-full h-full object-cover transition-transform duration-500 ease-sett-out group-hover/card:scale-[1.04]"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
-            }}
           />
 
           {/* Hover overlay with zoom icon */}
