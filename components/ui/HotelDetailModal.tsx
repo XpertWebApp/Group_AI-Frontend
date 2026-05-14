@@ -78,7 +78,7 @@ interface HotelDetailModalProps {
 }
 
 export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClose }: HotelDetailModalProps) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [detail, setDetail] = useState<HotelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -130,6 +130,14 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
 
   const images = detail?.images?.length ? detail.images : [];
   const heroSrc = images.length > 0 ? imageUrl(images[activeImage]) : PLACEHOLDER;
+
+  // Locale-aware description pick (same shape as hotel cards). Falls back to
+  // the other language, then the legacy single `description` field.
+  const localizedDescription = detail?.descriptions?.[locale]
+    ?? detail?.descriptions?.[locale === 'de' ? 'en' : 'de']
+    ?? null;
+  const descriptionText = localizedDescription?.text ?? detail?.description ?? null;
+  const translationStale = localizedDescription?.isFallback === true;
 
   return (
     <div
@@ -303,16 +311,27 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
                 )}
               </div>
 
-              {/* Description */}
-              {(detail.description || detail.location) && (
+              {/* Description — reads descriptions[locale] from the multi-lang payload.
+                  Switching EN↔DE re-renders this without a new API call. */}
+              {(descriptionText || detail.location) && (
                 <div className="animate-card-rise-in" style={{ animationDelay: '220ms' }}>
-                  <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase tracking-wide mb-2">
-                    {t.addHotel.hotelDescription}
-                  </h3>
-                  {detail.description ? (
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase tracking-wide">
+                      {t.addHotel.hotelDescription}
+                    </h3>
+                    {translationStale && (
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-sett-fill text-sett-text-accent border border-sett-border-light"
+                        title={t.addHotel.translationUnavailableTooltip}
+                      >
+                        {t.addHotel.translationUnavailable}
+                      </span>
+                    )}
+                  </div>
+                  {descriptionText ? (
                     <div
                       className="font-montserrat text-[14px] text-sett-text-secondary leading-relaxed prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: detail.description }}
+                      dangerouslySetInnerHTML={{ __html: descriptionText }}
                     />
                   ) : (
                     <p className="font-montserrat text-[14px] text-sett-text-secondary leading-relaxed">

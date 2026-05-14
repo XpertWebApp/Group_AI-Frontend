@@ -275,6 +275,15 @@ export interface HotelSearchResult {
   description?: string | null;
   descriptionLanguage?: string | null;
   descriptionSource?: string | null;
+  // Multi-language descriptions — backend ships both EN and DE in every search/details
+  // response so the UI can swap on language toggle without a new API call.
+  // `isFallback: true` means the text under this locale is actually English (no native
+  // translation was available) — surface that to the user via the "Translation
+  // unavailable" badge.
+  descriptions?: {
+    en?: { text: string; source: string; isFallback: boolean } | null;
+    de?: { text: string; source: string; isFallback: boolean } | null;
+  } | null;
   facilities?: Facility[];
   // Legacy / backward compat fields
   sessionId?: string;

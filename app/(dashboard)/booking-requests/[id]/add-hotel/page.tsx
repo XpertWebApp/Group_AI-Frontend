@@ -1387,17 +1387,17 @@ export default function AddHotelPage() {
 
         {/* Searching with relaxed criteria message */}
         {phase === 'polling' && showSearchingWithRelaxation && (
-          <div className="bg-blue-50 rounded-[14px] border-l-4 border-l-blue-400 border border-blue-200 px-5 py-4 mb-4 animate-sidebar-fade-up">
+          <div className="bg-sett-navy/5 rounded-[14px] border-l-4 border-l-sett-primary border border-sett-primary/20 px-5 py-4 mb-4 animate-sidebar-fade-up">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <div className="w-8 h-8 rounded-full bg-sett-primary flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-sett-navy animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               </div>
               <div>
-                <p className="font-montserrat text-[14px] font-semibold text-blue-900">Searching with relaxed criteria...</p>
-                <p className="font-montserrat text-[13px] text-blue-700 mt-0.5">Our system is searching for the best matches across different hotel categories.</p>
+                <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">Searching with relaxed criteria...</p>
+                <p className="font-montserrat text-[13px] text-sett-text-secondary mt-0.5">Our system is searching for the best matches across different hotel categories.</p>
               </div>
             </div>
           </div>
@@ -1981,12 +1981,7 @@ export default function AddHotelPage() {
                       </div>
                     )}
 
-                    <div className="bg-gradient-to-br from-blue-50/40 to-transparent border border-blue-100/40 rounded-[14px] p-5 transition-all duration-200"
-                      style={{
-                        background: alternativesExpanded
-                          ? 'linear-gradient(135deg, rgba(219,234,254,0.6) 0%, rgba(240,249,255,0.4) 100%)'
-                          : 'linear-gradient(135deg, rgba(245,249,255,0.4) 0%, transparent 100%)'
-                      }}>
+                    <div className="border border-sett-border-light rounded-[14px] p-5 transition-all duration-200 bg-sett-primary/[0.04]">
                       {/* Accordion Header */}
                       <button
                         type="button"
@@ -1995,7 +1990,7 @@ export default function AddHotelPage() {
                       >
                         {/* Chevron with rotation */}
                         <div className={`shrink-0 mt-1 transition-transform duration-300 ${alternativesExpanded ? 'rotate-180' : ''}`}>
-                          <ChevronRight className="w-5 h-5 text-blue-500 group-hover:text-blue-600" />
+                          <ChevronRight className="w-5 h-5 text-sett-primary group-hover:text-sett-green-dark" />
                         </div>
 
                         {/* Content */}
@@ -2004,7 +1999,7 @@ export default function AddHotelPage() {
                             <h3 className="font-montserrat text-[14px] font-bold text-sett-text-primary">
                               {t.addHotel.similarAlternatives}
                             </h3>
-                            <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-montserrat text-[11px] font-semibold whitespace-nowrap">
+                            <span className="px-2 py-1 rounded-full bg-sett-navy text-sett-primary font-montserrat text-[11px] font-semibold whitespace-nowrap">
                               {phase === 'polling' && alternativesFetched ? (
                                 <span className="flex items-center gap-1">
                                   <svg className="w-3 h-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -2024,8 +2019,8 @@ export default function AddHotelPage() {
                         </div>
 
                         {/* Hover indicator */}
-                        <div className="shrink-0 p-2 rounded-full group-hover:bg-blue-100/60 transition-colors">
-                          <svg className="w-4 h-4 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <div className="shrink-0 p-2 rounded-full group-hover:bg-sett-primary/15 transition-colors">
+                          <svg className="w-4 h-4 text-sett-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M12 5v14M5 12h14" />
                           </svg>
                         </div>
@@ -2033,11 +2028,11 @@ export default function AddHotelPage() {
 
                       {/* Expanded content with smooth animation */}
                       {alternativesExpanded && (
-                        <div className="mt-5 pt-5 border-t border-blue-100/50 animate-in fade-in duration-300">
+                        <div className="mt-5 pt-5 border-t border-sett-primary/20 animate-in fade-in duration-300">
                           {alternativesLoading && filteredAltResults.length === 0 ? (
                             // Loading alternatives and none found yet
                             <div className="flex items-center justify-center gap-3 py-8">
-                              <svg className="w-5 h-5 animate-spin text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                               </svg>
@@ -2162,14 +2157,18 @@ function SearchBanner({ type, message, onDismiss }: {
 }) {
   const isRelaxation = type === 'relaxation';
 
+  // Both variants use the brand navy + green palette. Relaxation = green accent
+  // (the search is alive and adapting). Destination-widened = navy accent
+  // (system-level message). No off-palette amber/blue per §10.
   const wrapperCls = isRelaxation
-    ? 'bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400'
-    : 'bg-blue-50 border border-blue-200 border-l-4 border-l-blue-400';
+    ? 'bg-sett-primary/5 border border-sett-primary/20 border-l-4 border-l-sett-primary'
+    : 'bg-sett-navy/5 border border-sett-navy/15 border-l-4 border-l-sett-navy';
   const iconCircleCls = isRelaxation
-    ? 'bg-amber-400'
-    : 'bg-blue-500';
-  const titleCls = isRelaxation ? 'text-amber-900' : 'text-blue-900';
-  const msgCls = isRelaxation ? 'text-amber-700' : 'text-blue-700';
+    ? 'bg-sett-primary'
+    : 'bg-sett-navy';
+  const iconColorCls = isRelaxation ? 'text-sett-navy' : 'text-white';
+  const titleCls = 'text-sett-text-primary';
+  const msgCls = 'text-sett-text-secondary';
   const title = isRelaxation ? 'Search adjusted' : 'Destination widened';
   const IconComp = isRelaxation ? Info : MapPin;
 
@@ -2180,7 +2179,7 @@ function SearchBanner({ type, message, onDismiss }: {
     >
       {/* Icon circle */}
       <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${iconCircleCls}`}>
-        <IconComp className="w-3.5 h-3.5 text-white" />
+        <IconComp className={`w-3.5 h-3.5 ${iconColorCls}`} />
       </div>
 
       {/* Text */}
@@ -2259,9 +2258,16 @@ function HotelResultCard({
   const sellPrice = hotel.sellingPricePerRoomPerNight;
   const hasCancellation = !!hotel.cxlDeadline;
   const isLimited = hotel.capacityStatus === 'LIMITED';
-  // Translation availability — true if backend returned content in the user's
-  // requested language. When false, hotel.description is still shown but tagged.
-  const translationStale = !!hotel.descriptionLanguage && hotel.descriptionLanguage !== locale;
+  // Pick the description for the active locale from the multi-language payload.
+  // Fallback order: descriptions[locale] → descriptions[other lang] → legacy single
+  // `description` field (for older cached results before backend started shipping
+  // multi-lang). `isFallback: true` means the text shown is English text living
+  // under the de key because no native German GIATA was available.
+  const localizedDescription = hotel.descriptions?.[locale]
+    ?? hotel.descriptions?.[locale === 'de' ? 'en' : 'de']
+    ?? null;
+  const descriptionText = localizedDescription?.text ?? hotel.description ?? null;
+  const translationStale = localizedDescription?.isFallback === true;
 
   // Build room type list from perTypeAllocations, enriched with meal plan data from bestOption/supplierSplit
   const mealName: string = (hotel.supplierSplit?.[0]?.mealName as string | undefined) ?? hotel.bestOption?.mealName ?? '';
@@ -2358,13 +2364,13 @@ function HotelResultCard({
                 </div>
                 <StarRating rating={Number(hotel.starRating)} size={18} />
                 {isLimited && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0">
                     <AlertTriangle className="w-3 h-3" />
                     {t.addHotel.limitedCapacity}
                   </span>
                 )}
                 {alternativeReason && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 font-montserrat text-[11px] font-medium text-blue-700 shrink-0">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-sett-navy text-sett-primary font-montserrat text-[11px] font-semibold shrink-0">
                     {alternativeReason}
                   </span>
                 )}
@@ -2382,8 +2388,8 @@ function HotelResultCard({
                   </span>
                 </div>
               )}
-              {/* Description */}
-              {hotel.description && (
+              {/* Description — reads descriptions[locale] so EN↔DE toggle is instant. */}
+              {descriptionText && (
                 <div className="animate-sidebar-fade-up" style={{ animationDelay: '200ms' }}>
                   <p
                     className="font-montserrat text-[14px] text-sett-text-secondary leading-snug"
@@ -2394,7 +2400,7 @@ function HotelResultCard({
                       overflow: 'hidden',
                     }}
                   >
-                    {hotel.description}
+                    {descriptionText}
                   </p>
                   {translationStale && (
                     <span
@@ -2473,17 +2479,18 @@ function HotelResultCard({
             <div className="border border-sett-border-light rounded-[14px] overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-sett-border-light bg-[#FAFAFA]">
-                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                  {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
+                  <tr className="bg-sett-navy">
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
                       {t.addHotel.roomType}
                     </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
                       {t.addHotel.rooms}
                     </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
                       {t.addHotel.rateBasis}
                     </th>
-                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent py-2.5 px-4">
+                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
                       {t.addHotel.perNight}
                     </th>
                   </tr>

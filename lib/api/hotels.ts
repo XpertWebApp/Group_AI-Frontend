@@ -20,6 +20,13 @@ export interface HotelDetail {
   description?: string | null;
   descriptionLanguage?: string | null;
   descriptionSource?: string | null;
+  // Multi-language descriptions — backend ships both EN and DE so UI can swap
+  // languages without re-calling this endpoint. `isFallback: true` = English
+  // text under the de key because no native German GIATA was available.
+  descriptions?: {
+    en?: { text: string; source: string; isFallback: boolean } | null;
+    de?: { text: string; source: string; isFallback: boolean } | null;
+  } | null;
   location?: string | null;
   address?: string | null;
   addressCity?: string | null;
