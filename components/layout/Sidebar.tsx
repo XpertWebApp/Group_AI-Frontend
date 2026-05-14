@@ -13,7 +13,7 @@ import {
   User,
   Building2,
   Loader2,
-  ChevronLeft,
+  Menu,
 } from 'lucide-react';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -75,6 +75,24 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  // Keyboard shortcut — press `[` anywhere to toggle the sidebar.
+  // Skipped when focus is in an editable element so typing `[` into a field works normally.
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== '[') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (target.isContentEditable) return;
+      e.preventDefault();
+      toggleSidebar();
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [toggleSidebar]);
 
   // Debounced search
   useEffect(() => {
@@ -153,12 +171,15 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const content = (
     <>
       <div className="flex flex-col h-full">
-        {/* Logo — height matches Header (64px) so the green strip below aligns across the top */}
+        {/* Logo + collapse toggle.
+            Height matches Header (64px) so the green strip below aligns across the top.
+            When expanded, the toggle sits on the right edge of the row, next to the logo.
+            When collapsed, the toggle stacks below a smaller logo so neither competes. */}
         <div
           className={cn(
             'h-[64px] flex items-center transition-[padding] duration-320 ease-sett-in-out',
             'animate-sidebar-fade-up',
-            sidebarCollapsed ? 'px-3 justify-center' : 'px-6'
+            sidebarCollapsed ? 'px-3 justify-center' : 'px-6 justify-between gap-3'
           )}
           style={{ animationDelay: '120ms' }}
         >
@@ -180,7 +201,26 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
               priority
             />
           </Link>
+          {/* Collapse/expand toggle — desktop only. Mobile uses a drawer.
+              When expanded: visible here next to the logo.
+              When collapsed: hidden here (moved to its own row below for centred alignment). */}
+          {!sidebarCollapsed && (
+            <SidebarCollapseToggle
+              collapsed={sidebarCollapsed}
+              onToggle={toggleSidebar}
+            />
+          )}
         </div>
+
+        {/* Collapsed-state toggle row — centred icon below the small logo */}
+        {sidebarCollapsed && (
+          <div className="hidden lg:flex justify-center px-3 pb-2">
+            <SidebarCollapseToggle
+              collapsed={sidebarCollapsed}
+              onToggle={toggleSidebar}
+            />
+          </div>
+        )}
 
         {/* §8.2 green strip — runs continuously with the Header's underline across the top of the page */}
         <div aria-hidden className="h-[2px] bg-sett-primary shrink-0" />
@@ -388,29 +428,6 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
         )}
       >
         {content}
-
-        {/* Collapse toggle — only on lg+ (no value on mobile, where the
-            sidebar is a drawer with a backdrop) */}
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-expanded={!sidebarCollapsed}
-          className={cn(
-            'hidden lg:flex absolute top-[26px] -right-3 z-50 items-center justify-center',
-            'w-6 h-6 rounded-full bg-sett-primary text-sett-navy shadow-md',
-            'ring-2 ring-sett-sidebar hover:bg-sett-green-dark hover:text-white',
-            'transition-all duration-280 ease-sett-spring',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sett-sidebar'
-          )}
-        >
-          <ChevronLeft
-            className={cn(
-              'w-3.5 h-3.5 transition-transform duration-320 ease-sett-spring',
-              sidebarCollapsed ? 'rotate-180' : 'rotate-0'
-            )}
-          />
-        </button>
       </aside>
       <div
         className={cn(
@@ -549,6 +566,69 @@ function SidebarIconButton({ label, onClick, icon: Icon }: SidebarIconButtonProp
         )}
       >
         {label}
+        <span
+          aria-hidden
+          className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-sett-navy"
+        />
+      </span>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────
+ * Sidebar Collapse Toggle
+ * ──────────────────────────────────────────────────────────── */
+
+/**
+ * Desktop-only toggle that collapses/expands the sidebar.
+ * Uses Lucide's PanelLeftClose / PanelLeftOpen icons (semantic — they actually
+ * depict what the action does). Renders a tooltip with the keyboard shortcut.
+ */
+function SidebarCollapseToggle({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  return (
+    <div className="relative group hidden lg:block">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={label}
+        aria-expanded={!collapsed}
+        aria-keyshortcuts="["
+        className={cn(
+          'flex items-center justify-center w-9 h-9 rounded-lg',
+          'text-white/80 hover:text-sett-primary hover:bg-white/[0.06]',
+          'transition-colors duration-180 ease-sett-out',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2 focus-visible:ring-offset-sett-sidebar'
+        )}
+      >
+        {/* Bold three-line hamburger — heavy strokes read clearly on navy at this size */}
+        <Menu className="w-5 h-5" strokeWidth={2.25} />
+      </button>
+      {/* Tooltip — points right when expanded (button on right edge) and
+          right when collapsed (centred row, plenty of room to the right). */}
+      <span
+        role="tooltip"
+        className={cn(
+          'pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50',
+          'whitespace-nowrap rounded-md bg-sett-navy text-white text-xs font-medium',
+          'px-2.5 py-1.5 shadow-lg ring-1 ring-white/10',
+          'opacity-0 -translate-x-1 transition-all duration-180 ease-sett-out',
+          'group-hover:opacity-100 group-hover:translate-x-0',
+          'group-focus-within:opacity-100 group-focus-within:translate-x-0'
+        )}
+      >
+        <span className="flex items-center gap-2">
+          {label}
+          <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded bg-white/15 text-white/90 font-mono text-[10px] font-semibold">
+            [
+          </kbd>
+        </span>
         <span
           aria-hidden
           className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-sett-navy"
