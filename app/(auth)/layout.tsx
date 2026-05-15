@@ -49,21 +49,60 @@ function BrandHeroColumn() {
                  px-6 py-8 lg:px-14 lg:py-12
                  flex flex-col justify-between"
     >
-      {/* Decorative waves — top corner accent + bottom flowing band.
-          Sits behind the content via z-0; content is z-10. */}
-      <GreenWaves
-        className="absolute -top-10 -right-10 w-[480px] h-[260px] opacity-50 rotate-[12deg] pointer-events-none hidden lg:block"
-      />
-      <GreenWaves
-        className="absolute bottom-0 left-0 w-full h-[340px] opacity-60 pointer-events-none hidden lg:block"
-      />
-      {/* Subtle background gradient per §8.3 */}
+      {/* Layer 1 — gradient backdrop (z-0).
+          Per §8.3, the navy hero uses a 135° gradient for depth. Pinned behind
+          the wave decorations so they can read against it. */}
       <div
         aria-hidden
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 z-0 pointer-events-none"
         style={{
           background: 'linear-gradient(135deg, #071c42 0%, #0d2b5e 50%, #071c42 100%)',
         }}
+      />
+
+      {/* Layer 2 — radial spotlight (z-0).
+          A soft green-tinted spotlight emanating from the top-right corner. Makes
+          the logo + H1 feel "illuminated" rather than floating on a flat surface.
+          Brand-correct because the tint comes from sett-primary at 8% alpha. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 z-0 pointer-events-none hidden lg:block"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 50% at 85% 25%, rgba(170,199,55,0.10) 0%, rgba(170,199,55,0) 70%)',
+        }}
+      />
+
+      {/* Layer 3 — Signature hero wave (z-[1]).
+          The dominant brand gesture. Sweeps diagonally across the upper-right
+          quadrant behind the H1 tagline. Uses the `bold` variant for heavier
+          strokes that read clearly against the gradient backdrop. */}
+      <GreenWaves
+        variant="bold"
+        className="absolute -top-20 -right-32 w-[680px] h-[340px] opacity-80 rotate-[18deg] pointer-events-none z-[1] hidden lg:block"
+      />
+
+      {/* Layer 4 — Mid-band wave (z-[1]).
+          Fills the visual gap between the H1 block and the stats list. Pulled
+          partly off the right edge so it reads as "the brand is flowing across,
+          not contained inside." Counter-rotated to the signature wave so the
+          two create rhythm instead of stacking. */}
+      <GreenWaves
+        className="absolute top-[45%] -right-40 w-[620px] h-[260px] opacity-55 -rotate-[8deg] pointer-events-none z-[1] hidden lg:block"
+      />
+
+      {/* Layer 5 — Lower-left whisper wave (z-[1]).
+          Pulled mostly off-screen-left so it reads as "passing through" the hero.
+          Anchors the stats list without crowding it. */}
+      <GreenWaves
+        className="absolute bottom-32 -left-48 w-[640px] h-[260px] opacity-50 -rotate-[6deg] pointer-events-none z-[1] hidden lg:block"
+      />
+
+      {/* Layer 6 — Bottom-edge horizontal whisper (z-[1]).
+          Very low-opacity full-width band at the very bottom — visually links
+          into the §8.2 green bar at the page base. "The brand keeps flowing." */}
+      <GreenWaves
+        className="absolute -bottom-8 left-0 w-full h-[180px] opacity-40 pointer-events-none z-[1] hidden lg:block"
       />
 
       {/* Logo (top) */}
@@ -78,37 +117,55 @@ function BrandHeroColumn() {
         />
       </div>
 
-      {/* Tagline + stats (centre/bottom on lg, hidden on small for compactness) */}
-      <div className="relative z-10 hidden lg:block mt-auto">
+      {/* Eyebrow — "Since 1989 · Privately Owned" establishes credibility before the manifesto */}
+      <div
+        className="relative z-10 hidden lg:flex items-center gap-3 mt-12 animate-sidebar-fade-up"
+        style={{ animationDelay: '100ms' }}
+      >
+        <span aria-hidden className="block h-px w-10 bg-sett-primary/70" />
+        <span className="font-montserrat text-[12px] font-semibold tracking-[0.18em] uppercase text-sett-primary">
+          {t.login.eyebrow}
+        </span>
+      </div>
+
+      {/* Hero manifesto — two-line statement, brand voice §1.
+          Line 1 in white/85 sets up; line 2 in solid white delivers the punch. */}
+      <div className="relative z-10 hidden lg:block mt-6 max-w-xl">
         <h1
-          className="font-montserrat text-[32px] xl:text-[36px] font-extrabold leading-[1.15] text-white max-w-md animate-sidebar-fade-up"
-          style={{ animationDelay: '120ms' }}
+          className="font-montserrat text-[34px] xl:text-[42px] font-extrabold leading-[1.1] tracking-tight animate-sidebar-fade-up"
+          style={{ animationDelay: '180ms' }}
         >
-          {t.login.heroTitle}
+          <span className="block text-white/80">{t.login.heroTitleLine1}</span>
+          <span
+            className="block text-white animate-sidebar-fade-up"
+            style={{ animationDelay: '280ms' }}
+          >
+            {t.login.heroTitleLine2}
+          </span>
         </h1>
         <p
-          className="mt-4 font-montserrat text-[15px] font-normal leading-relaxed text-white/75 max-w-md animate-sidebar-fade-up"
-          style={{ animationDelay: '200ms' }}
+          className="mt-6 font-montserrat text-[15px] font-normal leading-relaxed text-white/70 max-w-lg animate-sidebar-fade-up"
+          style={{ animationDelay: '380ms' }}
         >
           {t.login.heroSubtitle}
         </p>
 
-        {/* Brand stats — confident B2B positioning per brand guide §1 */}
-        <ul className="mt-10 space-y-3 max-w-md">
+        {/* Headline stats — bigger, more concrete inventory numbers. */}
+        <ul className="mt-10 grid grid-cols-3 gap-6 max-w-lg">
           {[
-            { stat: '12,000+', label: t.login.statAgencies, delay: 320 },
-            { stat: '195', label: t.login.statCountries, delay: 400 },
-            { stat: '24H', label: t.login.statResponse, delay: 480 },
+            { stat: '2.7M', label: t.login.statHotels, delay: 480 },
+            { stat: '700+', label: t.login.statChannelManagers, delay: 560 },
+            { stat: '360', label: t.login.statBedBanks, delay: 640 },
           ].map((row) => (
             <li
               key={row.stat}
-              className="flex items-baseline gap-3 animate-sidebar-fade-up"
+              className="flex flex-col gap-1.5 animate-sidebar-fade-up"
               style={{ animationDelay: `${row.delay}ms` }}
             >
-              <span className="font-montserrat text-[20px] font-extrabold text-sett-primary tabular-nums shrink-0 min-w-[78px]">
+              <span className="font-montserrat text-[28px] xl:text-[32px] font-extrabold text-sett-primary leading-none tabular-nums">
                 {row.stat}
               </span>
-              <span className="font-montserrat text-[14px] font-normal text-white/85">
+              <span className="font-montserrat text-[12px] font-medium text-white/70 leading-snug">
                 {row.label}
               </span>
             </li>
@@ -116,12 +173,25 @@ function BrandHeroColumn() {
         </ul>
       </div>
 
-      {/* Bottom legal — only visible on lg */}
+      {/* Bottom legal block — only visible on lg.
+          The supplier ticker line sits above the confidentiality footer, in
+          muted white with green dot-separators — adds depth without crowding. */}
       <div
-        className="relative z-10 hidden lg:block mt-8 animate-sidebar-fade-up"
-        style={{ animationDelay: '600ms' }}
+        className="relative z-10 hidden lg:block mt-auto animate-sidebar-fade-up"
+        style={{ animationDelay: '760ms' }}
       >
-        <p className="font-montserrat text-[11px] font-normal text-white/45">
+        <p className="font-montserrat text-[11px] font-medium text-white/55 leading-snug max-w-2xl">
+          {t.login.heroTicker.split('  ·  ').map((part, i, arr) => (
+            <span key={part} className="inline-block">
+              {part}
+              {i < arr.length - 1 && (
+                <span aria-hidden className="inline-block mx-2 text-sett-primary/70">·</span>
+              )}
+            </span>
+          ))}
+        </p>
+        <div className="mt-3 h-px w-16 bg-white/10" aria-hidden />
+        <p className="mt-3 font-montserrat text-[11px] font-normal text-white/40">
           © 2026 S-E-T-T &nbsp;·&nbsp; {t.login.confidential}
         </p>
       </div>

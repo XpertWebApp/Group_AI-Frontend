@@ -557,14 +557,19 @@ export const translations = {
 
     // ── Login / Forgot Password ──
     login: {
-      eyebrow: 'SETT Hub Access',
+      eyebrow: 'Since 1989  ·  Privately Owned',
       welcomeBack: 'Sign in to SETT Hub',
       signInSubtitle: 'Access your group booking workspace and proposals.',
-      heroTitle: 'Group hotel booking for travel professionals.',
-      heroSubtitle: 'The B2B reservation platform trusted by travel agencies worldwide. Built for confident, reliable group bookings at scale.',
-      statAgencies: 'Travel agency partners',
-      statCountries: 'Countries served',
-      statResponse: 'Group offer turnaround',
+      // Hero manifesto — two punchy lines (line break preserved by rendering as
+      // two spans). Verbatim from the brand's main site.
+      heroTitleLine1: 'We don’t sell travel.',
+      heroTitleLine2: 'We power the agencies that do.',
+      heroSubtitle: 'SETT Hub provides the booking technology, supplier network, and human support that travel agencies need to thrive — built over 35 years of real-world experience.',
+      statHotels: 'Hotels worldwide',
+      statChannelManagers: 'Channel manager integrations',
+      statBedBanks: 'Bed bank suppliers',
+      // Single-line supplier ticker shown above the confidentiality footer
+      heroTicker: '2.7M Hotels  ·  700+ Channel Managers  ·  360 Bed Banks  ·  Transfers & Activities in 1,500+ destinations',
       confidential: 'Confidential — for authorized agency partners only.',
       email: 'EMAIL',
       emailPlaceholder: 'Enter email',
@@ -1271,14 +1276,16 @@ export const translations = {
 
     // ── Login / Forgot Password ──
     login: {
-      eyebrow: 'SETT Hub Zugang',
+      eyebrow: 'Seit 1989  ·  Privatgeführt',
       welcomeBack: 'Anmeldung bei SETT Hub',
       signInSubtitle: 'Greifen Sie auf Ihren Gruppenbuchungs-Arbeitsplatz und Angebote zu.',
-      heroTitle: 'Gruppenhotelbuchungen für Reiseprofis.',
-      heroSubtitle: 'Die B2B-Reservierungsplattform, der Reisebüros weltweit vertrauen. Entwickelt für zuverlässige Gruppenbuchungen im großen Maßstab.',
-      statAgencies: 'Reisebüro-Partner',
-      statCountries: 'Länder weltweit',
-      statResponse: 'Bearbeitungszeit für Gruppenangebote',
+      heroTitleLine1: 'Wir verkaufen keine Reisen.',
+      heroTitleLine2: 'Wir stärken die Agenturen, die es tun.',
+      heroSubtitle: 'SETT Hub bietet Reisebüros die Buchungstechnologie, das Lieferantennetzwerk und den persönlichen Support, den sie zum Erfolg brauchen — entwickelt aus 35 Jahren echter Praxiserfahrung.',
+      statHotels: 'Hotels weltweit',
+      statChannelManagers: 'Channel-Manager-Integrationen',
+      statBedBanks: 'Bettenbank-Lieferanten',
+      heroTicker: '2,7 Mio. Hotels  ·  700+ Channel Manager  ·  360 Bettenbanken  ·  Transfers & Aktivitäten in 1.500+ Reisezielen',
       confidential: 'Vertraulich — nur für autorisierte Agenturpartner.',
       email: 'E-MAIL',
       emailPlaceholder: 'E-Mail eingeben',
