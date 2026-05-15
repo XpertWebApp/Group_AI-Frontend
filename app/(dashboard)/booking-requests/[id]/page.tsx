@@ -42,6 +42,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU, formatDateTimeEU } from '@/lib/dateFormatter';
 import { formatPriceEU, formatCurrencyEU, formatPercentageEU, formatNumberEU } from '@/lib/numberFormatter';
 import { cn } from '@/lib/utils/cn';
+import { getGroupTypeLabel, groupTypeRequiresAge } from '@/lib/utils/groupType';
 import toast from 'react-hot-toast';
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -661,10 +662,7 @@ export default function RequestDetailPage() {
         ? t.offer.outsideCityCenter
         : '—';
 
-  const formatGroupType = (gt: string | null | undefined): string => {
-    if (!gt) return '—';
-    return gt.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  };
+  const formatGroupType = (gt: string | null | undefined): string => getGroupTypeLabel(gt, t);
 
 
   return (
@@ -762,6 +760,23 @@ export default function RequestDetailPage() {
               </div>
             </div>
 
+            {/* Youth/School ranking note — sets staff expectations that auto-results
+                were ranked to surface youth-friendly properties first, but regular
+                hotels are intentionally still in the list. */}
+            {groupTypeRequiresAge(request.groupType) && request.averageAge != null && (
+              <div
+                className="mt-5 flex items-start gap-3 rounded-[10px] border border-sett-primary/30 bg-sett-primary/[0.06] px-4 py-3 animate-sidebar-fade-up"
+                style={{ animationDelay: '480ms' }}
+              >
+                <div className="shrink-0 w-7 h-7 rounded-full bg-sett-primary flex items-center justify-center mt-0.5">
+                  <Users className="w-3.5 h-3.5 text-sett-navy" />
+                </div>
+                <p className="font-montserrat text-[13px] leading-snug text-sett-text-primary">
+                  {t.addHotel.youthSchoolRankingNote.replace('{age}', String(request.averageAge))}
+                </p>
+              </div>
+            )}
+
             {/* ── Trip Details (always visible — collapsed view shows ONLY this) ── */}
             <div className={summaryCollapsed ? 'mt-6' : 'mt-6 mb-6'}>
               <div className="flex flex-col xl:flex-row xl:items-center justify-between min-h-[51px] gap-6">
@@ -854,7 +869,7 @@ export default function RequestDetailPage() {
                       {/* Vertical divider */}
                       <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />
                       {/* Average Age - conditionally shown */}
-                      {(request.groupType === 'youth_group' || request.groupType === 'school_group') &&
+                      {groupTypeRequiresAge(request.groupType) &&
                         request.averageAge != null && (
                         <>
                           <div

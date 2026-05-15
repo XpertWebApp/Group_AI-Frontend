@@ -13,6 +13,14 @@ import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { Select } from '@/components/ui/Select';
 import { RoomCounter } from '@/components/ui/RoomCounter';
+import {
+  AGE_REQUIRED_GROUP_TYPES,
+  AVERAGE_AGE_MAX,
+  AVERAGE_AGE_MIN,
+  buildGroupTypeOptions,
+  groupTypeRequiresAge,
+  toCanonicalGroupType,
+} from '@/lib/utils/groupType';
 import { Spinner } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils/cn';
 import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
@@ -388,10 +396,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         .replace('{groupSize}', String(groupSize));
     }
 
-    // Validate averageAge for youth/school groups
-    const needsAge = form.groupType === 'youth_group' || form.groupType === 'school_group';
-    if (needsAge && (form.averageAge === '' || form.averageAge == null)) {
-      errors.averageAge = t.createForm.averageAgeRequired;
+    // Validate averageAge for youth/school groups (6–25 inclusive per backend)
+    if (groupTypeRequiresAge(form.groupType)) {
+      if (form.averageAge === '' || form.averageAge == null) {
+        errors.averageAge = t.createForm.averageAgeRequired;
+      } else if (Number(form.averageAge) < AVERAGE_AGE_MIN || Number(form.averageAge) > AVERAGE_AGE_MAX) {
+        errors.averageAge = t.createForm.averageAgeInvalid;
+      }
     }
 
     // Customer Details validation
@@ -451,9 +462,11 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         checkoutDate: form.checkoutDate || undefined,
         starRating: form.starRating ? Number(form.starRating) : undefined,
         budgetRange: form.budgetRange || undefined,
-        groupType: form.groupType || undefined,
+        // Always send the canonical code. If the form still carries a legacy
+        // value (loaded from an older saved request), normalize it on write.
+        groupType: form.groupType ? (toCanonicalGroupType(form.groupType) ?? form.groupType) : undefined,
         groupSize: form.groupSize ? Number(form.groupSize) : undefined,
-        averageAge: (['youth_group', 'school_group'].includes(form.groupType) && form.averageAge !== '')
+        averageAge: groupTypeRequiresAge(form.groupType) && form.averageAge !== ''
           ? Number(form.averageAge)
           : undefined,
         rooms: {
@@ -512,16 +525,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     { value: 'luxury', label: t.createForm.luxury },
   ];
 
-  const groupTypeOptions = [
-    { value: 'business_group', label: t.createForm.businessGroup },
-    { value: 'leisure_group', label: t.createForm.leisureGroup },
-    { value: 'sports_team', label: t.createForm.sportsTeam },
-    { value: 'conference', label: t.createForm.conference },
-    { value: 'wedding', label: t.createForm.wedding },
-    { value: 'youth_group', label: t.createForm.youthGroup },
-    { value: 'school_group', label: t.createForm.schoolGroup },
-    { value: 'mice_group', label: t.createForm.miceGroup },
-  ];
+  // Canonical codes per backend handover. Old request values loaded into the
+  // form are normalized on display (`displayedGroupType`) so the Select shows
+  // the right option without the user having to re-select.
+  const groupTypeOptions = buildGroupTypeOptions(t);
+  const displayedGroupType = form.groupType
+    ? (toCanonicalGroupType(form.groupType) ?? form.groupType)
+    : '';
 
   if (!open) return null;
 
@@ -678,11 +688,11 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 <Select
                   label={t.offer.editGroupType}
                   options={groupTypeOptions}
-                  value={form.groupType}
+                  value={displayedGroupType}
                   onChange={(e) => {
                     const val = e.target.value;
                     setField('groupType', val);
-                    if (val !== 'youth_group' && val !== 'school_group') {
+                    if (!AGE_REQUIRED_GROUP_TYPES.has(val as never)) {
                       setField('averageAge', '');
                     }
                   }}
@@ -705,14 +715,14 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
               </div>
             </div>
 
-            {(form.groupType === 'youth_group' || form.groupType === 'school_group') && (
+            {groupTypeRequiresAge(form.groupType) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>{t.createForm.averageAge}</label>
                   <input
                     type="number"
-                    min={1}
-                    max={120}
+                    min={AVERAGE_AGE_MIN}
+                    max={AVERAGE_AGE_MAX}
                     className={inputCls}
                     value={form.averageAge === '' ? '' : String(form.averageAge)}
                     onChange={(e) => {

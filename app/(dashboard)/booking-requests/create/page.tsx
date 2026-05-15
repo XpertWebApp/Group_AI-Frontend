@@ -18,6 +18,13 @@ import { cn } from '@/lib/utils/cn';
 import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import {
+  AGE_REQUIRED_GROUP_TYPES,
+  AVERAGE_AGE_MAX,
+  AVERAGE_AGE_MIN,
+  buildGroupTypeOptions,
+  groupTypeRequiresAge,
+} from '@/lib/utils/groupType';
 
 interface FormData {
   // Step 1: Trip Details
@@ -160,10 +167,9 @@ function getStepProgress(step: number, data: FormData): number {
     checks.push(!!data.hotelCategory);
     checks.push(!!data.groupType);
     checks.push(!!data.groupSize.trim() && Number(data.groupSize) > 0);
-    const needsAge = data.groupType === 'youth_group' || data.groupType === 'school_group';
-    if (needsAge) {
+    if (groupTypeRequiresAge(data.groupType)) {
       const age = Number(data.averageAge);
-      checks.push(data.averageAge !== '' && data.averageAge != null && age >= 1 && age <= 120);
+      checks.push(data.averageAge !== '' && data.averageAge != null && age >= AVERAGE_AGE_MIN && age <= AVERAGE_AGE_MAX);
     }
   }
 
@@ -239,11 +245,10 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (Number(data.groupSize) <= 0) {
       errors.groupSize = t.createForm.groupSizePositive;
     }
-    const needsAge = data.groupType === 'youth_group' || data.groupType === 'school_group';
-    if (needsAge) {
+    if (groupTypeRequiresAge(data.groupType)) {
       if (data.averageAge === '' || data.averageAge == null) {
         errors.averageAge = t.createForm.averageAgeRequired;
-      } else if (Number(data.averageAge) < 1 || Number(data.averageAge) > 120) {
+      } else if (Number(data.averageAge) < AVERAGE_AGE_MIN || Number(data.averageAge) > AVERAGE_AGE_MAX) {
         errors.averageAge = t.createForm.averageAgeInvalid;
       }
     }
@@ -440,7 +445,7 @@ function CreateBookingRequestPageInner() {
         budgetRange: formData.budgetRange || undefined,
         groupType: formData.groupType || undefined,
         groupSize: formData.groupSize ? Number(formData.groupSize) : undefined,
-        averageAge: (['youth_group', 'school_group'].includes(formData.groupType) && formData.averageAge !== '')
+        averageAge: groupTypeRequiresAge(formData.groupType) && formData.averageAge !== ''
           ? Number(formData.averageAge)
           : undefined,
         currencyCode: 'EUR',
@@ -713,16 +718,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
     { value: 'premium', label: t.createForm.premium },
     { value: 'luxury', label: t.createForm.luxury },
   ];
-  const groupTypeOptions = [
-    { value: 'business_group', label: t.createForm.businessGroup },
-    { value: 'leisure_group', label: t.createForm.leisureGroup },
-    { value: 'sports_team', label: t.createForm.sportsTeam },
-    { value: 'conference', label: t.createForm.conference },
-    { value: 'wedding', label: t.createForm.wedding },
-    { value: 'youth_group', label: t.createForm.youthGroup },
-    { value: 'school_group', label: t.createForm.schoolGroup },
-    { value: 'mice_group', label: t.createForm.miceGroup },
-  ];
+  // Canonical codes per backend handover: business | leisure | sports | youth |
+  // school | family | wedding | mice | other. The Select sends the code as-is;
+  // labels come from the i18n layer.
+  const groupTypeOptions = buildGroupTypeOptions(t);
 
   useEffect(() => {
     if (!userTypingRef.current) return;
@@ -916,7 +915,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             onChange={(e) => {
               const val = e.target.value;
               updateField('groupType', val);
-              if (val !== 'youth_group' && val !== 'school_group') {
+              // Clear age unless the new group type requires it.
+              if (!AGE_REQUIRED_GROUP_TYPES.has(val as never)) {
                 updateField('averageAge', '');
               }
             }}
@@ -944,14 +944,14 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
         </div>
 
         {/* Average Age — conditional, slides in only for youth/school groups */}
-        {(formData.groupType === 'youth_group' || formData.groupType === 'school_group') && (
+        {groupTypeRequiresAge(formData.groupType) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="animate-field-fade-in">
               <Input
                 label={`${t.createForm.averageAge} *`}
                 type="number"
-                min="1"
-                max="120"
+                min={AVERAGE_AGE_MIN}
+                max={AVERAGE_AGE_MAX}
                 placeholder={t.createForm.averageAgePlaceholder}
                 value={formData.averageAge === '' ? '' : String(formData.averageAge)}
                 onChange={(e) => {

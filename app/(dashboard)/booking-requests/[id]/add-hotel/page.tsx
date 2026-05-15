@@ -10,7 +10,7 @@ import {
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
-  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, type LucideIcon,
+  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, Users, type LucideIcon,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +24,7 @@ import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
 import { formatDateEU } from '@/lib/dateFormatter';
 import { cn } from '@/lib/utils/cn';
+import { groupTypeRequiresAge } from '@/lib/utils/groupType';
 import type {
   HotelSearchResult,
   HotelSearchPhase,
@@ -1055,6 +1056,11 @@ export default function AddHotelPage() {
       return true;
     });
 
+  // True when this request is a youth/school group — gates the "Youth-friendly"
+  // badge on hotel cards. For other group types the youthFriendly flag is still
+  // sent by backend but isn't meaningful, so we don't render the badge.
+  const isYouthOrSchoolGroup = groupTypeRequiresAge(request?.groupType);
+
   // Apply filters separately to main and star-mismatch results (not to true alternatives)
   const filteredMainResults = applyFilters(mainResults);
   const filteredStarMismatchResults = applyFilters(starMismatchResults);
@@ -1923,6 +1929,7 @@ export default function AddHotelPage() {
                             onAddToOffer={() => handleAddToOffer(hotel)}
                             onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                             onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
+                            showYouthFriendlyBadge={isYouthOrSchoolGroup}
                           />
                         </div>
                       ))}
@@ -1979,6 +1986,7 @@ export default function AddHotelPage() {
                               onAddToOffer={() => handleAddToOffer(hotel)}
                               onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                               onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
+                              showYouthFriendlyBadge={isYouthOrSchoolGroup}
                             />
                           </div>
                         ))}
@@ -2083,6 +2091,7 @@ export default function AddHotelPage() {
                                     onAddToOffer={() => handleAddToOffer(hotel)}
                                     onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                                     onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
+                                    showYouthFriendlyBadge={isYouthOrSchoolGroup}
                                   />
                                 </div>
                               ))}
@@ -2300,6 +2309,7 @@ function HotelResultCard({
   onViewDetails,
   alternativeReason,
   onImageClick,
+  showYouthFriendlyBadge = false,
 }: {
   hotel: HotelSearchResult;
   isAdded: boolean;
@@ -2308,6 +2318,9 @@ function HotelResultCard({
   onViewDetails: () => void;
   alternativeReason?: string | null;
   onImageClick?: () => void;
+  /** When true (i.e. the parent request is a youth/school group), render the
+   *  "Youth-friendly" badge on cards where `hotel.youthFriendly === true`. */
+  showYouthFriendlyBadge?: boolean;
 }) {
   const { t, locale } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
@@ -2421,6 +2434,15 @@ function HotelResultCard({
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0">
                     <AlertTriangle className="w-3 h-3" />
                     {t.addHotel.limitedCapacity}
+                  </span>
+                )}
+                {showYouthFriendlyBadge && hotel.youthFriendly && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-light-green-bg border border-sett-primary text-sett-green-dark shrink-0"
+                    title={t.addHotel.youthFriendlyTooltip}
+                  >
+                    <Users className="w-3 h-3" />
+                    {t.addHotel.youthFriendlyBadge}
                   </span>
                 )}
                 {alternativeReason && (

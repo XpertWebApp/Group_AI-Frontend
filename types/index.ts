@@ -300,6 +300,10 @@ export interface HotelSearchResult {
   // Alternatives search
   searchKind?: 'main' | 'alternative';
   alternativeReason?: string | null;
+  // Youth/school group helper — when the parent request's groupType is youth/school,
+  // the backend ranks results so youthFriendly:true cards bubble up. The flag is
+  // still set for all group types but is only meaningful for youth/school requests.
+  youthFriendly?: boolean;
 }
 
 export interface HotelSearchResponse {

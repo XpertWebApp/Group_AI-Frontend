@@ -14,6 +14,7 @@ import { getCurrentUserId } from '@/lib/auth/getCurrentUser';
 import { formatDateEU } from '@/lib/dateFormatter';
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { getGroupTypeLabel, groupTypeRequiresAge } from '@/lib/utils/groupType';
 import { useRefreshOnNotification } from '@/lib/notifications/useRefreshOnNotification';
 
 const PAGE_SIZE = 6;
@@ -305,6 +306,7 @@ export default function BookingRequestsPage() {
                     <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.destination}</th>
                     <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.checkInOut}</th>
                     <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.rooms}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.group}</th>
                     <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.totalSell}</th>
                     <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.margin}</th>
                     <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.owner}</th>
@@ -356,6 +358,14 @@ export default function BookingRequestsPage() {
                         </td>
                         <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
                           {rooms ?? '—'}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
+                          <span className="block">{getGroupTypeLabel(row.groupType, t)}</span>
+                          {groupTypeRequiresAge(row.groupType) && row.averageAge != null && (
+                            <span className="block text-sett-text-accent text-[12px] font-medium mt-0.5">
+                              {t.offer.averageAge}: {row.averageAge}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary text-right">
                           {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
@@ -460,6 +470,17 @@ export default function BookingRequestsPage() {
                       <div>
                         <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.rooms}</span>
                         <p className="text-sett-text-primary mt-0.5">{rooms ?? '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.group}</span>
+                        <p className="text-sett-text-primary mt-0.5">
+                          {getGroupTypeLabel(row.groupType, t)}
+                          {groupTypeRequiresAge(row.groupType) && row.averageAge != null && (
+                            <span className="block text-sett-text-accent text-[11px] mt-0.5">
+                              {t.offer.averageAge}: {row.averageAge}
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <div>
                         <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.totalSell}</span>
