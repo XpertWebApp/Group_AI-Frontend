@@ -4,6 +4,7 @@ import type {
   Attachment,
   BookingRequest,
   HotelSearchInitResponse,
+  HotelSearchMoreResponse,
   HotelSearchStatusResponse,
   OptionDetailResult,
   CalculatePriceResult,
@@ -187,6 +188,28 @@ export const requestsApi = {
     );
     if (!data.success || !data.data) {
       throw new Error(data.message || 'Failed to start alternatives search');
+    }
+    return data.data;
+  },
+
+  // Trigger the "Search More" feature — fetches the next ~200 hotels at the same
+  // destination + star level. Caller should branch on response.decision.
+  // Body is empty by design; overrides are accepted but rarely needed.
+  async startHotelSearchMore(
+    requestId: string,
+    params?: {
+      mealType?: string;
+      currencyCode?: string;
+      nationalityCode?: string;
+      waitSeconds?: number;
+    }
+  ): Promise<HotelSearchMoreResponse> {
+    const { data } = await apiClient.post<ApiResponse<HotelSearchMoreResponse>>(
+      `/requests/${requestId}/hotel-search/more`,
+      params ?? {}
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to trigger Search More');
     }
     return data.data;
   },

@@ -424,6 +424,31 @@ export interface HotelSearchStatusResponse {
     phase?: HotelSearchPhase | null;
   };
   jobs: HotelSearchJobStatus[];
+  // Whether the user can request another batch via POST /hotel-search/more.
+  // Backend sets this to true only when (a) the search is settled, (b) a
+  // pagination cursor was persisted, and (c) more candidates exist at this level.
+  // Absent on pre-deploy backends — treat as false in that case.
+  canSearchMore?: boolean;
+}
+
+/**
+ * POST /hotel-search/more — the "Search More" trigger endpoint.
+ * Backend returns one of five decision values; FE branches accordingly.
+ */
+export type HotelSearchMoreDecision =
+  | 'queued'
+  | 'destination_exhausted'
+  | 'in_progress'
+  | 'no_cursor'
+  | 'exhausted';
+
+export interface HotelSearchMoreResponse {
+  decision: HotelSearchMoreDecision;
+  queuedCount?: number;
+  nextOffset?: number;
+  sseEndpoint?: string;
+  statusEndpoint?: string;
+  message?: string;
 }
 
 export interface PaginatedResponse<T> {

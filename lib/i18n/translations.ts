@@ -460,6 +460,11 @@ export const translations = {
       similarAlternatives: 'Similar alternatives',
       noAlternativesFound: 'No alternative hotels found',
       alternativesLoading: 'Loading…',
+      // Search More — fetches the next ~200 hotels at the same destination/star
+      searchMore: 'Search More Hotels',
+      searchingMore: 'Searching more hotels…',
+      searchMoreExhausted: 'No more hotels available for this destination.',
+      searchMoreFailed: 'Failed to fetch more hotels',
       alternativeReasons: {
         'Wider star rating': 'Wider star rating',
         'Different star rating': 'Different star rating',
@@ -1171,6 +1176,11 @@ export const translations = {
       similarAlternatives: 'Ähnliche Alternativen',
       noAlternativesFound: 'Keine alternativen Hotels gefunden',
       alternativesLoading: 'Laden…',
+      // Search More
+      searchMore: 'Weitere Hotels suchen',
+      searchingMore: 'Suche weitere Hotels…',
+      searchMoreExhausted: 'Keine weiteren Hotels für dieses Reiseziel verfügbar.',
+      searchMoreFailed: 'Weitere Hotels konnten nicht geladen werden',
       alternativeReasons: {
         'Wider star rating': 'Erweiterte Sternebewertung',
         'Different star rating': 'Andere Sternebewertung',

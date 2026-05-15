@@ -237,6 +237,12 @@ export default function AddHotelPage() {
   const [alternativesFetched, setAlternativesFetched] = useState(false);
   const [alternativesLoading, setAlternativesLoading] = useState(false);
   const [alternativesExpanded, setAlternativesExpanded] = useState(false);
+
+  // "Search More" feature — fetches the next ~200 hotels at the same destination + star level.
+  // `canSearchMore` mirrors the top-level boolean on the /status response.
+  // `searchingMore` is an optimistic-disable flag for the button until polling confirms.
+  const [canSearchMore, setCanSearchMore] = useState(false);
+  const [searchingMore, setSearchingMore] = useState(false);
   const sidebarRef = useRef<HTMLElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
@@ -370,6 +376,7 @@ export default function AddHotelPage() {
         running: 0,
         phase: status.summary.phase ?? null,
       });
+      setCanSearchMore(status.canSearchMore === true);
       // Only show manual request card if zero successful results AND all probes are terminal
       if (finalHotels.length === 0) {
         setManualRequestOnly(true);
@@ -457,6 +464,11 @@ export default function AddHotelPage() {
             summaryUpdateThrottledRef.current = false;
           }, 1000);
         }
+
+        // Track whether the user can request another batch via "Search More".
+        // Backend only flips this to true once the search has settled AND a
+        // pagination cursor was persisted AND more candidates exist.
+        setCanSearchMore(status.canSearchMore === true);
 
         // Detect a new batch starting after the first one has already produced hotels.
         // Backend probes in batches of 200, so the total jumps up when a fresh batch is queued.
@@ -577,6 +589,11 @@ export default function AddHotelPage() {
           zeroPollCountRef.current = 0;
           setShowSearchingWithRelaxation(false);
           setSearchingWiderArea(false);
+          // Clear the "Search More" optimistic-disable flag — the next status
+          // poll has set canSearchMore to the true server-of-truth value, so
+          // the button re-renders correctly (visible if more batches available,
+          // hidden if the destination is now drained).
+          setSearchingMore(false);
           if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
 
           // Only show "No Hotels Found" if search exhausted with zero results
@@ -680,6 +697,8 @@ export default function AddHotelPage() {
     setErrorMsg('');
     setCompletedResults([]);
     setSearchSummary(null);
+    setCanSearchMore(false);
+    setSearchingMore(false);
     setSearchingWiderArea(false);
     previousTotalRef.current = 0;
     if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
@@ -745,6 +764,7 @@ export default function AddHotelPage() {
           running: status.summary.running,
           phase: status.summary.phase ?? null,
         });
+        setCanSearchMore(status.canSearchMore === true);
 
         // Detect if alternatives have already been fetched
         const hasAlt = completedHotels.some(h => h.searchKind === 'alternative');
@@ -941,6 +961,62 @@ export default function AddHotelPage() {
       setAlternativesLoading(false);
     }
   }, [requestId, relaxation, request, startPollingFallback, locale, t]);
+
+  // "Search More" — fetches the next ~200 hotels at the same destination + star
+  // rating. Reuses the existing polling loop: new hotels stream into the same
+  // `completedResults` array as `jobs[]` grows on the /status response.
+  const handleSearchMore = useCallback(async () => {
+    setSearchingMore(true);
+    // Optimistically hide the button while we wait for the decision + first poll.
+    setCanSearchMore(false);
+    try {
+      const resp = await requestsApi.startHotelSearchMore(requestId, {
+        currencyCode: request?.currencyCode || 'EUR',
+        nationalityCode: request?.nationalityCode || undefined,
+        mealType: request?.breakfastPreference || undefined,
+      });
+      switch (resp.decision) {
+        case 'queued': {
+          // Backend has enqueued the next batch. Flip back to polling so the
+          // existing progress UI lights up and new hotels stream in.
+          setPhase('polling');
+          startPollingFallback(requestId);
+          break;
+        }
+        case 'destination_exhausted': {
+          // Last batch already shipped — no more hotels to find. Button stays
+          // hidden because canSearchMore is now permanently false.
+          toast.success(t.addHotel.searchMoreExhausted);
+          setSearchingMore(false);
+          break;
+        }
+        case 'in_progress': {
+          // Race condition (e.g. double-click). Treat as a no-op — keep the
+          // existing loading state visible.
+          setPhase('polling');
+          startPollingFallback(requestId);
+          break;
+        }
+        case 'no_cursor':
+        case 'exhausted': {
+          // Either the request was created before this feature shipped, or the
+          // original search was a dead end. Either way, no more pagination is
+          // possible. Hide the button silently — the user has no useful action.
+          setSearchingMore(false);
+          break;
+        }
+        default: {
+          // Unknown decision — be defensive and just stop the spinner.
+          setSearchingMore(false);
+        }
+      }
+    } catch {
+      toast.error(t.addHotel.searchMoreFailed);
+      setSearchingMore(false);
+      // Re-enable the button so the user can retry. The next poll will refresh
+      // canSearchMore from the server-of-truth value.
+    }
+  }, [requestId, request, startPollingFallback, t]);
 
   // Add hotel to offer flow
   const handleAddToOffer = async (hotel: HotelSearchResult) => {
@@ -1937,6 +2013,35 @@ export default function AddHotelPage() {
                   </div>
                 )}
 
+                {/* Search More button — appears when the backend has paginated
+                    results available AND the current search is settled. Hidden
+                    (not disabled) when canSearchMore is false. */}
+                {canSearchMore && phase === 'done' && (
+                  <div className="flex justify-center py-3 animate-sidebar-fade-up">
+                    <button
+                      type="button"
+                      onClick={handleSearchMore}
+                      disabled={searchingMore}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-sett-primary text-sett-navy font-montserrat text-[14px] font-bold uppercase tracking-[0.04em] hover:bg-sett-green-dark hover:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_2px_8px_0_rgba(170,199,55,0.25)]"
+                    >
+                      {searchingMore ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          {t.addHotel.searchingMore}
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          {t.addHotel.searchMore}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 {/* Show Alternatives button — computed locally when 1-4 main hotels succeeded */}
                 {shouldShowAlternativesButton && (
                   <div className="flex justify-center py-3 animate-sidebar-fade-up">
@@ -2418,17 +2523,24 @@ function HotelResultCard({
           {/* Top: Name, Address, Stars + Add to Offer */}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex-1 min-w-0 flex flex-col gap-2">
-              {/* Name + Stars on the same row */}
+              {/* Name on its own row so long titles wrap cleanly without
+                  interfering with the stars/badges below. */}
               <div
-                className="flex items-center gap-2 flex-wrap animate-sidebar-fade-up"
+                className="animate-sidebar-fade-up min-w-0"
                 style={{ animationDelay: '80ms' }}
               >
-                <div className="flex-1 min-w-0">
-                  <HotelName
-                    hotel={hotel}
-                    className="font-montserrat text-[16px] font-semibold leading-tight transition-colors duration-180 ease-sett-out group-hover/card:text-sett-primary"
-                  />
-                </div>
+                <HotelName
+                  hotel={hotel}
+                  className="font-montserrat text-[16px] font-semibold leading-tight transition-colors duration-180 ease-sett-out group-hover/card:text-sett-primary"
+                />
+              </div>
+              {/* Stars + status badges on a separate row.
+                  Wraps naturally on narrow widths; stars always read on their
+                  own baseline so they're never visually merged with the title. */}
+              <div
+                className="flex items-center gap-x-2 gap-y-1.5 flex-wrap animate-sidebar-fade-up"
+                style={{ animationDelay: '120ms' }}
+              >
                 <StarRating rating={Number(hotel.starRating)} size={18} />
                 {isLimited && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0">
