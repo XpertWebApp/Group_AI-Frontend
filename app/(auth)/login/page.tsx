@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
 import { AlertTriangle } from 'lucide-react';
 import { authApi } from '@/lib/api/auth';
 import { getApiError } from '@/lib/api/auth';
@@ -15,6 +14,7 @@ import { setUser } from '@/lib/store/slices/authSlice';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Checkbox } from '@/components/ui/Checkbox';
+import { AuthTransition } from '@/components/ui/AuthTransition';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 type LoginFormValues = {
@@ -23,8 +23,17 @@ type LoginFormValues = {
   rememberMe?: boolean;
 };
 
+type TransitionState = {
+  active: boolean;
+  userName: string | null;
+};
+
 export default function LoginPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Transition state — when active, the AuthTransition curtain mounts. We don't
+  // navigate to /dashboard until the curtain has played, so the user always sees
+  // the full brand moment before the dashboard mounts.
+  const [transition, setTransition] = useState<TransitionState>({ active: false, userName: null });
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { t } = useLanguage();
@@ -48,6 +57,14 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
+  // Fires when the AuthTransition curtain finishes its choreography. By the
+  // time this runs the brand reveal has played for ~1.4s, so we navigate to the
+  // dashboard immediately and let Next.js mount it underneath the dissolving
+  // overlay (the dashboard layout has its own entrance animations).
+  const handleTransitionComplete = useCallback(() => {
+    router.push('/dashboard');
+  }, [router]);
+
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setSubmitError(null);
@@ -57,8 +74,15 @@ export default function LoginPage() {
         localStorage.setItem('refreshToken', result.tokens.refreshToken);
       }
       dispatch(setUser(result.user));
-      toast.success(t.toasts.loginSuccess);
-      router.push('/dashboard');
+      // Mount the transition curtain. Navigation happens inside
+      // handleTransitionComplete after the curtain has finished playing — that
+      // way the user always sees the full brand moment rather than a snap-cut.
+      // No success toast here: the curtain's "Welcome back" IS the feedback.
+      const displayName = [result.user.firstName, result.user.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim() || null;
+      setTransition({ active: true, userName: displayName });
     } catch (err) {
       const apiErr = getApiError(err);
       const message = apiErr.message || 'Invalid credentials';
@@ -68,13 +92,24 @@ export default function LoginPage() {
 
   return (
     <div>
+      {/* Brand transition curtain — only mounted after a successful login.
+          Plays the navy reveal animation, then navigates to the dashboard. */}
+      {transition.active && (
+        <AuthTransition
+          userName={transition.userName}
+          welcomeText={t.login.welcomeBackToast}
+          signingInText={t.login.signingYouIn}
+          onComplete={handleTransitionComplete}
+        />
+      )}
+
       {/* Page heading — true H1 per §3 (weight 800, 28–36px range) */}
       <div className="mb-8 sm:mb-10">
         <p
           className="font-montserrat text-[12px] font-semibold tracking-[0.12em] uppercase text-sett-primary mb-3 animate-sidebar-fade-up"
           style={{ animationDelay: '60ms' }}
         >
-          {t.login.eyebrow}
+          {t.login.formEyebrow}
         </p>
         <h2
           className="font-montserrat text-[28px] sm:text-[32px] font-extrabold leading-tight text-sett-text-primary animate-sidebar-fade-up"
@@ -147,7 +182,8 @@ export default function LoginPage() {
             type="submit"
             variant="primary"
             fullWidth
-            isLoading={isSubmitting}
+            isLoading={isSubmitting || transition.active}
+            disabled={transition.active}
           >
             {t.login.signIn}
           </Button>

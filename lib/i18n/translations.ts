@@ -558,6 +558,7 @@ export const translations = {
     // ── Login / Forgot Password ──
     login: {
       eyebrow: 'Since 1989  ·  Privately Owned',
+      formEyebrow: 'Agency Portal',
       welcomeBack: 'Sign in to SETT Hub',
       signInSubtitle: 'Access your group booking workspace and proposals.',
       // Hero manifesto — two punchy lines (line break preserved by rendering as
@@ -583,8 +584,11 @@ export const translations = {
       emailInvalid: 'Please enter a valid email address',
       passwordRequired: 'Password is required',
       forgotPasswordTitle: 'Forgot password?',
-      forgotPasswordDesc: 'Contact support to reset your password.',
+      forgotPasswordDesc: 'Contact Admin to reset your password.',
       backToSignIn: 'Back to Sign In',
+      // Auth → dashboard transition
+      welcomeBackToast: 'Welcome back',
+      signingYouIn: 'Signing you in…',
     },
 
     // ── Toast Messages ──
@@ -1277,6 +1281,7 @@ export const translations = {
     // ── Login / Forgot Password ──
     login: {
       eyebrow: 'Seit 1989  ·  Privatgeführt',
+      formEyebrow: 'Agentur-Portal',
       welcomeBack: 'Anmeldung bei SETT Hub',
       signInSubtitle: 'Greifen Sie auf Ihren Gruppenbuchungs-Arbeitsplatz und Angebote zu.',
       heroTitleLine1: 'Wir verkaufen keine Reisen.',
@@ -1299,8 +1304,11 @@ export const translations = {
       emailInvalid: 'Bitte geben Sie eine gültige E-Mail-Adresse ein',
       passwordRequired: 'Passwort ist erforderlich',
       forgotPasswordTitle: 'Passwort vergessen?',
-      forgotPasswordDesc: 'Kontaktieren Sie den Support, um Ihr Passwort zurückzusetzen.',
+      forgotPasswordDesc: 'Kontaktieren Sie den Admin, um Ihr Passwort zurückzusetzen.',
       backToSignIn: 'Zurück zur Anmeldung',
+      // Auth → dashboard transition
+      welcomeBackToast: 'Willkommen zurück',
+      signingYouIn: 'Sie werden angemeldet…',
     },
 
     // ── Toast-Nachrichten ──

@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
           className="font-montserrat text-[12px] font-semibold tracking-[0.12em] uppercase text-sett-primary mb-3 animate-sidebar-fade-up"
           style={{ animationDelay: '60ms' }}
         >
-          {t.login.eyebrow}
+          {t.login.formEyebrow}
         </p>
         <h2
           className="font-montserrat text-[28px] sm:text-[32px] font-extrabold leading-tight text-sett-text-primary animate-sidebar-fade-up"

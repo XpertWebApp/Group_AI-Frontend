@@ -119,11 +119,13 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
       aria-modal="true"
       aria-label="Hotel image gallery"
     >
-      {/* Top bar — counter + close */}
+      {/* Top bar — counter + close.
+          Use solid-dark backings (not translucent white) so the controls stay
+          legible against bright photos (white-walled hotels, pale skies, etc.). */}
       <div className="flex items-center justify-between px-2 sm:px-4 pb-3 z-10">
         {showCarousel ? (
-          <span className="font-montserrat text-[13px] font-semibold text-white/85 tabular-nums">
-            {idx + 1} <span className="text-white/40">/</span> {total}
+          <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[13px] font-semibold text-white tabular-nums shadow-lg">
+            {idx + 1} <span className="text-white/55 mx-1.5">/</span> {total}
           </span>
         ) : (
           <span />
@@ -131,7 +133,7 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
         <button
           type="button"
           onClick={onClose}
-          className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary"
+          className="p-2.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 hover:bg-black/85 hover:ring-white/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary shadow-lg"
           aria-label="Close"
         >
           <X className="w-5 h-5 text-white" />
@@ -143,12 +145,12 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
         className="flex-1 relative flex items-center justify-center min-h-0"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Prev arrow */}
+        {/* Prev arrow — solid dark fill so it's visible against any photo */}
         {showCarousel && (
           <button
             type="button"
             onClick={() => advance(-1)}
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary"
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 text-white flex items-center justify-center shadow-xl transition-all hover:bg-black/85 hover:ring-white/30 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary"
             aria-label="Previous image"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -173,12 +175,12 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
           }}
         />
 
-        {/* Next arrow */}
+        {/* Next arrow — same solid dark fill as Prev */}
         {showCarousel && (
           <button
             type="button"
             onClick={() => advance(1)}
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-white/10 hover:bg-white/25 text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary"
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 text-white flex items-center justify-center shadow-xl transition-all hover:bg-black/85 hover:ring-white/30 hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary"
             aria-label="Next image"
           >
             <ChevronRight className="w-6 h-6" />
