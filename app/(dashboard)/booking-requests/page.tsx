@@ -2,27 +2,27 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { RefreshCw } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
 import { TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
+import { getCurrentUserId } from '@/lib/auth/getCurrentUser';
+import { formatDateEU } from '@/lib/dateFormatter';
 import type { BookingRequest, RoomsConfig } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { getGroupTypeLabel, groupTypeRequiresAge } from '@/lib/utils/groupType';
+import { useRefreshOnNotification } from '@/lib/notifications/useRefreshOnNotification';
 
 const PAGE_SIZE = 6;
 
 /* ───── helpers ───── */
 
 function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso; // already formatted
-  return d.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return formatDateEU(iso);
 }
 
 function totalRooms(rooms: RoomsConfig | null | undefined): number | null {
@@ -45,15 +45,7 @@ function customerName(r: BookingRequest): string {
   return '—';
 }
 
-function formatStatus(status: string): string {
-  return status
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
-function effectiveStatus(r: BookingRequest): string {
-  return r.proposals?.[0]?.status ?? r.status;
-}
 
 function getProposalTotals(r: BookingRequest): { totalSell: number | null; margin: number | null } {
   const p = r.proposals?.[0];
@@ -100,9 +92,27 @@ function matchesDateRange(r: BookingRequest, range: string): boolean {
 
 export default function BookingRequestsPage() {
   const { t } = useLanguage();
+  const router = useRouter();
+
+  const statusLabel = (status: string): string => {
+    const map: Record<string, string> = {
+      pending: t.requests.pending,
+      draft: t.requests.draft,
+      sent: t.requests.sent,
+      declined: t.requests.declined,
+      processing: t.requests.processing,
+      ai_generated: t.requests.aiGenerated,
+      completed: t.requests.completed,
+      cancelled: t.requests.cancelled,
+      approved: t.requests.approved,
+      needs_manual_handling: t.requests.needsManualHandling,
+    };
+    return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
   const [statusFilter, setStatusFilter] = useState('');
   const [dateRange, setDateRange] = useState('');
   const [page, setPage] = useState(1);
@@ -110,10 +120,13 @@ export default function BookingRequestsPage() {
     total: number;
     totalPages: number;
   } | null>(null);
+  const [claimingRequestId, setClaimingRequestId] = useState<string | null>(null);
+  const [currentUserId] = useState(() => getCurrentUserId());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadRequests = useCallback(async () => {
+  const loadRequests = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const result = await requestsApi.list({
         page,
         limit: PAGE_SIZE,
@@ -132,9 +145,64 @@ export default function BookingRequestsPage() {
     } catch {
       // keep empty
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, search, statusFilter]);
+
+  // Auto-refresh when a notification arrives that relates to a booking request
+  // or proposal/offer (a new offer == a new request from this list's POV).
+  useRefreshOnNotification(
+    () => loadRequests(true),
+    { match: /booking|request|proposal|offer/i },
+  );
+
+  const handleClaimRequest = useCallback(async (requestId: string) => {
+    setClaimingRequestId(requestId);
+    try {
+      const response = await requestsApi.claim(requestId);
+      // Optimistically update the row
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === requestId ? { ...r, assignedUser: response.owner } : r
+        )
+      );
+      toast.success('Request claimed successfully');
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: { data?: { owner?: unknown } } } };
+      if (error.response?.status === 409) {
+        // Someone else claimed it
+        const owner = (error.response.data?.data as { owner?: { firstName?: string; lastName?: string } } | undefined)?.owner;
+        const ownerName = owner && (owner.firstName || owner.lastName)
+          ? `${owner.firstName || ''} ${owner.lastName || ''}`.trim()
+          : 'another user';
+        toast.success(`Already owned by ${ownerName}`);
+        // Update the row with the owner who claimed it
+        if (owner) {
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === requestId ? { ...r, assignedUser: owner as never } : r
+            )
+          );
+        }
+      } else {
+        toast.error('Failed to claim request');
+      }
+    } finally {
+      setClaimingRequestId(null);
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadRequests();
+      toast.success('Requests updated');
+    } catch {
+      toast.error('Failed to refresh requests');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadRequests]);
 
   useEffect(() => {
     loadRequests();
@@ -175,233 +243,325 @@ export default function BookingRequestsPage() {
       <Header title={t.requests.title} />
 
       <div className="p-4 md:p-6 space-y-6">
-      {/* Card with filters + table */}
-      <div className="bg-white rounded-[14px] border border-sett-border overflow-hidden">
-        {/* Filter bar */}
-        <div className="p-3 sm:p-5">
-          <BookingRequestFilters
-            search={search}
-            onSearchChange={setSearch}
-            status={statusFilter}
-            onStatusChange={setStatusFilter}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-          />
-        </div>
-
-        {/* Loading skeleton */}
-        {loading && (
-          <>
-            <div className="hidden lg:block border-t border-sett-border">
-              <TableSkeleton rows={PAGE_SIZE} columns={10} />
+        {/* Card with filters + table */}
+        <div className="bg-white rounded-[14px] border border-sett-border animate-card-rise-in">
+          {/* Filter bar with refresh button — no overflow-hidden here so Select dropdowns are never clipped */}
+          <div
+            className="relative z-10 p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-sidebar-fade-up"
+            style={{ animationDelay: '120ms' }}
+          >
+            <div className="flex-1 min-w-0">
+              <BookingRequestFilters
+                search={search}
+                onSearchChange={setSearch}
+                status={statusFilter}
+                onStatusChange={setStatusFilter}
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
             </div>
-            <div className="lg:hidden border-t border-sett-border">
-              <CardSkeleton cards={PAGE_SIZE} />
-            </div>
-          </>
-        )}
-
-        {/* Empty state */}
-        {!loading && filtered.length === 0 && (
-          <div className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border">
-            {t.requests.noRequests}
-          </div>
-        )}
-
-        {/* ── Desktop Table (lg and up) ── */}
-        {!loading && rows.length > 0 && (
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full min-w-[1100px]">
-              <thead>
-                <tr className="border-y border-sett-border">
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.offerId}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.customer}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.destination}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.checkInOut}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.rooms}</th>
-                  <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.totalSell}</th>
-                  <th className="text-right text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.margin}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.status}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.createdOn}</th>
-                  <th className="text-left text-label text-sett-text-accent uppercase tracking-wide px-5 py-4 font-semibold">{t.requests.lastUpdated}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const rooms = totalRooms(row.rooms);
-                  const { totalSell, margin } = getProposalTotals(row);
-
-                  return (
-                    <tr
-                      key={row.id}
-                      className="border-b border-sett-border last:border-0 hover:bg-sett-fill/50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-5 py-5 text-body font-medium text-sett-text-primary">
-                        <Link href={`/booking-requests/${row.id}`} className="hover:text-sett-primary">
-                          #{row.referenceNumber ?? row.id.slice(0, 4)}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-5 text-body font-medium text-sett-text-primary">
-                        {customerName(row)}
-                      </td>
-                      <td className="px-5 py-5 text-body text-sett-text-primary">
-                        {row.destinationName ?? '—'}
-                      </td>
-                      <td className="px-5 py-5 text-body text-sett-text-primary">
-                        <span className="block">{formatDate(row.checkinDate)}</span>
-                        <span className="block text-sett-text-secondary mt-0.5">
-                          {formatDate(row.checkoutDate)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-5 text-body text-sett-text-primary">
-                        {rooms ?? '—'}
-                      </td>
-                      <td className="px-5 py-5 text-body font-medium text-sett-text-primary text-right">
-                        {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                      </td>
-                      <td className="px-5 py-5 text-body font-medium text-sett-olive text-right">
-                        {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                      </td>
-                      <td className="px-5 py-5">
-                        <Badge variant={getStatusBadgeVariant(effectiveStatus(row))}>
-                          {formatStatus(effectiveStatus(row))}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-5 text-body text-sett-text-secondary">
-                        {formatDate(row.createdAt)}
-                      </td>
-                      <td className="px-5 py-5 text-body text-sett-text-secondary">
-                        {getLastUpdated(row)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ── Mobile/Tablet Card View (below lg) ── */}
-        {!loading && rows.length > 0 && (
-          <div className="lg:hidden divide-y divide-sett-border border-t border-sett-border">
-            {rows.map((row) => {
-              const rooms = totalRooms(row.rooms);
-              const { totalSell, margin } = getProposalTotals(row);
-
-              return (
-                <Link
-                  key={row.id}
-                  href={`/booking-requests/${row.id}`}
-                  className="block p-4 hover:bg-sett-fill/50 transition-colors"
-                >
-                  {/* Top row: ID + Status */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-body font-semibold text-sett-text-primary">
-                      #{row.referenceNumber ?? row.id.slice(0, 4)}
-                    </span>
-                    <Badge variant={getStatusBadgeVariant(effectiveStatus(row))}>
-                      {formatStatus(effectiveStatus(row))}
-                    </Badge>
-                  </div>
-
-                  {/* Customer & Destination */}
-                  <p className="text-body font-medium text-sett-text-primary truncate">
-                    {customerName(row)}
-                  </p>
-                  <p className="text-sm text-sett-text-secondary truncate mt-0.5">
-                    {row.destinationName ?? '—'}
-                  </p>
-
-                  {/* Details grid */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 text-sm">
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.checkInOut}</span>
-                      <p className="text-sett-text-primary mt-0.5">
-                        {formatDate(row.checkinDate)} — {formatDate(row.checkoutDate)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.rooms}</span>
-                      <p className="text-sett-text-primary mt-0.5">{rooms ?? '—'}</p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.totalSell}</span>
-                      <p className="text-sett-text-primary font-medium mt-0.5">
-                        {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.margin}</span>
-                      <p className="text-sett-olive font-medium mt-0.5">
-                        {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.createdOn}</span>
-                      <p className="text-sett-text-secondary mt-0.5">{formatDate(row.createdAt)}</p>
-                    </div>
-                    <div>
-                      <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.lastUpdated}</span>
-                      <p className="text-sett-text-secondary mt-0.5">{getLastUpdated(row)}</p>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {!loading && filtered.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
-            {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, totalItems)} {t.requests.of}{' '}
-            {totalItems} {t.requests.requestsLabel}
-          </p>
-          <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
             <button
               type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safeCurrentPage <= 1}
-              className="px-2 sm:px-2.5 h-8 rounded-lg text-sm sm:text-body font-medium text-sett-text-accent disabled:opacity-40"
+              onClick={handleRefresh}
+              disabled={loading || isRefreshing}
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill hover:border-sett-primary/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              title={t.requests.refresh || 'Refresh requests'}
             >
-              {t.requests.prev}
-            </button>
-            {renderPagination().map((p, i) =>
-              p === '...' ? (
-                <span
-                  key={`ellipsis-${i}`}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary"
-                >
-                  ...
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPage(p as number)}
-                  className={`w-8 h-8 rounded-lg text-sm sm:text-body ${
-                    p === safeCurrentPage
-                      ? 'bg-sett-primary text-white font-bold'
-                      : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-background'
-                  }`}
-                >
-                  {p}
-                </button>
-              )
-            )}
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safeCurrentPage >= totalPages}
-              className="px-2 sm:px-2.5 h-8 rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary disabled:opacity-40 hover:bg-sett-background"
-            >
-              {t.requests.next}
+              <RefreshCw className={`w-4 h-4 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{t.requests.refresh || 'Refresh'}</span>
             </button>
           </div>
+
+          {/* Loading skeleton */}
+          {loading && (
+            <>
+              <div className="hidden xl:block border-t border-sett-border overflow-hidden">
+                <TableSkeleton rows={PAGE_SIZE} columns={10} />
+              </div>
+              <div className="xl:hidden border-t border-sett-border overflow-hidden">
+                <CardSkeleton cards={PAGE_SIZE} />
+              </div>
+            </>
+          )}
+
+          {/* Empty state */}
+          {!loading && filtered.length === 0 && (
+            <div
+              className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border animate-sidebar-fade-up"
+              style={{ animationDelay: '320ms' }}
+            >
+              {t.requests.noRequests}
+            </div>
+          )}
+
+          {/* ── Desktop Table (xl and up) ── */}
+          {!loading && rows.length > 0 && (
+            <div className="hidden xl:block overflow-x-auto overflow-hidden">
+              <table className="w-full min-w-[950px] 2xl:min-w-[1100px]">
+                <thead>
+                  {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
+                  <tr className="bg-sett-navy">
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.offerId}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.customer}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.destination}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.checkInOut}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.rooms}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.group}</th>
+                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.totalSell}</th>
+                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.margin}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.owner}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.status}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.createdOn}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.lastUpdated}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, i) => {
+                    const rooms = totalRooms(row.rooms);
+                    const { totalSell, margin } = getProposalTotals(row);
+
+                    return (
+                      <tr
+                        key={row.id}
+                        className={`group border-b border-sett-border-light last:border-0 cursor-pointer transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in ${
+                          // §5.2 Alternating row: #F8F9FA
+                          i % 2 === 1 ? 'bg-sett-table-alt-row' : 'bg-white'
+                        }`}
+                        style={{ animationDelay: `${320 + Math.min(i, 6) * 50}ms` }}
+                        onClick={() => router.push(`/booking-requests/${row.id}`)}
+                      >
+                        <td className="relative px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary">
+                          {/* Left accent bar — slides in on row hover */}
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
+                          />
+                          <Link
+                            href={`/booking-requests/${row.id}`}
+                            className="inline-flex items-center gap-1 transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            #{row.referenceNumber ?? row.id.slice(0, 4)}
+                          </Link>
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary">
+                          {customerName(row)}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
+                          {row.destinationName ?? '—'}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
+                          <span className="block">{formatDate(row.checkinDate)}</span>
+                          <span className="block text-sett-text-secondary mt-0.5">
+                            {formatDate(row.checkoutDate)}
+                          </span>
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
+                          {rooms ?? '—'}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
+                          <span className="block">{getGroupTypeLabel(row.groupType, t)}</span>
+                          {groupTypeRequiresAge(row.groupType) && row.averageAge != null && (
+                            <span className="block text-sett-text-accent text-[12px] font-medium mt-0.5">
+                              {t.offer.averageAge}: {row.averageAge}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary text-right">
+                          {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body font-semibold text-sett-primary text-right">
+                          {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-primary">
+                          {row.assignedUser ? (
+                            <span className={row.assignedUser.id === currentUserId ? 'font-semibold text-sett-primary' : ''}>
+                              {row.assignedUser.id === currentUserId
+                                ? t.requests.you
+                                : row.assignedUser.firstName && row.assignedUser.lastName
+                                  ? `${row.assignedUser.firstName} ${row.assignedUser.lastName}`
+                                  : row.assignedUser.email}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClaimRequest(row.id);
+                              }}
+                              disabled={claimingRequestId === row.id}
+                              className="inline-flex items-center px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-sett-navy bg-sett-primary rounded-button hover:bg-sett-green-dark hover:text-white active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150"
+                            >
+                              {claimingRequestId === row.id ? (
+                                <>
+                                  <span className="inline-block w-3 h-3 mr-1.5 border-2 border-transparent border-t-sett-navy rounded-full animate-spin" />
+                                  {t.requests.claim}
+                                </>
+                              ) : (
+                                t.requests.claim
+                              )}
+                            </button>
+                          )}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4">
+                          <Badge variant={getStatusBadgeVariant(row.status)}>
+                            {statusLabel(row.status)}
+                          </Badge>
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-secondary">
+                          {formatDate(row.createdAt)}
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 text-body text-sett-text-secondary">
+                          {getLastUpdated(row)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── Mobile/Tablet Card View (below xl) ── */}
+          {!loading && rows.length > 0 && (
+            <div className="xl:hidden divide-y divide-sett-border border-t border-sett-border overflow-hidden">
+              {rows.map((row, i) => {
+                const rooms = totalRooms(row.rooms);
+                const { totalSell, margin } = getProposalTotals(row);
+
+                return (
+                  <Link
+                    key={row.id}
+                    href={`/booking-requests/${row.id}`}
+                    className="group relative block p-4 transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                    style={{ animationDelay: `${320 + Math.min(i, 6) * 60}ms` }}
+                  >
+                    {/* Left accent bar — slides in on hover */}
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
+                    />
+                    {/* Top row: ID + Status */}
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-body font-semibold text-sett-text-primary transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5">
+                        #{row.referenceNumber ?? row.id.slice(0, 4)}
+                      </span>
+                      <Badge variant={getStatusBadgeVariant(row.status)}>
+                        {statusLabel(row.status)}
+                      </Badge>
+                    </div>
+
+                    {/* Customer & Destination */}
+                    <p className="text-body font-medium text-sett-text-primary truncate">
+                      {customerName(row)}
+                    </p>
+                    <p className="text-sm text-sett-text-secondary truncate mt-0.5">
+                      {row.destinationName ?? '—'}
+                    </p>
+
+                    {/* Details grid */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 text-sm">
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.checkInOut}</span>
+                        <p className="text-sett-text-primary mt-0.5">
+                          {formatDate(row.checkinDate)} — {formatDate(row.checkoutDate)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.rooms}</span>
+                        <p className="text-sett-text-primary mt-0.5">{rooms ?? '—'}</p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.group}</span>
+                        <p className="text-sett-text-primary mt-0.5">
+                          {getGroupTypeLabel(row.groupType, t)}
+                          {groupTypeRequiresAge(row.groupType) && row.averageAge != null && (
+                            <span className="block text-sett-text-accent text-[11px] mt-0.5">
+                              {t.offer.averageAge}: {row.averageAge}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.totalSell}</span>
+                        <p className="text-sett-text-primary font-medium mt-0.5">
+                          {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.margin}</span>
+                        <p className="text-sett-primary font-semibold mt-0.5">
+                          {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.createdOn}</span>
+                        <p className="text-sett-text-secondary mt-0.5">{formatDate(row.createdAt)}</p>
+                      </div>
+                      <div>
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.lastUpdated}</span>
+                        <p className="text-sett-text-secondary mt-0.5">{getLastUpdated(row)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Pagination */}
+        {!loading && filtered.length > 0 && (
+          <div
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 animate-sidebar-fade-up"
+            style={{ animationDelay: '720ms' }}
+          >
+            <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
+              {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, totalItems)} {t.requests.of}{' '}
+              {totalItems} {t.requests.requestsLabel}
+            </p>
+            <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage <= 1}
+                className="px-2 sm:px-2.5 h-8 rounded-lg text-sm sm:text-body font-medium text-sett-text-accent transition-all duration-180 ease-sett-out hover:text-sett-primary active:scale-95 disabled:opacity-40 disabled:hover:text-sett-text-accent"
+              >
+                {t.requests.prev}
+              </button>
+              {renderPagination().map((p, i) =>
+                p === '...' ? (
+                  <span
+                    key={`ellipsis-${i}`}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary"
+                  >
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPage(p as number)}
+                    className={`w-8 h-8 rounded-lg text-sm sm:text-body transition-all duration-180 ease-sett-out active:scale-90 ${p === safeCurrentPage
+                      ? 'bg-sett-primary text-sett-navy font-bold shadow-[0_2px_6px_0_rgba(170,199,55,0.35)]'
+                      : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary'
+                      }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage >= totalPages}
+                className="px-2 sm:px-2.5 h-8 rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary transition-all duration-180 ease-sett-out hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-sett-text-secondary"
+              >
+                {t.requests.next}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

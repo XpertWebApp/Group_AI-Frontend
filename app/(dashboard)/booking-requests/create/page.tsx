@@ -1,22 +1,30 @@
 'use client';
 
-import { useState, useEffect, useRef, forwardRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, forwardRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Header } from '@/components/layout/Header';
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { StepperNav } from '@/components/ui/StepperNav';
 import { RoomCounter } from '@/components/ui/RoomCounter';
-import { PhoneInput } from '@/components/ui/PhoneInput';
+import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
 import { Spinner } from '@/components/ui/Loader';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { cn } from '@/lib/utils/cn';
-import { destinationsApi } from '@/lib/api/destinations';
+import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import {
+  AGE_REQUIRED_GROUP_TYPES,
+  AVERAGE_AGE_MAX,
+  AVERAGE_AGE_MIN,
+  buildGroupTypeOptions,
+  groupTypeRequiresAge,
+} from '@/lib/utils/groupType';
 
 interface FormData {
   // Step 1: Trip Details
@@ -28,6 +36,7 @@ interface FormData {
   budgetRange: string;
   groupType: string;
   groupSize: string;
+  averageAge: number | '';
   // Step 2: Room & Accommodations
   singleRooms: number;
   doubleRooms: number;
@@ -45,6 +54,7 @@ interface FormData {
   firstName: string;
   lastName: string;
   email: string;
+  phoneCountryCode: string;
   phone: string;
   specialRequestsCustomer: string;
   // Step 4: Policies
@@ -61,6 +71,7 @@ const defaultFormData: FormData = {
   budgetRange: '',
   groupType: '',
   groupSize: '',
+  averageAge: '',
   singleRooms: 0,
   doubleRooms: 0,
   standardDoubleBeds: 0,
@@ -76,19 +87,20 @@ const defaultFormData: FormData = {
   firstName: '',
   lastName: '',
   email: '',
+  phoneCountryCode: '+44',
   phone: '',
   specialRequestsCustomer: '',
   termsAndConditions:
-    '1. All prices are per person unless otherwise stated\n2. Prices are subject to availability at time of booking\n3. Full payment required 30 days before arrival\n4. Cancellation policy applies as per individual hotel terms\n5. Group rates are valid for minimum 10 participants\n6. Final room list required 14 days before arrival',
+    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>All prices are per room per night unless otherwise stated</li><li>Prices are subject to availability at time of booking</li><li>Full payment required 30 days before arrival</li><li>Cancellation policy applies as per individual hotel terms</li><li>Group rates are valid for minimum 10 participants</li><li>Final room list required 14 days before arrival</li></ol>',
   cancellationConditions:
-    'Cancellations made 14 days or more in advance of the event date will receive a 100% refund. Cancellations made within 7 days will incur a 50% fee.',
+    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>Cancellations made 14 days or more in advance of the event date will receive a 100% refund.</li><li>Cancellations made within 7 days will incur a 50% fee.</li></ol>',
 };
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="flex items-start gap-3 mb-6">
-      <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
-      <div>
+      <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5 animate-sidebar-fade-up" />
+      <div className="animate-sidebar-fade-up" style={{ animationDelay: '80ms' }}>
         <h2 className="text-heading-sm font-bold text-sett-text-primary">{title}</h2>
         <p className="text-body text-sett-text-accent mt-0.5">{subtitle}</p>
       </div>
@@ -110,10 +122,11 @@ function RadioOption({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal transition-colors flex-1',
+        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal flex-1',
+        'transition-all duration-180 ease-sett-out active:scale-[0.97]',
         selected
-          ? 'border-sett-primary/40 bg-sett-light-green-bg text-sett-text-primary'
-          : 'border-sett-border-light bg-white text-sett-text-primary hover:border-sett-primary/40'
+          ? 'border-sett-primary/40 bg-sett-light-green-bg text-sett-text-primary shadow-[0_2px_8px_0_rgba(170,199,55,0.18)]'
+          : 'border-sett-border-light bg-white text-sett-text-primary hover:border-sett-primary/40 hover:bg-sett-light-green-bg/30'
       )}
     >
       {selected ? (
@@ -129,6 +142,75 @@ function RadioOption({
 }
 
 type FieldErrors = Record<string, string>;
+
+/**
+ * Computes 0–1 completion of the current step based on the same required fields
+ * used by validateStep. Kept in lockstep with validateStep so the visual progress
+ * never disagrees with the validator that gates the Next button.
+ */
+function getStepProgress(step: number, data: FormData): number {
+  const checks: boolean[] = [];
+
+  if (step === 0) {
+    const today = new Date().toISOString().split('T')[0];
+    const maxDate = new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0];
+    checks.push(!!data.destination.trim());
+    checks.push(
+      !!data.checkInDate && data.checkInDate >= today && data.checkInDate <= maxDate
+    );
+    checks.push(
+      !!data.checkOutDate &&
+      data.checkOutDate >= today &&
+      data.checkOutDate <= maxDate &&
+      (!data.checkInDate || data.checkOutDate > data.checkInDate)
+    );
+    checks.push(!!data.hotelCategory);
+    checks.push(!!data.groupType);
+    checks.push(!!data.groupSize.trim() && Number(data.groupSize) > 0);
+    if (groupTypeRequiresAge(data.groupType)) {
+      const age = Number(data.averageAge);
+      checks.push(data.averageAge !== '' && data.averageAge != null && age >= AVERAGE_AGE_MIN && age <= AVERAGE_AGE_MAX);
+    }
+  }
+
+  if (step === 1) {
+    const totalRooms = data.singleRooms + data.doubleRooms + data.tripleRooms + data.quadrupleRooms;
+    checks.push(totalRooms >= 1);
+    if (data.doubleRooms > 0) {
+      checks.push(data.standardDoubleBeds + data.twinBeds === data.doubleRooms);
+    }
+    const guestCapacity =
+      data.singleRooms * 1 +
+      data.standardDoubleBeds * 2 +
+      data.twinBeds * 2 +
+      data.tripleRooms * 3 +
+      data.quadrupleRooms * 4;
+    const groupSize = Number(data.groupSize);
+    if (groupSize > 0) {
+      checks.push(guestCapacity >= groupSize);
+    }
+  }
+
+  if (step === 2) {
+    checks.push(!!data.companyName.trim());
+    checks.push(!!data.firstName.trim());
+    checks.push(!!data.lastName.trim());
+    checks.push(
+      !!data.email.trim() &&
+      /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(data.email)
+    );
+    checks.push(!!data.phone.trim() && data.phone.length >= 7 && data.phone.length <= 15);
+  }
+
+  if (step === 3) {
+    // Policies have sensible defaults — count as fully complete.
+    return 1;
+  }
+
+  if (checks.length === 0) return 0;
+  const passed = checks.filter(Boolean).length;
+  return passed / checks.length;
+}
 
 function validateStep(step: number, data: FormData, t: ReturnType<typeof useLanguage>['t']): FieldErrors {
   const errors: FieldErrors = {};
@@ -163,11 +245,31 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     } else if (Number(data.groupSize) <= 0) {
       errors.groupSize = t.createForm.groupSizePositive;
     }
+    if (groupTypeRequiresAge(data.groupType)) {
+      if (data.averageAge === '' || data.averageAge == null) {
+        errors.averageAge = t.createForm.averageAgeRequired;
+      } else if (Number(data.averageAge) < AVERAGE_AGE_MIN || Number(data.averageAge) > AVERAGE_AGE_MAX) {
+        errors.averageAge = t.createForm.averageAgeInvalid;
+      }
+    }
   }
 
   if (step === 1) {
     const totalRooms = data.singleRooms + data.doubleRooms + data.tripleRooms + data.quadrupleRooms;
     if (totalRooms < 1) errors.rooms = t.createForm.selectAtLeastOneRoom;
+    if (data.doubleRooms > 0) {
+      if (data.standardDoubleBeds + data.twinBeds !== data.doubleRooms) {
+        errors.bedConfig = t.createForm.bedConfigRequired.replace(/{count}/g, String(data.doubleRooms));
+      }
+    }
+    const guestCapacity = data.singleRooms * 1 + data.standardDoubleBeds * 2 + data.twinBeds * 2
+      + data.tripleRooms * 3 + data.quadrupleRooms * 4;
+    const groupSize = Number(data.groupSize);
+    if (groupSize > 0 && guestCapacity > 0 && guestCapacity < groupSize) {
+      errors.rooms = t.createForm.capacityTooSmall
+        .replace('{capacity}', String(guestCapacity))
+        .replace('{groupSize}', String(groupSize));
+    }
   }
 
   if (step === 2) {
@@ -176,13 +278,12 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     if (!data.lastName.trim()) errors.lastName = t.createForm.lastNameRequired;
     if (!data.email.trim()) {
       errors.email = t.createForm.emailRequired;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    } else if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
-    const phoneDigits = data.phone.replace(/\D/g, '');
-    if (!data.phone.trim() || phoneDigits.length <= 3) {
+    if (!data.phone.trim()) {
       errors.phone = t.createForm.phoneRequired;
-    } else if (phoneDigits.length < 11) {
+    } else if (data.phone.length < 7 || data.phone.length > 15) {
       errors.phone = t.createForm.invalidPhone;
     }
   }
@@ -191,9 +292,32 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
 }
 
 export default function CreateBookingRequestPage() {
+  return (
+    <Suspense fallback={null}>
+      <CreateBookingRequestPageInner />
+    </Suspense>
+  );
+}
+
+const SESSION_KEY = 'createFormSession';
+
+function CreateBookingRequestPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLanguage();
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('draft')) return 0;
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const { step } = JSON.parse(saved);
+        return typeof step === 'number' ? step : 0;
+      }
+    } catch {}
+    return 0;
+  });
 
   const STEPS = [
     { label: t.createForm.stepTripDetails, icon: '/icons/streamline-ultimate_trip-road.svg' },
@@ -201,11 +325,61 @@ export default function CreateBookingRequestPage() {
     { label: t.createForm.stepCustomerDetails, icon: '/icons/boxicons_user.svg' },
     { label: t.createForm.stepPolicies, icon: '/icons/material-symbols_policy-outline-rounded.svg' },
   ];
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [formData, setFormData] = useState<FormData>(() => {
+    if (typeof window === 'undefined') return defaultFormData;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('draft')) return defaultFormData;
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        const { formData: savedForm } = JSON.parse(saved) as { formData: FormData };
+        return { ...defaultFormData, ...savedForm, nameListFile: null };
+      }
+    } catch {}
+    return defaultFormData;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [attempted, setAttempted] = useState(false);
+  // When returning from summary page to edit a just-created request
+  const [draftRequestId, setDraftRequestId] = useState<string | null>(null);
+
+  // Track step transition direction for the slide animation:
+  // 'forward' (Next) → slides in from right; 'back' (Back) → from left.
+  // Initial mount uses 'forward' so the first step also slides in.
+  const prevStepRef = useRef<number>(currentStep);
+  const stepDirection: 'forward' | 'back' =
+    currentStep >= prevStepRef.current ? 'forward' : 'back';
+  useEffect(() => {
+    prevStepRef.current = currentStep;
+  }, [currentStep]);
+
+  useEffect(() => {
+    const draft = searchParams.get('draft');
+    if (!draft) return;
+    try {
+      const saved = sessionStorage.getItem(`createFormDraft_${draft}`);
+      if (saved) {
+        const parsed = JSON.parse(saved) as FormData;
+        setFormData({ ...defaultFormData, ...parsed, nameListFile: null });
+        setDraftRequestId(draft);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [searchParams]);
+
+  // Continuously save step + formData so a reload can restore them
+  useEffect(() => {
+    if (draftRequestId) return; // submitted request uses its own key
+    try {
+      const { nameListFile: _file, ...serializableFormData } = formData;
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ step: currentStep, formData: serializableFormData }));
+    } catch {
+      // storage full — not critical
+    }
+  }, [currentStep, formData, draftRequestId]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => {
@@ -231,7 +405,7 @@ export default function CreateBookingRequestPage() {
     if (Object.keys(stepErrors).length > 0) {
       // Scroll to first error field
       setTimeout(() => {
-        const firstError = document.querySelector('.text-red-500');
+        const firstError = document.querySelector('.text-sett-destructive');
         if (firstError) {
           firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -261,7 +435,7 @@ export default function CreateBookingRequestPage() {
     setSubmitError(null);
     try {
       const { requestsApi } = await import('@/lib/api/requests');
-      const created = await requestsApi.create({
+      const payload = {
         // Step 1: Trip Details
         destinationId: formData.destinationId,
         destinationName: formData.destination,
@@ -271,19 +445,24 @@ export default function CreateBookingRequestPage() {
         budgetRange: formData.budgetRange || undefined,
         groupType: formData.groupType || undefined,
         groupSize: formData.groupSize ? Number(formData.groupSize) : undefined,
+        averageAge: groupTypeRequiresAge(formData.groupType) && formData.averageAge !== ''
+          ? Number(formData.averageAge)
+          : undefined,
         currencyCode: 'EUR',
         // Step 2: Room & Accommodations
         rooms: {
           single: formData.singleRooms,
-          double: formData.doubleRooms,
+          double: 0,
+          twin: 0,
+          standardDoubleBeds: formData.standardDoubleBeds,
+          twinBeds: formData.twinBeds,
           triple: formData.tripleRooms,
           quadruple: formData.quadrupleRooms,
-          standardDoubleBeds: formData.standardDoubleBeds || undefined,
-          twinBeds: formData.twinBeds || undefined,
+          suites: 0,
           extraRoomsNote: formData.extraRooms || undefined,
         },
-        breakfastPreference: formData.breakfastPreference === 'with' ? 'BB' : 'RO',
-        hotelLocation: formData.hotelLocation === 'central' ? 'central' : 'outside_city_center',
+        breakfastPreference: (formData.breakfastPreference === 'with' ? 'BB' : 'RO') as 'BB' | 'RO',
+        hotelLocation: (formData.hotelLocation === 'central' ? 'central' : 'outside_city_center') as 'central' | 'outside_city_center',
         specialRequirements: formData.specialRequestsRooms || undefined,
         // Step 3: Customer Details
         companyName: formData.companyName,
@@ -291,14 +470,45 @@ export default function CreateBookingRequestPage() {
         lastName: formData.lastName,
         contactEmail: formData.email,
         contactPhone: formData.phone,
+        contactPhoneCountryCode: formData.phoneCountryCode || undefined,
         customerNotes: formData.specialRequestsCustomer || undefined,
         // Step 4: Policies
-        termsAndConditions: formData.termsAndConditions || undefined,
-        cancellationConditions: formData.cancellationConditions || undefined,
-        status: 'pending',
-      });
-      toast.success(t.toasts.requestCreated);
-      router.push(`/booking-requests/${created.id}`);
+        termsAndConditions: formData.termsAndConditions?.replace(/<[^>]*>/g, '').trim() ? formData.termsAndConditions : undefined,
+        cancellationConditions: formData.cancellationConditions?.replace(/<[^>]*>/g, '').trim() ? formData.cancellationConditions : undefined,
+        status: 'pending' as const,
+      };
+
+      let requestId: string;
+      if (draftRequestId) {
+        // Returning from summary to edit — update the existing request
+        await requestsApi.update(draftRequestId, payload);
+        // Keep the draft key so the user can go back again from the summary page
+        try {
+          sessionStorage.setItem(`createFormDraft_${draftRequestId}`, JSON.stringify(formData));
+        } catch { /* storage full — not critical */ }
+        requestId = draftRequestId;
+        toast.success(t.toasts.requestCreated);
+      } else {
+        // Fresh create
+        const created = await requestsApi.create(payload);
+        // Save form data so Back button on summary page can restore it
+        try {
+          sessionStorage.setItem(`createFormDraft_${created.id}`, JSON.stringify(formData));
+        } catch { /* storage full — not critical */ }
+        requestId = created.id;
+        toast.success(t.toasts.requestCreated);
+      }
+
+      if (formData.nameListFile) {
+        try {
+          await requestsApi.uploadAttachments(requestId, [formData.nameListFile]);
+        } catch {
+          toast.error(t.toasts.fileUploadFailed);
+        }
+      }
+
+      sessionStorage.removeItem(SESSION_KEY);
+      router.push(`/booking-requests/${requestId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create request';
       setSubmitError(message);
@@ -312,24 +522,47 @@ export default function CreateBookingRequestPage() {
       <Header title={t.createForm.title} />
 
       <div className="p-4 md:p-6 space-y-6">
-      <StepperNav steps={STEPS} currentStep={currentStep} />
+      <div className="animate-card-rise-in">
+        <StepperNav
+          steps={STEPS}
+          currentStep={currentStep}
+          stepProgress={getStepProgress(currentStep, formData)}
+        />
+      </div>
 
-      <div className="bg-white rounded-[14px] border border-sett-border-light p-6">
-        {currentStep === 0 && (
-          <TripDetailsStep formData={formData} updateField={updateField} errors={errors} />
-        )}
-        {currentStep === 1 && (
-          <RoomAccommodationsStep formData={formData} updateField={updateField} errors={errors} />
-        )}
-        {currentStep === 2 && (
-          <CustomerDetailsStep formData={formData} updateField={updateField} errors={errors} />
-        )}
-        {currentStep === 3 && (
-          <PoliciesStep formData={formData} updateField={updateField} />
-        )}
+      <div
+        className="bg-white rounded-[14px] border border-sett-border-light p-6 animate-card-rise-in"
+        style={{ animationDelay: '200ms' }}
+      >
+        {/* Step content — re-keys on step change so the slide animation fires every transition.
+            `relative z-10` is required because the entrance animations on this wrapper and on the
+            bottom buttons row both create stacking contexts. Without this, the buttons (later in
+            DOM order) paint over inline-rendered Select dropdowns inside the step content. */}
+        <div
+          key={`step-${currentStep}`}
+          className={cn(
+            'relative z-10',
+            stepDirection === 'forward'
+              ? 'animate-step-in-right'
+              : 'animate-step-in-left'
+          )}
+        >
+          {currentStep === 0 && (
+            <TripDetailsStep formData={formData} updateField={updateField} errors={errors} />
+          )}
+          {currentStep === 1 && (
+            <RoomAccommodationsStep formData={formData} updateField={updateField} errors={errors} />
+          )}
+          {currentStep === 2 && (
+            <CustomerDetailsStep formData={formData} updateField={updateField} errors={errors} />
+          )}
+          {currentStep === 3 && (
+            <PoliciesStep formData={formData} updateField={updateField} />
+          )}
+        </div>
 
         {submitError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-[14px] text-body mt-4">
+          <div className="bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive px-4 py-3 rounded-[14px] text-body mt-4 animate-sidebar-fade-up">
             {submitError}
           </div>
         )}
@@ -337,42 +570,40 @@ export default function CreateBookingRequestPage() {
         {/* Horizontal Line */}
         <div className="w-full h-px bg-sett-border-light mt-6" />
 
-        {/* Bottom Actions */}
-        <div className="flex items-center justify-between pt-6">
-          <button
-            type="button"
-            onClick={() => router.push('/booking-requests')}
-            className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#EBEBEB] hover:text-sett-text-primary hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
+        {/* Bottom Actions
+            `relative z-0` keeps this row beneath any inline-rendered Select dropdown above
+            (whose stacking context is on the step content wrapper at z-10). */}
+        <div
+          className="relative z-0 flex items-center justify-between pt-6 animate-sidebar-fade-up"
+          style={{ animationDelay: '520ms' }}
+        >
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => { sessionStorage.removeItem(SESSION_KEY); router.push('/booking-requests'); }}
           >
             {t.common.cancel}
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
             {currentStep > 0 && (
-              <button
-                type="button"
-                onClick={handleBack}
-                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-secondary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#EBEBEB] hover:text-sett-text-primary hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
-              >
+              <Button variant="secondary" size="md" onClick={handleBack}>
                 {t.common.back}
-              </button>
+              </Button>
             )}
             {currentStep < STEPS.length - 1 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-sett-primary-hover hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
-              >
+              <Button variant="primary" size="md" onClick={handleNext}>
                 {t.common.next}
-              </button>
+              </Button>
             ) : (
-              <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="inline-flex py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50 transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-sett-primary-hover hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
-                >
-                  {isSubmitting ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t.createForm.createRequestBtn}
-                </button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                isLoading={isSubmitting}
+              >
+                {t.createForm.createRequestBtn}
+              </Button>
             )}
           </div>
         </div>
@@ -390,15 +621,43 @@ interface StepProps {
   errors: FieldErrors;
 }
 
+// §5.5 Form Inputs: border 1px solid #D0D0D0 (sett-border), radius 4px,
+// focus: border #AAC737 + box-shadow 0 0 0 3px rgba(170,199,55,0.15)
 const inputClass = (hasError: boolean) =>
   cn(
-    'w-full p-3 rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal focus:outline-none focus:ring-2 focus:ring-sett-primary',
-    hasError ? 'border-red-500' : 'border-sett-border-light'
+    'w-full p-3 rounded-input border bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal focus:outline-none focus:border-sett-primary focus:shadow-input-focus',
+    hasError ? 'border-sett-destructive' : 'border-sett-border'
   );
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
-  return <p className="mt-1 text-caption text-red-500">{message}</p>;
+  return <p className="mt-1 text-caption text-sett-destructive">{message}</p>;
+}
+
+function StarDisplay({ rating, label }: { rating: number; label: string }) {
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  const total = Math.ceil(rating);
+  const empty = total - full - (half ? 1 : 0);
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-0.5">
+        {Array.from({ length: full }).map((_, i) => (
+          <svg key={`f${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#AAC737" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ))}
+        {half && (
+          <svg key="h" width="14" height="14" viewBox="0 0 24 24" className="shrink-0">
+            <defs><linearGradient id="half-grad-sc"><stop offset="50%" stopColor="#AAC737"/><stop offset="50%" stopColor="#D1D1D1"/></linearGradient></defs>
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(#half-grad-sc)"/>
+          </svg>
+        )}
+        {Array.from({ length: empty }).map((_, i) => (
+          <svg key={`e${i}`} width="14" height="14" viewBox="0 0 24 24" fill="#D1D1D1" className="shrink-0"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        ))}
+      </span>
+      <span className="text-sett-text-primary">{label}</span>
+    </span>
+  );
 }
 
 interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -439,18 +698,19 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const justSelectedRef = useRef(false);
   const userTypingRef = useRef(false);
 
+  // Sync destQuery when formData.destination is restored from sessionStorage draft
+  useEffect(() => {
+    if (formData.destination && !userTypingRef.current) {
+      setDestQuery(formData.destination);
+    }
+  }, [formData.destination]);
+
   const hotelCategoryOptions = [
-    { value: '1',   label: t.createForm.star1 },
-    { value: '1.5', label: t.createForm.star1_5 },
-    { value: '2',   label: t.createForm.star2 },
-    { value: '2.5', label: t.createForm.star2_5 },
-    { value: '3',   label: t.createForm.star3 },
-    { value: '3.5', label: t.createForm.star3_5 },
-    { value: '4',   label: t.createForm.star4 },
-    { value: '4.5', label: t.createForm.star4_5 },
-    { value: '5',   label: t.createForm.star5 },
-    { value: '5.5', label: t.createForm.star5_5 },
-    { value: '6',   label: t.createForm.star6 },
+    { value: '1',   label: t.createForm.star1,   node: <StarDisplay rating={1}   label="1 Star" /> },
+    { value: '2',   label: t.createForm.star2,   node: <StarDisplay rating={2}   label="2 Stars" /> },
+    { value: '3',   label: t.createForm.star3,   node: <StarDisplay rating={3}   label="3 Stars" /> },
+    { value: '4',   label: t.createForm.star4,   node: <StarDisplay rating={4}   label="4 Stars" /> },
+    { value: '5',   label: t.createForm.star5,   node: <StarDisplay rating={5}   label="5 Stars" /> },
   ];
   const budgetRangeOptions = [
     { value: 'economy', label: t.createForm.economy },
@@ -458,13 +718,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
     { value: 'premium', label: t.createForm.premium },
     { value: 'luxury', label: t.createForm.luxury },
   ];
-  const groupTypeOptions = [
-    { value: 'business', label: t.createForm.businessGroup },
-    { value: 'leisure', label: t.createForm.leisureGroup },
-    { value: 'sports', label: t.createForm.sportsTeam },
-    { value: 'conference', label: t.createForm.conference },
-    { value: 'wedding', label: t.createForm.wedding },
-  ];
+  // Canonical codes per backend handover: business | leisure | sports | youth |
+  // school | family | wedding | mice | other. The Select sends the code as-is;
+  // labels come from the i18n layer.
+  const groupTypeOptions = buildGroupTypeOptions(t);
 
   useEffect(() => {
     if (!userTypingRef.current) return;
@@ -529,9 +786,21 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
         subtitle={t.createForm.tripDetailsSubtitle}
       />
       <div className="space-y-4">
-        <div ref={destWrapperRef} className="relative">
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
-            {t.createForm.destination} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
+        {/* Destination — animate-field-fade-in uses opacity only (no transform),
+            so neither this wrapper nor its siblings create a CSS stacking context.
+            When the suggestions dropdown is open, the wrapper itself needs a high
+            z-index so the absolute <ul> can float above sibling form fields below
+            (same pattern as the shared Select component). */}
+        <div
+          ref={destWrapperRef}
+          className={cn(
+            'relative group animate-field-fade-in',
+            destOpen && destResults.length > 0 && 'z-[9999]'
+          )}
+          style={{ animationDelay: '120ms' }}
+        >
+          <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+            {t.createForm.destination} <span className="text-sett-destructive">*</span>
           </label>
           <input
             type="text"
@@ -543,19 +812,20 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           />
           {destOpen && destResults.length > 0 && (
             <ul className="absolute z-50 w-full mt-1 bg-white border border-sett-border rounded-input shadow-lg max-h-60 overflow-y-auto">
-              {destResults.map((dest) => (
+              {destResults.map((dest, i) => (
                 <li
                   key={dest.id}
                   onClick={() => handleDestinationSelect(dest)}
-                  className="px-3 py-2 text-body cursor-pointer hover:bg-sett-fill"
+                  className="px-3 py-2 text-body cursor-pointer hover:bg-sett-fill transition-colors duration-150 animate-fade-in-right"
+                  style={{ animationDelay: `${i * 30}ms` }}
                 >
-                  {dest.name} ({dest.countryCode})
+                  {dest.name} ({getCountryName(dest.countryCode)})
                 </li>
               ))}
             </ul>
           )}
           {destLoading && (
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-2 mt-1.5 animate-sidebar-fade-up">
               <Spinner size="sm" />
               <span className="text-caption text-sett-text-muted">{t.createForm.searching}</span>
             </div>
@@ -563,10 +833,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           <FieldError message={errors.destination} />
         </div>
 
+        {/* Check-in / Check-out */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
-              {t.createForm.checkInDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
+          <div className="animate-field-fade-in" style={{ animationDelay: '180ms' }}>
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+              {t.createForm.checkInDate} <span className="text-sett-destructive">*</span>
             </label>
             <div className="sett-datepicker">
               <DatePicker
@@ -574,10 +845,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 onChange={(date: Date | null) => updateField('checkInDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="MM/DD/YYYY"
+                dateFormat="dd.MM.yyyy"
+                placeholderText="DD.MM.YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
+                portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
                 todayButton="Today"
                 showPopperArrow={false}
@@ -586,9 +858,9 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </div>
             <FieldError message={errors.checkInDate} />
           </div>
-          <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
-              {t.createForm.checkOutDate} <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
+          <div className="animate-field-fade-in" style={{ animationDelay: '220ms' }}>
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+              {t.createForm.checkOutDate} <span className="text-sett-destructive">*</span>
             </label>
             <div className="sett-datepicker">
               <DatePicker
@@ -596,10 +868,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 onChange={(date: Date | null) => updateField('checkOutDate', date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')}
                 minDate={formData.checkInDate ? new Date(formData.checkInDate) : new Date()}
                 maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="MM/DD/YYYY"
+                dateFormat="dd.MM.yyyy"
+                placeholderText="DD.MM.YYYY"
                 popperClassName="sett-datepicker-popper"
                 popperPlacement="bottom-end"
+                portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
                 todayButton="Today"
                 showPopperArrow={false}
@@ -610,6 +883,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
         </div>
 
+        {/* Hotel Category / Budget */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label={`${t.createForm.hotelCategory} *`}
@@ -618,6 +892,8 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             onChange={(e) => updateField('hotelCategory', e.target.value)}
             placeholder={t.createForm.selectHotelCategory}
             error={errors.hotelCategory}
+            className="animate-field-fade-in"
+            style={{ animationDelay: '280ms' }}
           />
           <Select
             label={`${t.createForm.budgetRange} ${t.createForm.optional}`}
@@ -625,32 +901,76 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             value={formData.budgetRange}
             onChange={(e) => updateField('budgetRange', e.target.value)}
             placeholder={t.createForm.selectBudgetRange}
+            className="animate-field-fade-in"
+            style={{ animationDelay: '320ms' }}
           />
         </div>
 
+        {/* Group Type / Group Size */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label={`${t.createForm.groupType} *`}
             options={groupTypeOptions}
             value={formData.groupType}
-            onChange={(e) => updateField('groupType', e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              updateField('groupType', val);
+              // Clear age unless the new group type requires it.
+              if (!AGE_REQUIRED_GROUP_TYPES.has(val as never)) {
+                updateField('averageAge', '');
+              }
+            }}
             placeholder={t.createForm.selectGroupType}
             error={errors.groupType}
+            className="animate-field-fade-in"
+            style={{ animationDelay: '380ms' }}
           />
-          <Input
-            label={`${t.createForm.groupSize} *`}
-            type="number"
-            min="1"
-            placeholder={t.createForm.groupSizePlaceholder}
-            value={formData.groupSize}
-            onChange={(e) => {
-              const val = e.target.value.replace(/[^0-9]/g, '');
-              if (val === '' || Number(val) >= 0) updateField('groupSize', val);
-            }}
-            onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
-            error={errors.groupSize}
-          />
+          <div className="animate-field-fade-in" style={{ animationDelay: '420ms' }}>
+            <Input
+              label={`${t.createForm.groupSize} *`}
+              type="number"
+              min="1"
+              placeholder={t.createForm.groupSizePlaceholder}
+              value={formData.groupSize}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                if (val === '' || Number(val) >= 0) updateField('groupSize', val);
+              }}
+              onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
+              error={errors.groupSize}
+            />
+          </div>
         </div>
+
+        {/* Average Age — conditional, slides in only for youth/school groups */}
+        {groupTypeRequiresAge(formData.groupType) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="animate-field-fade-in">
+              <Input
+                label={`${t.createForm.averageAge} *`}
+                type="number"
+                min={AVERAGE_AGE_MIN}
+                max={AVERAGE_AGE_MAX}
+                placeholder={t.createForm.averageAgePlaceholder}
+                value={formData.averageAge === '' ? '' : String(formData.averageAge)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    updateField('averageAge', '');
+                  } else {
+                    const num = Number(val);
+                    if (num >= 0) {
+                      updateField('averageAge', num);
+                    }
+                  }
+                }}
+                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                error={errors.averageAge}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -678,9 +998,16 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
           value={formData.doubleRooms}
           onChange={(v) => {
             updateField('doubleRooms', v);
-            // Reset bed configuration when double rooms change
-            updateField('standardDoubleBeds', 0);
-            updateField('twinBeds', 0);
+            // If reducing double rooms, clamp sub-fields so they don't exceed the new total
+            const currentSdb = formData.standardDoubleBeds;
+            const currentTwin = formData.twinBeds;
+            if (currentSdb + currentTwin > v) {
+              // Preserve ratio as much as possible; reduce twin first, then standard
+              const newTwin = Math.min(currentTwin, v);
+              const newSdb = Math.min(currentSdb, v - newTwin);
+              updateField('twinBeds', newTwin);
+              updateField('standardDoubleBeds', newSdb);
+            }
           }}
         />
         <RoomCounter
@@ -698,31 +1025,32 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
 
       {/* Bed Configuration for Double Room */}
       {formData.doubleRooms > 0 && (
-        <div className="mt-4 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] p-5">
+        <div className="mt-4 rounded-[14px] border border-sett-border-light bg-sett-fill p-5">
           <h3 className="font-montserrat text-[16px] font-semibold leading-normal text-sett-text-primary mb-4">
             Select Bed Configuration for Double Room
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RoomCounter
-              label="Standard Double Bed"
+              label={t.offer.standardDoubleBed}
               value={formData.standardDoubleBeds}
               onChange={(v) => updateField('standardDoubleBeds', v)}
-              max={formData.doubleRooms - Math.floor(formData.twinBeds / 2)}
+              max={formData.doubleRooms - formData.twinBeds}
             />
             <RoomCounter
-              label="Twin Bed"
+              label={t.offer.twinBed}
               value={formData.twinBeds}
               onChange={(v) => updateField('twinBeds', v)}
-              max={(formData.doubleRooms - formData.standardDoubleBeds) * 2}
+              max={formData.doubleRooms - formData.standardDoubleBeds}
             />
           </div>
+          <FieldError message={errors.bedConfig} />
         </div>
       )}
       <div className="mb-4" />
 
       <div className="space-y-4">
         <div>
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+          <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.extraRooms} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
@@ -735,7 +1063,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.breakfastPreference} <span className="text-sett-destructive">*</span>
             </label>
             <div className="flex gap-2">
@@ -752,7 +1080,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
             </div>
           </div>
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.hotelLocation} <span className="text-sett-destructive">*</span>
             </label>
             <div className="flex gap-2">
@@ -771,7 +1099,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
         </div>
 
         <div>
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+          <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.specialRequests} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
@@ -795,7 +1123,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
   const getEmailError = () => {
     if (!emailTouched) return errors.email;
     if (!formData.email.trim()) return t.createForm.emailRequired;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return t.createForm.invalidEmail;
+    if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email)) return t.createForm.invalidEmail;
     return errors.email;
   };
   const emailError = getEmailError();
@@ -808,7 +1136,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.companyName} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -821,7 +1149,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             <FieldError message={errors.companyName} />
           </div>
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.nameList}
             </label>
             {formData.nameListFile ? (
@@ -847,7 +1175,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
                 <input
                   type="file"
                   className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp"
                   onChange={(e) => updateField('nameListFile', e.target.files?.[0] || null)}
                 />
               </label>
@@ -857,7 +1185,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.firstName} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -870,7 +1198,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             <FieldError message={errors.firstName} />
           </div>
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.lastName} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -886,7 +1214,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.emailAddress} <span className="text-sett-destructive">*</span>
             </label>
             <input
@@ -899,15 +1227,17 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             />
             <FieldError message={emailError} />
           </div>
-          <PhoneInput
-            value={formData.phone}
-            onChange={(phone) => updateField('phone', phone)}
+          <PhoneInputSplit
+            countryCode={formData.phoneCountryCode}
+            number={formData.phone}
+            onCountryCodeChange={(code) => updateField('phoneCountryCode', code)}
+            onNumberChange={(num) => updateField('phone', num)}
             error={errors.phone}
           />
         </div>
 
         <div>
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+          <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.specialRequests} <span className="text-sett-text-accent">{t.createForm.optional}</span>
           </label>
           <textarea
@@ -940,7 +1270,7 @@ function PoliciesStep({
       />
       <div className="space-y-6">
         <div>
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+          <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.termsAndConditions}
           </label>
           <RichTextEditor
@@ -951,7 +1281,7 @@ function PoliciesStep({
         </div>
 
         <div>
-          <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+          <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.cancellationConditions}
           </label>
           <RichTextEditor

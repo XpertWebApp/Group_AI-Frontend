@@ -1,5 +1,5 @@
 import { apiClient, getApiError } from './client';
-import type { ApiResponse, Proposal, ProposalHotel, ProposalService } from '@/types';
+import type { ApiResponse, Proposal, ProposalHotel, ProposalService, OfferHistoryEntry } from '@/types';
 import type {
   UpdateProposalPayload,
   AddProposalHotelPayload,
@@ -47,6 +47,19 @@ export const proposalsApi = {
       `/proposals/${proposalId}/hotels`
     );
     if (!data.success || !Array.isArray(data.data)) return [];
+    return data.data;
+  },
+
+  async toggleHotelIncluded(
+    proposalId: string,
+    hotelId: string,
+    includedInTotal: boolean
+  ): Promise<{ hotel: ProposalHotel; proposal: Proposal }> {
+    const { data } = await apiClient.patch<ApiResponse<{ hotel: ProposalHotel; proposal: Proposal }>>(
+      `/proposals/${proposalId}/hotels/${hotelId}`,
+      { includedInTotal }
+    );
+    if (!data.success || !data.data) throw new Error(data.message || 'Failed to update hotel inclusion');
     return data.data;
   },
 
@@ -113,13 +126,21 @@ export const proposalsApi = {
     return data.data;
   },
 
-  async send(proposalId: string, payload?: SendProposalPayload): Promise<Proposal> {
-    const { data } = await apiClient.post<ApiResponse<Proposal>>(
+  async send(proposalId: string, payload?: SendProposalPayload): Promise<{ proposal: Proposal; emailSent: boolean; sendPlaceholder: boolean; emailError: string | null; sentToEmails?: string[]; offer?: Pick<OfferHistoryEntry, 'id' | 'offerNumber' | 'type' | 'pdfUrl' | 'sentAt'> }> {
+    const { data } = await apiClient.post<ApiResponse<{ proposal: Proposal; emailSent: boolean; sendPlaceholder: boolean; sent: boolean; emailError: string | null; sentToEmails?: string[]; offer?: Pick<OfferHistoryEntry, 'id' | 'offerNumber' | 'type' | 'pdfUrl' | 'sentAt'> }>>(
       `/proposals/${proposalId}/actions/send`,
       payload ?? {}
     );
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to send');
     return data.data;
+  },
+
+  async listOffers(proposalId: string): Promise<OfferHistoryEntry[]> {
+    const { data } = await apiClient.get<ApiResponse<{ offers: OfferHistoryEntry[]; count: number }>>(
+      `/proposals/${proposalId}/offers`
+    );
+    if (!data.success || !data.data) return [];
+    return data.data.offers ?? [];
   },
 
   async previewPdf(proposalId: string, language?: string): Promise<string> {

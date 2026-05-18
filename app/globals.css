@@ -2,6 +2,254 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes shimmer {
+  100% { transform: translateX(200%); }
+}
+
+@keyframes toast-in {
+  0%   { opacity: 0; transform: translateX(24px) scale(0.96); }
+  60%  { opacity: 1; transform: translateX(-2px) scale(1.005); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes toast-out {
+  0%   { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(24px) scale(0.96); }
+}
+.animate-toast-in  { animation: toast-in 280ms cubic-bezier(0.21, 1.02, 0.73, 1) both; }
+.animate-toast-out { animation: toast-out 200ms ease-in both; }
+
+/* Bell shake — fires periodically when unread notifications exist.
+   Pivot at the top so it swings like a real bell. */
+@keyframes bell-shake {
+  0%, 70%, 100% { transform: rotate(0); }
+  72% { transform: rotate(14deg); }
+  74% { transform: rotate(-12deg); }
+  76% { transform: rotate(10deg); }
+  78% { transform: rotate(-8deg); }
+  80% { transform: rotate(6deg); }
+  82% { transform: rotate(-4deg); }
+  84% { transform: rotate(2deg); }
+  86% { transform: rotate(0); }
+}
+.animate-bell-shake {
+  transform-origin: 50% 12%;
+  animation: bell-shake 3.2s ease-in-out infinite;
+}
+
+/* ── Page-load entrance animations (sidebar + nav items) ── */
+@keyframes sidebar-slide-in {
+  0%   { transform: translateX(-110%); opacity: 0.4; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes sidebar-item-in {
+  0%   { opacity: 0; transform: translateX(-12px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes sidebar-fade-up {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-sidebar-slide-in {
+  animation: sidebar-slide-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-sidebar-item-in {
+  animation: sidebar-item-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-sidebar-fade-up {
+  animation: sidebar-fade-up 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Reusable content entrance animations (cards, panels, list items) ──
+   Use these on any data-driven section that loads in. */
+@keyframes card-rise-in {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes badge-pop-in {
+  0%   { opacity: 0; transform: scale(0.4); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes value-count-in {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-card-rise-in  { animation: card-rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-badge-pop-in  { animation: badge-pop-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-value-count-in { animation: value-count-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Exit animations (collapsing panels, dismissing cards) ──
+   Use these to gracefully remove content. Pair with a delayed unmount so the
+   animation has time to play. */
+@keyframes card-shrink-out {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-12px) scale(0.98); }
+}
+.animate-card-shrink-out {
+  animation: card-shrink-out 260ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* ── GreenWaves (auth pages) — draw-in + perpetual shimmer ── */
+@keyframes sett-wave-draw {
+  0%   { stroke-dashoffset: 900; }
+  100% { stroke-dashoffset: 0; }
+}
+.sett-wave-draw {
+  animation: sett-wave-draw 1600ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* Shimmer — a short bright dash travels along the path. Starts hidden
+   (offset positions the dash off-screen left), then drifts across. */
+@keyframes sett-wave-shimmer {
+  0%   { stroke-dashoffset: 40; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { stroke-dashoffset: -900; opacity: 0; }
+}
+.sett-wave-shimmer {
+  /* 40px bright dash with a gap larger than the full path length so only one
+     bright segment is visible at a time. */
+  stroke-dasharray: 40 900;
+  stroke-dashoffset: 40;
+  /* fill-mode "both" keeps the dashoffset from snapping back between cycles. */
+}
+.sett-wave-shimmer--slow   { animation: sett-wave-shimmer 16s ease-in-out infinite both; }
+.sett-wave-shimmer--medium { animation: sett-wave-shimmer 12s ease-in-out infinite both; }
+.sett-wave-shimmer--fast   { animation: sett-wave-shimmer 8s  ease-in-out infinite both; }
+
+/* ── Modal (dialog) entrance ──
+   Backdrop fades in, panel rises + scales up. Used by full-screen modals
+   like the Hotel Details dialog. */
+@keyframes modal-overlay-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes modal-pop-in {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.94); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modal-image-fade {
+  0%   { opacity: 0; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-modal-overlay-in { animation: modal-overlay-in 220ms ease-out both; }
+.animate-modal-pop-in     { animation: modal-pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-modal-image-fade { animation: modal-image-fade 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Form-field fade-in ──
+   Opacity-only entrance for form fields. No transform = no CSS stacking context,
+   which means absolute/portal'd dropdowns above/below the field can render
+   correctly on top of all siblings. Use this on any wrapper that contains a
+   Select/DatePicker/dropdown menu instead of card-rise-in. */
+@keyframes field-fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+.animate-field-fade-in {
+  animation: field-fade-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Badge pulse ──
+   Gentle opacity pulse for "in-motion" status badges (e.g. Processing).
+   Slow + subtle so multiple badges in a list don't strobe. */
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.7; }
+}
+.animate-badge-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+/* ── Indeterminate progress bar ──
+   Used during the inter-batch lull on hotel search: a thin band slides
+   left→right across an otherwise-empty track to signal "still working,
+   no precise progress yet". */
+@keyframes indeterminate-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.animate-indeterminate-slide {
+  animation: indeterminate-slide 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* ── Step transitions (multi-step forms / wizards) ── */
+@keyframes step-slide-in-right {
+  0%   { opacity: 0; transform: translateX(28px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes step-slide-in-left {
+  0%   { opacity: 0; transform: translateX(-28px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-step-in-right {
+  animation: step-slide-in-right 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-step-in-left {
+  animation: step-slide-in-left 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Auth → Dashboard transition curtain ──
+   A full-screen navy panel that bridges the login page to the dashboard.
+   Three keyframes choreographed in sequence by the AuthTransition component:
+     1. curtain-slide-in   — navy panel slides in from the left, covering the form (400ms)
+     2. welcome-rise       — logo + welcome text rise + scale in (320ms)
+     3. curtain-fade-out   — entire panel fades out to reveal the dashboard (300ms)
+*/
+@keyframes curtain-slide-in {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(0); }
+}
+@keyframes welcome-rise {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes curtain-fade-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-curtain-slide-in { animation: curtain-slide-in 400ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+.animate-welcome-rise     { animation: welcome-rise 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.animate-curtain-fade-out { animation: curtain-fade-out 300ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in,
+  .animate-toast-out,
+  .animate-bell-shake,
+  .animate-fade-in-right,
+  .animate-tooltip-in,
+  .animate-sidebar-slide-in,
+  .animate-sidebar-item-in,
+  .animate-sidebar-fade-up,
+  .animate-card-rise-in,
+  .animate-badge-pop-in,
+  .animate-value-count-in,
+  .animate-step-in-right,
+  .animate-step-in-left,
+  .animate-card-shrink-out,
+  .animate-modal-overlay-in,
+  .animate-modal-pop-in,
+  .animate-modal-image-fade,
+  .animate-indeterminate-slide,
+  .animate-badge-pulse,
+  .animate-field-fade-in,
+  .animate-curtain-slide-in,
+  .animate-welcome-rise,
+  .animate-curtain-fade-out,
+  .sett-wave-draw,
+  .sett-wave-shimmer { animation: none !important; }
+  /* When reduced-motion is on, hide the shimmer overlay entirely (otherwise its
+     "frozen mid-stroke" state would be visible). The base wave paths still show
+     because their stroke-dashoffset would freeze at the initial value (hidden);
+     reset them so the lines remain visible. */
+  .sett-wave-draw    { stroke-dashoffset: 0 !important; }
+  .sett-wave-shimmer { opacity: 0 !important; }
+
+  /* Disable sidebar width / margin transitions for users who prefer reduced motion */
+  .sett-motion-collapse,
+  .sett-motion-collapse * { transition: none !important; }
+}
+
 /*
  * ═══════════════════════════════════════════════════════════
  *  SETT Hub Brand Theme — CSS Variables & Base Styles
@@ -178,7 +426,7 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   z-index: 9999 !important;
 }
 
-.sett-datepicker .react-datepicker {
+.sett-datepicker-popper .react-datepicker {
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
   border: 1px solid var(--sett-border-light);
   border-radius: 14px;
@@ -186,36 +434,83 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   overflow: hidden;
 }
 
-.sett-datepicker .react-datepicker__header {
+/* Mobile responsiveness — prevent calendar overflow on smaller screens */
+@media (max-width: 768px) {
+  .sett-datepicker-popper {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: 75vh !important;
+    max-width: calc(100vw - 32px) !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin: 0 !important;
+  }
+
+  .sett-datepicker-popper .react-datepicker {
+    max-height: 70vh;
+    width: auto !important;
+    font-size: 12px;
+  }
+
+  .sett-datepicker-popper .react-datepicker__header {
+    padding: 8px 0 4px;
+  }
+
+  .sett-datepicker-popper .react-datepicker__current-month {
+    font-size: 12px;
+  }
+
+  .sett-datepicker-popper .react-datepicker__day-name {
+    font-size: 11px;
+    width: 1.5rem;
+    line-height: 1.5rem;
+  }
+
+  .sett-datepicker-popper .react-datepicker__day {
+    width: 1.5rem;
+    line-height: 1.5rem;
+    font-size: 11px;
+  }
+
+  .sett-datepicker-popper .react-datepicker__today-button {
+    font-size: 11px;
+    padding: 6px;
+  }
+}
+
+.sett-datepicker-popper .react-datepicker__header {
   background-color: var(--sett-navy);
   border-bottom: none;
   padding: 12px 0 8px;
 }
 
-.sett-datepicker .react-datepicker__current-month {
+.sett-datepicker-popper .react-datepicker__current-month {
   color: #fff;
   font-weight: 600;
   font-size: 14px;
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
 }
 
-.sett-datepicker .react-datepicker__day-name {
-  color: rgba(255,255,255,0.7);
+.sett-datepicker-popper .react-datepicker__day-name {
+  color: rgba(102, 127, 55, 0.7);
   font-size: 12px;
   font-weight: 500;
   width: 2rem;
   line-height: 2rem;
 }
 
-.sett-datepicker .react-datepicker__navigation-icon::before {
+.sett-datepicker-popper .react-datepicker__navigation-icon::before {
   border-color: rgba(255,255,255,0.8);
 }
 
-.sett-datepicker .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+.sett-datepicker-popper .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
   border-color: #fff;
 }
 
-.sett-datepicker .react-datepicker__day {
+.sett-datepicker-popper .react-datepicker__day {
   width: 2rem;
   line-height: 2rem;
   border-radius: 6px;
@@ -224,38 +519,38 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.sett-datepicker .react-datepicker__day:hover {
+.sett-datepicker-popper .react-datepicker__day:hover {
   background-color: #f0f6d0;
   color: var(--sett-navy);
 }
 
-.sett-datepicker .react-datepicker__day--selected {
+.sett-datepicker-popper .react-datepicker__day--selected {
   background-color: var(--sett-primary) !important;
   color: var(--sett-navy) !important;
   font-weight: 700;
 }
 
-.sett-datepicker .react-datepicker__day--today {
+.sett-datepicker-popper .react-datepicker__day--today {
   font-weight: 700;
   border: 1px solid var(--sett-primary);
   background-color: transparent;
 }
 
-.sett-datepicker .react-datepicker__day--keyboard-selected {
+.sett-datepicker-popper .react-datepicker__day--keyboard-selected {
   background-color: #e8f2b0;
   color: var(--sett-navy);
 }
 
-.sett-datepicker .react-datepicker__day--disabled {
+.sett-datepicker-popper .react-datepicker__day--disabled {
   color: #ccc;
   cursor: not-allowed;
 }
 
-.sett-datepicker .react-datepicker__day--disabled:hover {
+.sett-datepicker-popper .react-datepicker__day--disabled:hover {
   background-color: transparent;
 }
 
-.sett-datepicker .react-datepicker__today-button {
+.sett-datepicker-popper .react-datepicker__today-button {
   background-color: var(--sett-primary);
   color: var(--sett-navy);
   font-weight: 700;
@@ -265,6 +560,20 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   padding: 8px;
 }
 
-.sett-datepicker .react-datepicker__triangle {
+.sett-datepicker-popper .react-datepicker__triangle {
   display: none;
+}
+
+/* Contract preview HTML content (terms & cancellation conditions) */
+.contract-html-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+.contract-html-content ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+.contract-html-content li {
+  margin-bottom: 0.4rem;
+  line-height: 1.6;
 }

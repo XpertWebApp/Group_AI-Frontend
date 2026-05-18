@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { X, Download } from 'lucide-react';
 import { proposalsApi } from '@/lib/api/proposals';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU } from '@/lib/dateFormatter';
+import { formatPriceEU, formatCurrencyEU, formatPercentageEU } from '@/lib/numberFormatter';
 import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 
@@ -15,16 +17,45 @@ interface ContractPreviewModalProps {
 }
 
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDateEU(dateStr);
+}
+
+const ROOM_TYPE_LABELS: Record<string, string> = {
+  twinbeds: 'Twin Rooms',
+  standarddoublebeds: 'Standard Double Rooms',
+  single: 'Single',
+  double: 'Double',
+  twin: 'Twin',
+  triple: 'Triple',
+  quadruple: 'Quadruple',
+  suite: 'Suite',
+  suites: 'Suites',
+};
+
+function formatRoomType(raw: string): string {
+  const known = ROOM_TYPE_LABELS[raw.toLowerCase().replace(/[_\s]/g, '')];
+  if (known) return known;
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getRoomLabel(type: string, detail: any): string {
+  // If actual descriptions are available from the hotel, use those
+  if (detail.actualDescriptions && detail.actualDescriptions.length > 0) {
+    return detail.actualDescriptions[0];
+  }
+  // Otherwise, use the requested room type
+  return formatRoomType(type);
 }
 
 export function ContractPreviewModal({ open, onClose, request, proposal }: ContractPreviewModalProps) {
   const { t, locale } = useLanguage();
   const [downloading, setDownloading] = useState(false);
-  const hotels = proposal.hotels ?? [];
-  const services = proposal.services ?? [];
+  // Only show hotels/services that are included in the total
+  const hotels = (proposal.hotels ?? []).filter((h) => h.includedInTotal !== false);
+  const services = (proposal.services ?? []).filter((sv) => sv.includedInTotal !== false);
   const rooms = request.rooms as RoomsConfig | null | undefined;
   const contactName = [request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—';
 
@@ -61,7 +92,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
       aria-modal="true"
     >
       <div
-        className="bg-[#F7F7F7] flex flex-col max-h-[90vh] overflow-hidden"
+        className="bg-white flex flex-col max-h-[90vh] overflow-hidden"
         style={{ width: 790, borderRadius: 14, boxShadow: '0px 4px 20px 0px #00000014' }}
       >
         {/* ── Top Section ── */}
@@ -119,14 +150,21 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
             style={{ borderRadius: 14, border: '1px solid #68686866' }}
           >
             {/* ── Logo + TAX ID ── */}
-            <div className="flex items-start justify-between px-5 pt-5 pb-5" style={{ borderBottom: '1px solid #68686866' }}>
-              <div>
-                <h2 className="font-bold text-[24px] tracking-wide" style={{ color: '#071C42' }}>SETT</h2>
-                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: '#AAC737' }}>Sport &amp; Events Tours &amp; Travel</p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-[12px] uppercase text-[#686868]">{t.contract.taxId}</p>
-                <p className="font-bold text-[16px] text-[#1D1D1D]">DE123456789</p>
+            <div className="flex items-center justify-between px-5 pt-5 pb-5" style={{ borderBottom: '1px solid #68686866' }}>
+              <img src="/icons/sett_logo.svg" alt="SETT" style={{ height: 40 }} />
+              <div className="flex flex-col items-end" style={{ gap: 8 }}>
+                <span
+                  className="font-montserrat uppercase text-center"
+                  style={{ fontWeight: 400, fontSize: 12, lineHeight: '100%', letterSpacing: 0, color: '#4A4A4A' }}
+                >
+                  {t.contract.taxId}
+                </span>
+                <span
+                  className="font-montserrat"
+                  style={{ fontWeight: 500, fontSize: 14, lineHeight: '100%', letterSpacing: 0, color: '#071C42' }}
+                >
+                  1001233897
+                </span>
               </div>
             </div>
 
@@ -276,10 +314,10 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                               {hotel.hotelName ?? hotel.hotelCode}
                             </span>
                           </div>
-                          {hotel.tid && (
+                          {(hotel.hotelRef || hotel.tid) && (
                             <span className="text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
                               <span className="font-semibold">Reference number:</span>{' '}
-                              <span className="font-medium">{hotel.tid}</span>
+                              <span className="font-medium">{hotel.hotelRef ?? hotel.tid ?? `#${hotel.id.slice(0, 8)}`}</span>
                             </span>
                           )}
                         </div>
@@ -290,7 +328,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                             {/* Table header */}
                             <div className="flex items-center px-[13px] py-[14px]" style={{ borderBottom: '1px solid #E6EAF0' }}>
                               <span className="flex-1 font-semibold text-[12px] uppercase" style={{ color: '#4A4A4A' }}>
-                                {t.contract.destination ?? 'Destination'}
+                                {t.contract.roomType ?? 'Room Type'}
                               </span>
                               <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 80, color: '#4A4A4A' }}>
                                 Rate
@@ -311,11 +349,11 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                               const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
                               return (
                                 <div key={type} className="flex items-center px-[13px] py-3" style={{ borderBottom: '1px solid #E6EAF0' }}>
-                                  <span className="flex-1 font-normal text-[13px] text-[#1D1D1D] capitalize">
-                                    {type.replace(/_/g, ' ')}
+                                  <span className="flex-1 font-normal text-[13px] text-[#1D1D1D]">
+                                    {getRoomLabel(type, detail)}
                                   </span>
                                   <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 80 }}>
-                                    €{Number(detail.sell ?? 0).toFixed(2)}
+                                    €{formatPriceEU(detail.sell ?? 0)}
                                   </span>
                                   <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 55 }}>
                                     {detail.qty ?? 1}
@@ -324,7 +362,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                                     {detail.nights ?? 1}
                                   </span>
                                   <span className="font-bold text-[13px] text-[#1D1D1D] text-right" style={{ width: 100 }}>
-                                    €{rowTotal.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                                    €{formatPriceEU(rowTotal)}
                                   </span>
                                 </div>
                               );
@@ -334,7 +372,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                             <div className="flex items-center justify-end px-[13px] py-3">
                               <span className="font-medium text-[13px] text-[#686868] mr-3">Subtotal</span>
                               <span className="font-bold text-[14px] text-[#1D1D1D]" style={{ width: 100, textAlign: 'right' }}>
-                                €{subtotal.toLocaleString('de-DE', { minimumFractionDigits: 2 })}
+                                €{formatPriceEU(subtotal)}
                               </span>
                             </div>
                           </div>
@@ -342,7 +380,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
 
                         {roomEntries.length === 0 && (
                           <p className="text-[13px] text-[#686868]">
-                            Total: {hotel.currency} {Number(hotel.totalPrice).toFixed(2)}
+                            Total: {formatCurrencyEU(hotel.totalPrice, hotel.currency)}
                           </p>
                         )}
                       </div>
@@ -375,10 +413,10 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                         <tr key={s.id} style={{ borderBottom: '1px solid #68686866' }}>
                           <td className="px-3 py-2.5">{s.serviceName ?? '—'}</td>
                           <td className="px-3 py-2.5 text-right">{s.quantity ?? 1}</td>
-                          <td className="px-3 py-2.5 text-right">{Number(s.buyPrice ?? 0).toFixed(2)}</td>
-                          <td className="px-3 py-2.5 text-right">{Number(s.sellPrice ?? 0).toFixed(2)}</td>
+                          <td className="px-3 py-2.5 text-right">{formatPriceEU(s.buyPrice ?? 0)}</td>
+                          <td className="px-3 py-2.5 text-right">{formatPriceEU(s.sellPrice ?? 0)}</td>
                           <td className="px-3 py-2.5 text-right font-semibold">
-                            {(Number(s.sellPrice ?? 0) * (s.quantity ?? 1)).toFixed(2)}
+                            {formatPriceEU((Number(s.sellPrice ?? 0) * (s.quantity ?? 1)))}
                           </td>
                         </tr>
                       ))}
@@ -392,7 +430,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
             {/* ── GRAND TOTAL ── */}
             <div className="mx-5 my-5 flex justify-between items-center p-4 rounded-[14px]" style={{ background: '#071C42' }}>
               <span className="font-bold text-[16px] text-white">{t.contract.grandTotal}</span>
-              <span className="font-bold text-[20px] text-white">€{grandTotal.toLocaleString('en', { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-[20px] text-white">€{formatPriceEU(grandTotal)}</span>
             </div>
 
             {/* ── CANCELLATION CONDITIONS ── */}
@@ -401,7 +439,10 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                 <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
                 <div className="px-5 py-5">
                   <h3 className="font-semibold text-[16px] leading-none uppercase mb-4" style={{ color: '#071C42' }}>{t.contract.cancellationConditions}</h3>
-                  <p className="font-normal text-[13px] text-[#686868] whitespace-pre-line leading-relaxed">{request.cancellationConditions}</p>
+                  <div
+                    className="font-normal text-[13px] text-[#686868] leading-relaxed contract-html-content"
+                    dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
+                  />
                 </div>
               </>
             )}
@@ -414,16 +455,12 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                   {t.contract.termsConditions}
                 </h3>
 
-                {/* T&C bullet list */}
+                {/* T&C content */}
                 {request.termsAndConditions && (
-                  <ul className="flex flex-col gap-3 mb-5">
-                    {request.termsAndConditions.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => (
-                      <li key={i} className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
-                        <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
-                        <span>{line.replace(/^[\s·•\-–]+/, '').trim()}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div
+                    className="font-normal text-[13px] text-[#1D1D1D] leading-relaxed mb-5 contract-html-content"
+                    dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
+                  />
                 )}
 
                 {/* Payment notice */}
@@ -434,7 +471,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
                   <p className="font-normal text-[14px] text-[#1D1D1D]">
                     Please pay{' '}
                     <span className="font-bold">
-                      {grandTotal.toLocaleString('de-DE', { minimumFractionDigits: 2 })} EUR
+                      {formatPriceEU(grandTotal)} EUR
                     </span>{' '}
                     until{' '}
                     <span className="font-bold">

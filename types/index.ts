@@ -5,6 +5,7 @@ export enum BookingRequestStatus {
   AI_GENERATED = 'ai_generated',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
+  NEEDS_MANUAL_HANDLING = 'needs_manual_handling',
 }
 
 export enum ProposalStatus {
@@ -30,6 +31,16 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: User;
   tokens: AuthTokens;
+}
+
+export interface Attachment {
+  id: string;
+  fileKey: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url?: string;
+  createdAt: string;
 }
 
 export interface RoomsConfig {
@@ -60,6 +71,7 @@ export interface BookingRequest {
   budget?: number | null;
   groupType?: string | null;
   groupSize?: number | null;
+  averageAge?: number | null;
   currencyCode?: string | null;
   nationalityCode?: string | null;
 
@@ -76,8 +88,10 @@ export interface BookingRequest {
   contactName?: string | null;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  contactPhoneCountryCode?: string | null;
   guestListFileKey?: string | null;
   customerNotes?: string | null;
+  attachments?: Attachment[];
 
   // Step 4: Policies
   termsAndConditions?: string | null;
@@ -87,6 +101,12 @@ export interface BookingRequest {
   status: BookingRequestStatus;
   createdAt: string;
   updatedAt?: string | null;
+  assignedUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 
   // Joined from proposals (included in list response)
   proposals?: {
@@ -110,6 +130,12 @@ export interface BookingRequestListItem {
   margin?: number | null;
   status: BookingRequestStatus | ProposalStatus;
   createdAt: string;
+  assignedUser?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 export interface Proposal {
@@ -123,6 +149,8 @@ export interface Proposal {
   lockedBy?: string | null;
   lockedAt?: string | null;
   lockedByUser?: { firstName?: string; lastName?: string } | null;
+  pdfUrl?: string | null;
+  sentAt?: string | null;
   createdAt: string;
   updatedAt?: string | null;
   hotels?: ProposalHotel[];
@@ -135,6 +163,7 @@ export interface ProposalHotel {
   hotelCode: string;
   hotelName?: string;
   tid?: string | null;
+  hotelRef?: string | null;
   totalPrice: number;
   currency: string;
   freeCancellation?: boolean;
@@ -143,7 +172,12 @@ export interface ProposalHotel {
   rooms?: Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
   latitude?: number | null;
   longitude?: number | null;
+  starRating?: number | null;
+  address?: string | null;
+  addressCity?: string | null;
+  addressCountry?: string | null;
   createdAt: string;
+  includedInTotal?: boolean;
 }
 
 export interface ProposalService {
@@ -154,7 +188,27 @@ export interface ProposalService {
   sellPrice?: number | null;
   quantity?: number | null;
   notes?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
   createdAt: string;
+  includedInTotal?: boolean;
+}
+
+// ──── Offer History Types ────
+
+export interface OfferHistoryEntry {
+  id: string;
+  offerNumber: number;
+  type: 'initial' | 'final' | 'revision';
+  sentAt: string;
+  sentBy: string;
+  sentToEmails: string[];
+  totalPrice: number | null;
+  currency: string;
+  method: string;
+  pdfUrl: string | null;
+  hotelCount: number;
+  serviceCount: number;
 }
 
 // ──── Facility Types ────
@@ -187,6 +241,7 @@ export interface PerTypeAllocation {
   mealType?: string;
   mealName?: string;
   pricePerRoomPerNight?: number;
+  actualDescriptions?: string[];
 }
 
 export interface SupplierSplitItem {
@@ -202,6 +257,11 @@ export interface HotelSearchResult {
   hotelName: string;
   starRating: number;
   imageUrl?: string | null;
+  // Ordered fallback list of image URLs (best to worst). GIATA categorised first,
+  // then WBE image keys in displayOrder. The FE tries each on <img> error until
+  // one loads; the placeholder is only shown if every URL fails.
+  imageUrls?: string[];
+  sethubDetailsUrl?: string | null;
   address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;
@@ -216,6 +276,18 @@ export interface HotelSearchResult {
   supplierSplit?: SupplierSplitItem[];
   perTypeAllocations?: PerTypeAllocation[];
   note?: string | null;
+  description?: string | null;
+  descriptionLanguage?: string | null;
+  descriptionSource?: string | null;
+  // Multi-language descriptions — backend ships both EN and DE in every search/details
+  // response so the UI can swap on language toggle without a new API call.
+  // `isFallback: true` means the text under this locale is actually English (no native
+  // translation was available) — surface that to the user via the "Translation
+  // unavailable" badge.
+  descriptions?: {
+    en?: { text: string; source: string; isFallback: boolean } | null;
+    de?: { text: string; source: string; isFallback: boolean } | null;
+  } | null;
   facilities?: Facility[];
   // Legacy / backward compat fields
   sessionId?: string;
@@ -225,6 +297,13 @@ export interface HotelSearchResult {
   usableOptions?: unknown[];
   selectedOptions?: unknown[];
   name?: string;
+  // Alternatives search
+  searchKind?: 'main' | 'alternative';
+  alternativeReason?: string | null;
+  // Youth/school group helper — when the parent request's groupType is youth/school,
+  // the backend ranks results so youthFriendly:true cards bubble up. The flag is
+  // still set for all group types but is only meaningful for youth/school requests.
+  youthFriendly?: boolean;
 }
 
 export interface HotelSearchResponse {
@@ -306,6 +385,19 @@ export interface HotelSearchInitResponse {
   message: string;
   sseEndpoint: string;
   statusEndpoint: string;
+  relaxation?: {
+    level: 'star_pm2' | 'star_any' | 'meal_dropped' | 'location_dropped' | 'facilities_dropped';
+    bannerMessage: string;
+  } | null;
+  destinationFallback?: {
+    originalDestinationId: number;
+    originalDestinationName: string;
+    usedDestinationId: number;
+    usedDestinationName: string;
+    bannerMessage: string;
+  } | null;
+  manualRequestOnly?: boolean;
+  hasAlternativesAvailable?: boolean;
 }
 
 export interface HotelSearchJobStatus {
@@ -316,6 +408,8 @@ export interface HotelSearchJobStatus {
   resultJson?: HotelSearchResult | null;
 }
 
+export type HotelSearchPhase = 'in_progress' | 'settled' | 'exhausted';
+
 export interface HotelSearchStatusResponse {
   requestId: string;
   summary: {
@@ -325,8 +419,36 @@ export interface HotelSearchStatusResponse {
     completed: number;
     skipped: number;
     failed: number;
+    // Added by backend pagination work — NULL/absent on historical rows or pre-deploy backends.
+    // Treat absent or null as 'in_progress' for safety.
+    phase?: HotelSearchPhase | null;
   };
   jobs: HotelSearchJobStatus[];
+  // Whether the user can request another batch via POST /hotel-search/more.
+  // Backend sets this to true only when (a) the search is settled, (b) a
+  // pagination cursor was persisted, and (c) more candidates exist at this level.
+  // Absent on pre-deploy backends — treat as false in that case.
+  canSearchMore?: boolean;
+}
+
+/**
+ * POST /hotel-search/more — the "Search More" trigger endpoint.
+ * Backend returns one of five decision values; FE branches accordingly.
+ */
+export type HotelSearchMoreDecision =
+  | 'queued'
+  | 'destination_exhausted'
+  | 'in_progress'
+  | 'no_cursor'
+  | 'exhausted';
+
+export interface HotelSearchMoreResponse {
+  decision: HotelSearchMoreDecision;
+  queuedCount?: number;
+  nextOffset?: number;
+  sseEndpoint?: string;
+  statusEndpoint?: string;
+  message?: string;
 }
 
 export interface PaginatedResponse<T> {

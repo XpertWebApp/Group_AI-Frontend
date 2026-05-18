@@ -31,8 +31,11 @@ export function BookingRequestFilters({
     { value: 'draft', label: t.requests.draft },
     { value: 'processing', label: t.requests.processing },
     { value: 'ai_generated', label: t.requests.aiGenerated },
+    { value: 'sent', label: t.requests.sent },
     { value: 'completed', label: t.requests.completed },
     { value: 'cancelled', label: t.requests.cancelled },
+    { value: 'declined', label: t.requests.declined },
+    { value: 'needs_manual_handling', label: t.requests.needsManualHandling },
   ];
 
   const dateOptions = [
@@ -45,7 +48,7 @@ export function BookingRequestFilters({
   return (
     <div className="flex items-center gap-[14px] flex-wrap">
       {/* Search bar */}
-      <div className="relative w-full md:w-[600px]">
+      <div className="relative w-full flex-1 min-w-[200px] max-w-full md:max-w-[600px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-secondary" />
         <input
           type="search"

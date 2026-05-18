@@ -1,8 +1,10 @@
 import { apiClient, getApiError } from './client';
 import type {
   ApiResponse,
+  Attachment,
   BookingRequest,
   HotelSearchInitResponse,
+  HotelSearchMoreResponse,
   HotelSearchStatusResponse,
   OptionDetailResult,
   CalculatePriceResult,
@@ -98,6 +100,32 @@ export const requestsApi = {
     return data.data;
   },
 
+  async uploadAttachments(requestId: string, files: File[]): Promise<Attachment[]> {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+    const res = await fetch(`${base}/requests/${requestId}/attachments`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || 'Upload failed');
+    return json.data as Attachment[];
+  },
+
+  async listAttachments(requestId: string): Promise<Attachment[]> {
+    const { data } = await apiClient.get<ApiResponse<Attachment[]>>(
+      `/requests/${requestId}/attachments`
+    );
+    return data.data ?? [];
+  },
+
+  async deleteAttachment(requestId: string, attachmentId: string): Promise<void> {
+    await apiClient.delete(`/requests/${requestId}/attachments/${attachmentId}`);
+  },
+
   async createProposal(requestId: string, payload: CreateProposalPayload): Promise<{ id: string }> {
     const { data } = await apiClient.post<ApiResponse<{ id: string }>>(
       `/requests/${requestId}/proposals`,
@@ -119,6 +147,7 @@ export const requestsApi = {
       currencyCode?: string;
       nationalityCode?: string;
       facilityIds?: number[];
+      lang?: string;
     }
   ): Promise<HotelSearchInitResponse> {
     const { data } = await apiClient.post<ApiResponse<HotelSearchInitResponse>>(
@@ -138,6 +167,49 @@ export const requestsApi = {
     );
     if (!data.success || !data.data) {
       throw new Error(data.message || 'Failed to get search status');
+    }
+    return data.data;
+  },
+
+  // Start searching for alternative hotels (when main results are few)
+  async startHotelSearchAlternatives(
+    requestId: string,
+    params?: {
+      appliedLevel?: string;
+      mealType?: string;
+      currencyCode?: string;
+      nationalityCode?: string;
+      lang?: string;
+    }
+  ): Promise<HotelSearchInitResponse> {
+    const { data } = await apiClient.post<ApiResponse<HotelSearchInitResponse>>(
+      `/requests/${requestId}/hotel-search/alternatives`,
+      params ?? {}
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to start alternatives search');
+    }
+    return data.data;
+  },
+
+  // Trigger the "Search More" feature — fetches the next ~200 hotels at the same
+  // destination + star level. Caller should branch on response.decision.
+  // Body is empty by design; overrides are accepted but rarely needed.
+  async startHotelSearchMore(
+    requestId: string,
+    params?: {
+      mealType?: string;
+      currencyCode?: string;
+      nationalityCode?: string;
+      waitSeconds?: number;
+    }
+  ): Promise<HotelSearchMoreResponse> {
+    const { data } = await apiClient.post<ApiResponse<HotelSearchMoreResponse>>(
+      `/requests/${requestId}/hotel-search/more`,
+      params ?? {}
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to trigger Search More');
     }
     return data.data;
   },
@@ -165,6 +237,16 @@ export const requestsApi = {
     );
     if (!data.success || !data.data) {
       throw new Error(data.message || 'Price calculation failed');
+    }
+    return data.data;
+  },
+
+  async claim(requestId: string): Promise<{ owner: { id: string; firstName: string | null; lastName: string | null; email: string } }> {
+    const { data } = await apiClient.post<ApiResponse<{ owner: { id: string; firstName: string | null; lastName: string | null; email: string } }>>(
+      `/requests/${requestId}/actions/claim`
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to claim request');
     }
     return data.data;
   },

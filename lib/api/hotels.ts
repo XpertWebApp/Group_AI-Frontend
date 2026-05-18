@@ -9,6 +9,41 @@ export interface HotelSearchParams {
   offset?: number;
 }
 
+export interface HotelFacilityGroup {
+  Category: string;
+  Facilities: string[];
+}
+
+export interface HotelDetail {
+  hotelCode: string;
+  name: string;
+  description?: string | null;
+  descriptionLanguage?: string | null;
+  descriptionSource?: string | null;
+  // Multi-language descriptions — backend ships both EN and DE so UI can swap
+  // languages without re-calling this endpoint. `isFallback: true` = English
+  // text under the de key because no native German GIATA was available.
+  descriptions?: {
+    en?: { text: string; source: string; isFallback: boolean } | null;
+    de?: { text: string; source: string; isFallback: boolean } | null;
+  } | null;
+  location?: string | null;
+  address?: string | null;
+  addressCity?: string | null;
+  addressCountry?: string | null;
+  starRating?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  totalRooms?: number | null;
+  propertyType?: number | null;
+  category?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  images: string[];
+  roomFacilities: string[];
+  hotelFacilities: HotelFacilityGroup[];
+}
+
 export const hotelsApi = {
   async search(params: HotelSearchParams): Promise<HotelSearchResult[]> {
     const { data } = await apiClient.get<ApiResponse<HotelSearchResult[]>>('/hotels/search', {
@@ -24,6 +59,17 @@ export const hotelsApi = {
     );
     if (!data.success || !data.data?.facilities) return [];
     return data.data.facilities;
+  },
+
+  async getDetails(hotelCode: string, lang?: string): Promise<HotelDetail> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('code', hotelCode);
+    if (lang) queryParams.append('lang', lang);
+    const { data } = await apiClient.get<ApiResponse<HotelDetail>>(
+      `/hotels/details?${queryParams.toString()}`
+    );
+    if (!data.success || !data.data) throw new Error('Hotel details not found');
+    return data.data;
   },
 };
 

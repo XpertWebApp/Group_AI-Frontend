@@ -23,7 +23,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {label.endsWith('*') ? (
               <>
                 {label.slice(0, -1).trimEnd()}{' '}
-                <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
+                <span className="text-sett-destructive">*</span>
               </>
             ) : (
               label

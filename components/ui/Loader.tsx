@@ -3,16 +3,23 @@
 import { cn } from '@/lib/utils/cn';
 
 /* ────────────────────────────────────────────
-   Shared pulse animation bar used by skeletons
+   Shared shimmer placeholder used by skeletons.
+   A pale base + a diagonal highlight that travels left→right gives the
+   "data is loading" hint without strobing like a raw opacity pulse.
    ──────────────────────────────────────────── */
-function Shimmer({ className }: { className?: string }) {
+export function Shimmer({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'rounded bg-sett-border animate-pulse',
+        'relative overflow-hidden rounded bg-sett-fill',
         className,
       )}
-    />
+    >
+      <div
+        aria-hidden
+        className="absolute inset-0 -translate-x-full animate-[shimmer_1.6s_cubic-bezier(0.4,0,0.2,1)_infinite] bg-gradient-to-r from-transparent via-white/80 to-transparent"
+      />
+    </div>
   );
 }
 
@@ -145,7 +152,161 @@ export function CardSkeleton({ cards = 4, className }: CardSkeletonProps) {
 }
 
 /* ────────────────────────────────────────────
-   5. StatCardSkeleton — mimics dashboard stat cards
+   5. RequestSummarySkeleton — mimics the Request Summary page layout
+      (hero strip + summary card with trip stats, rooms, customer details, policies)
+   ──────────────────────────────────────────── */
+export function RequestSummarySkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn('p-4 md:p-6 space-y-6', className)}>
+      {/* ── Hero / breadcrumb strip ── */}
+      <div className="flex items-center gap-3 animate-card-rise-in">
+        <Shimmer className="h-4 w-16 rounded-full" />
+        <Shimmer className="h-4 w-4 rounded-full" />
+        <Shimmer className="h-4 w-24 rounded-full" />
+        <Shimmer className="h-4 w-4 rounded-full" />
+        <Shimmer className="h-5 w-40 rounded-full bg-sett-border" />
+      </div>
+
+      {/* ── Request Summary card ── */}
+      <div
+        className="relative bg-white rounded-[14px] border border-sett-border p-5 animate-card-rise-in"
+        style={{ animationDelay: '80ms' }}
+      >
+        {/* Section header */}
+        <div className="flex items-start gap-3 mb-6">
+          <div className="w-1 h-10 bg-sett-primary/40 rounded-full mt-0.5" />
+          <div className="space-y-2">
+            <Shimmer className="h-5 w-44 rounded-full bg-sett-border" />
+            <Shimmer className="h-3.5 w-28 rounded-full" />
+          </div>
+        </div>
+
+        {/* Trip details row */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-6">
+          {/* Left: heading + location + date */}
+          <div className="space-y-3">
+            <Shimmer className="h-4 w-28 rounded-full bg-sett-border" />
+            <div className="flex flex-wrap items-center gap-3">
+              <Shimmer className="h-4 w-32 rounded-full" />
+              <span className="w-1 h-1 rounded-full bg-sett-border-light" />
+              <Shimmer className="h-4 w-44 rounded-full" />
+            </div>
+          </div>
+          {/* Right: 4 stat columns */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 xl:gap-5 xl:flex xl:items-center">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex flex-col items-start xl:items-center gap-2">
+                <Shimmer className="h-3 w-20 rounded-full" />
+                <Shimmer className="h-4 w-24 rounded-full bg-sett-border" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <hr className="border-sett-border-light mb-6" />
+
+        {/* Room & Accommodations */}
+        <div className="space-y-5 mb-6">
+          <Shimmer className="h-5 w-56 rounded-full bg-sett-border" />
+          {/* Room types row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="flex flex-col items-center justify-center gap-3 border border-sett-border rounded-[14px] py-5"
+              >
+                <Shimmer className="h-6 w-12 rounded-full bg-sett-border" />
+                <Shimmer className="h-3 w-16 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <hr className="border-sett-border-light mb-6" />
+
+        {/* Customer Details */}
+        <div className="space-y-5 mb-6">
+          <Shimmer className="h-5 w-44 rounded-full bg-sett-border" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <Shimmer className="h-3 w-20 rounded-full" />
+                <Shimmer className="h-4 w-32 rounded-full bg-sett-border" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <hr className="border-sett-border-light mb-6" />
+
+        {/* Policies */}
+        <div className="space-y-3">
+          <Shimmer className="h-5 w-28 rounded-full bg-sett-border" />
+          <div className="bg-sett-fill rounded-card p-4 space-y-2">
+            <Shimmer className="h-3 w-32 rounded-full" />
+            <Shimmer className="h-3.5 w-full rounded-full" />
+            <Shimmer className="h-3.5 w-4/5 rounded-full" />
+          </div>
+          <div className="bg-sett-fill rounded-card p-4 space-y-2">
+            <Shimmer className="h-3 w-32 rounded-full" />
+            <Shimmer className="h-3.5 w-full rounded-full" />
+            <Shimmer className="h-3.5 w-3/5 rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Side-by-side: Hotels list + Pricing card ── */}
+      <div
+        className="flex flex-col lg:flex-row gap-6 animate-card-rise-in"
+        style={{ animationDelay: '180ms' }}
+      >
+        {/* Left: 2 hotel cards */}
+        <div className="flex-1 space-y-4">
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              className="bg-white rounded-[14px] border border-sett-border overflow-hidden flex flex-col sm:flex-row"
+            >
+              <Shimmer className="sm:w-[220px] h-[160px] sm:h-auto rounded-none" />
+              <div className="flex-1 p-5 space-y-3">
+                <Shimmer className="h-5 w-2/3 rounded-full bg-sett-border" />
+                <Shimmer className="h-3.5 w-1/2 rounded-full" />
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {[1, 2, 3, 4].map((j) => (
+                    <Shimmer key={j} className="h-6 w-20 rounded-full" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Right: Pricing sidebar */}
+        <div className="lg:w-[320px] shrink-0 space-y-4">
+          <div className="bg-white rounded-[14px] border border-sett-border p-5 space-y-4">
+            <Shimmer className="h-5 w-32 rounded-full bg-sett-border" />
+            <div className="space-y-2.5 pt-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <Shimmer className="h-3.5 w-24 rounded-full" />
+                  <Shimmer className="h-3.5 w-16 rounded-full bg-sett-border" />
+                </div>
+              ))}
+            </div>
+            <hr className="border-sett-border-light" />
+            <div className="flex items-center justify-between">
+              <Shimmer className="h-4 w-20 rounded-full bg-sett-border" />
+              <Shimmer className="h-5 w-24 rounded-full bg-sett-primary/30" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────
+   6. StatCardSkeleton — mimics dashboard stat cards
    ──────────────────────────────────────────── */
 interface StatCardSkeletonProps {
   cards?: number;

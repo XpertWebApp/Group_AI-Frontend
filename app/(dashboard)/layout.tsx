@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LanguageProvider } from '@/lib/i18n/LanguageContext';
+import { NotificationsProvider } from '@/lib/notifications/NotificationsContext';
 
 export default function DashboardLayout({
   children,
@@ -28,7 +29,9 @@ export default function DashboardLayout({
 
   return (
     <LanguageProvider>
-      <AppLayout>{children}</AppLayout>
+      <NotificationsProvider>
+        <AppLayout>{children}</AppLayout>
+      </NotificationsProvider>
     </LanguageProvider>
   );
 }

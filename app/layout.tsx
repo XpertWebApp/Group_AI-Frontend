@@ -26,12 +26,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
-      <body className="min-h-screen font-montserrat overflow-x-hidden">
+    <html lang="en" className={`${inter.variable} ${montserrat.variable} h-screen overflow-hidden`}>
+      <body className="h-screen font-montserrat overflow-hidden">
         <StoreProvider>
           <AuthHydration>{children}</AuthHydration>
           <ToastProvider />
         </StoreProvider>
+        {/* Portal target for react-datepicker poppers — keeps the calendar above
+            any CSS stacking context created by parent transforms (e.g. card-rise-in). */}
+        <div id="sett-datepicker-portal" />
       </body>
     </html>
   );

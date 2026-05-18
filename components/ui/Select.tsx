@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown, Check } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SelectOption {
   value: string;
   label: string;
+  /** Optional custom content rendered inside the dropdown item and trigger */
+  node?: ReactNode;
 }
 
 interface SelectProps {
@@ -18,12 +22,14 @@ interface SelectProps {
   onChange?: (e: { target: { value: string } }) => void;
   variant?: 'default' | 'filter';
   className?: string;
+  style?: React.CSSProperties;
   disabled?: boolean;
   name?: string;
 }
 
 export function Select({
   className,
+  style,
   label,
   error,
   options,
@@ -35,21 +41,39 @@ export function Select({
   name,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'absolute', visibility: 'hidden' });
+  const [positionMode, setPositionMode] = useState<'fixed' | 'absolute'>('fixed');
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const isFilter = variant === 'filter';
+
+  // Detect if we're inside a scrollable container (modal, etc.)
+  useEffect(() => {
+    let parent = containerRef.current?.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      if (style.overflow === 'auto' || style.overflow === 'scroll' || style.overflowY === 'auto' || style.overflowY === 'scroll') {
+        setPositionMode('absolute');
+        return;
+      }
+      parent = parent.parentElement;
+    }
+    setPositionMode('fixed');
+  }, []);
 
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption?.label || placeholder || '';
   const isPlaceholder = !selectedOption;
 
-  // Close on outside click
+  // Close on outside click (exclude both trigger container and portal dropdown)
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inContainer = containerRef.current?.contains(target);
+      const inDropdown = listRef.current?.contains(target);
+      if (!inContainer && !inDropdown) setOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -65,6 +89,82 @@ export function Select({
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
+  // Compute dropdown position (flip up if not enough space below)
+  // useLayoutEffect runs before the browser paints, so the dropdown is
+  // never visible in an unpositioned state — prevents the right-side layout shift.
+  const updateDropdownPosition = useCallback(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const dropdownHeight = 260; // max-h-[240px] + padding
+
+    const baseStyle: React.CSSProperties = {
+      position: positionMode,
+      visibility: 'visible',
+      width: rect.width + 'px',
+      zIndex: 9999,
+    };
+
+    if (positionMode === 'absolute') {
+      // For absolute positioning (inside scrollable containers like modals)
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (!containerRect) return;
+
+      const relativeTop = rect.top - containerRect.top + containerRect.height;
+      const relativeLeft = rect.left - containerRect.left;
+      const spaceBelow = containerRect.bottom - rect.bottom;
+      const spaceAbove = rect.top - containerRect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        // Open upward only if not enough space below AND enough space above
+        setDropdownStyle({
+          ...baseStyle,
+          top: spaceAbove - dropdownHeight - 2 + 'px',
+          left: relativeLeft + 'px',
+        });
+      } else {
+        // Open downward
+        setDropdownStyle({
+          ...baseStyle,
+          top: relativeTop - 2 + 'px',
+          left: relativeLeft + 'px',
+        });
+      }
+    } else {
+      // For fixed positioning (normal page context)
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        // Open upward
+        setDropdownStyle({
+          ...baseStyle,
+          top: rect.top - dropdownHeight - 2 + 'px',
+          left: rect.left + 'px',
+        });
+      } else {
+        // Open downward
+        setDropdownStyle({
+          ...baseStyle,
+          top: rect.bottom - 2 + 'px',
+          left: rect.left + 'px',
+        });
+      }
+    }
+  }, [open, positionMode]);
+
+  useLayoutEffect(() => {
+    updateDropdownPosition();
+  }, [open, updateDropdownPosition, positionMode]);
+
+  // Recalculate dropdown position on scroll (for modals with scrollable content)
+  useEffect(() => {
+    if (!open) return;
+    const handleScroll = () => updateDropdownPosition();
+    document.addEventListener('scroll', handleScroll, { capture: true });
+    return () => document.removeEventListener('scroll', handleScroll, { capture: true });
+  }, [open, updateDropdownPosition]);
+
   // Scroll selected item into view when opening
   useEffect(() => {
     if (open && listRef.current && value) {
@@ -76,16 +176,26 @@ export function Select({
   const handleSelect = useCallback((optValue: string) => {
     onChange?.({ target: { value: optValue } });
     setOpen(false);
-  }, [onChange]);
+    setDropdownStyle({ position: positionMode, visibility: 'hidden' });
+  }, [onChange, positionMode]);
 
   return (
-    <div ref={containerRef} className={cn('relative', className)}>
+    <div
+      ref={containerRef}
+      // When the dropdown is open AND we're in absolute (inline) mode, the
+      // container needs a high z-index so the dropdown's stacking context can
+      // float above sibling form fields lower in the page. Without this, the
+      // inline dropdown is trapped within the container's natural paint order
+      // and renders behind later siblings.
+      className={cn('relative', open && positionMode === 'absolute' && 'z-[9999]', className)}
+      style={style}
+    >
       {label && (
         <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
           {label.endsWith('*') ? (
             <>
               {label.slice(0, -1).trimEnd()}{' '}
-              <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36]">*</span>
+              <span className="text-sett-destructive">*</span>
             </>
           ) : (
             label
@@ -98,6 +208,7 @@ export function Select({
 
       {/* Trigger button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
@@ -116,7 +227,10 @@ export function Select({
                 : 'border-sett-border-light hover:border-sett-primary/40',
         )}
       >
-        <span className="truncate">{displayLabel}</span>
+        {selectedOption?.node
+          ? <span className="flex items-center gap-2 truncate">{selectedOption.node}</span>
+          : <span className="truncate">{displayLabel}</span>
+        }
         <ChevronDown
           className={cn(
             'shrink-0 transition-transform duration-200',
@@ -126,11 +240,12 @@ export function Select({
         />
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
+      {/* Dropdown panel — rendered in a portal for fixed, or inline for absolute */}
+      {open && positionMode === 'fixed' && typeof document !== 'undefined' && createPortal(
         <div
           ref={listRef}
-          className="absolute z-50 mt-1.5 w-full rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
+          style={dropdownStyle}
+          className="rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
         >
           <div className="max-h-[240px] overflow-y-auto py-1.5">
             {placeholder && (
@@ -161,7 +276,59 @@ export function Select({
                       : 'text-sett-text-primary hover:bg-[#F7F7F7]'
                   )}
                 >
-                  <span className="truncate">{opt.label}</span>
+                  {opt.node
+                    ? <span className="flex items-center gap-2">{opt.node}</span>
+                    : <span className="truncate">{opt.label}</span>
+                  }
+                  {isSelected && <Check className="w-4 h-4 text-sett-primary shrink-0 ml-2" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* For absolute positioning inside modals, render inline */}
+      {open && positionMode === 'absolute' && (
+        <div
+          ref={listRef}
+          style={dropdownStyle}
+          className="rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
+        >
+          <div className="max-h-[240px] overflow-y-auto py-1.5">
+            {placeholder && (
+              <button
+                type="button"
+                onClick={() => handleSelect('')}
+                className={cn(
+                  'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                  !value ? 'text-sett-primary font-medium bg-sett-light-green-bg' : 'text-sett-text-accent hover:bg-[#F7F7F7]'
+                )}
+              >
+                <span>{placeholder}</span>
+                {!value && <Check className="w-4 h-4 text-sett-primary shrink-0" />}
+              </button>
+            )}
+            {options.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  data-selected={isSelected}
+                  onClick={() => handleSelect(opt.value)}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                    isSelected
+                      ? 'text-sett-primary font-medium bg-sett-light-green-bg'
+                      : 'text-sett-text-primary hover:bg-[#F7F7F7]'
+                  )}
+                >
+                  {opt.node
+                    ? <span className="flex items-center gap-2">{opt.node}</span>
+                    : <span className="truncate">{opt.label}</span>
+                  }
                   {isSelected && <Check className="w-4 h-4 text-sett-primary shrink-0 ml-2" />}
                 </button>
               );

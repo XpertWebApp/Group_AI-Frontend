@@ -31,6 +31,8 @@ interface AddServiceModalProps {
   onAdd: (payload: AddProposalServicePayload) => Promise<void>;
   isLoading?: boolean;
   initialData?: ProposalService;
+  bookingStartDate?: string | null;
+  bookingEndDate?: string | null;
 }
 
 /* ── Shared input className ── */
@@ -38,30 +40,38 @@ const inputCls =
   'w-full h-[41px] p-3 rounded-[14px] border border-[#686868]/40 bg-white font-montserrat text-[14px] font-normal leading-none text-[#0A0A0A] placeholder:text-[#686868] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-sett-primary';
 
 /* ── Field wrapper ── */
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, error, required, children }: { label: string; error?: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-[6px]">
       <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-        {label}
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
+      {error && (
+        <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{error}</p>
+      )}
     </div>
   );
 }
 
+const errorInputCls =
+  'w-full h-[41px] p-3 rounded-[14px] border border-red-400 bg-white font-montserrat text-[14px] font-normal leading-none text-[#0A0A0A] placeholder:text-[#686868] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-red-300';
+
 /* ── Themed date input ── */
-interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
+interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  hasError?: boolean;
+}
 const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
-  ({ value, onClick, placeholder }, ref) => (
+  ({ value, onClick, placeholder, hasError }, ref) => (
     <div className="relative w-full">
       <input
         ref={ref}
         value={value as string}
         onClick={onClick}
-        onChange={() => {}}
+        onChange={() => { }}
         placeholder={placeholder ?? 'MM/DD/YYYY'}
         readOnly
-        className={cn(inputCls, 'pr-9 cursor-pointer')}
+        className={cn(hasError ? errorInputCls : inputCls, 'pr-9 cursor-pointer')}
       />
       <span onClick={onClick} className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#AAC737" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -76,7 +86,27 @@ const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
 );
 DateInput.displayName = 'DateInput';
 
-export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }: AddServiceModalProps) {
+interface FormErrors {
+  service?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  buyPrice?: string;
+  sellPrice?: string;
+  markup?: string;
+  quantity?: string;
+  day?: string;
+  night?: string;
+}
+
+/* Prevent scroll / zoom from changing number input values */
+const blurOnWheel = (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur();
+
+/* Prevent typing '-' in number inputs */
+const blockMinus = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === '-') e.preventDefault();
+};
+
+export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, bookingStartDate, bookingEndDate }: AddServiceModalProps) {
   const { t } = useLanguage();
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -88,6 +118,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
   const [quantity, setQuantity] = useState('');
   const [day, setDay] = useState('');
   const [night, setNight] = useState('');
+  const [errors, setErrors] = useState<FormErrors>({});
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,8 +137,8 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
       const notes = initialData.notes ?? '';
       setDay(notes.includes('Day') ? '1' : '');
       setNight(notes.includes('Night') ? '1' : '');
-      setDateFrom(null);
-      setDateTo(null);
+      setDateFrom(initialData.dateFrom ? new Date(initialData.dateFrom) : null);
+      setDateTo(initialData.dateTo ? new Date(initialData.dateTo) : null);
       setShowDropdown(false);
     } else if (!open) {
       setSelectedServices([]);
@@ -120,6 +151,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
       setQuantity('');
       setDay('');
       setNight('');
+      setErrors({});
     }
   }, [open, initialData]);
 
@@ -141,16 +173,20 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
   const handleBuyChange = (val: string) => {
     const clamped = val === '' ? '' : String(Math.max(0, Number(val)));
     setBuyPrice(clamped);
+    if (errors.buyPrice) setErrors((err) => ({ ...err, buyPrice: undefined }));
     if (clamped && markup) {
       setSellPrice((Number(clamped) * (1 + Number(markup) / 100)).toFixed(2));
+      if (errors.sellPrice) setErrors((err) => ({ ...err, sellPrice: undefined }));
     }
   };
 
   const handleMarkupChange = (val: string) => {
     const clamped = val === '' ? '' : String(Math.max(0, Number(val)));
     setMarkup(clamped);
+    if (errors.markup) setErrors((err) => ({ ...err, markup: undefined }));
     if (buyPrice && clamped) {
       setSellPrice((Number(buyPrice) * (1 + Number(clamped) / 100)).toFixed(2));
+      if (errors.sellPrice) setErrors((err) => ({ ...err, sellPrice: undefined }));
     }
   };
 
@@ -160,14 +196,37 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
     );
   };
 
+  const validate = (): FormErrors => {
+    const errs: FormErrors = {};
+    if (selectedServices.length === 0) errs.service = t.services.errServiceRequired;
+    if (!dateFrom) errs.dateFrom = t.services.errDateFromRequired;
+    if (!dateTo) errs.dateTo = t.services.errDateToRequired;
+    else if (dateFrom && dateTo < dateFrom) errs.dateTo = t.services.errDateToBeforeFrom;
+    if (!buyPrice) errs.buyPrice = t.services.errBuyPriceRequired;
+    else if (Number(buyPrice) <= 0) errs.buyPrice = t.services.errBuyPricePositive;
+    if (!sellPrice) errs.sellPrice = t.services.errSellPriceRequired;
+    else if (Number(sellPrice) <= 0) errs.sellPrice = t.services.errSellPricePositive;
+    if (!markup) errs.markup = t.services.errMarkupRequired;
+    if (!quantity) errs.quantity = t.services.errQuantityRequired;
+    else if (Number(quantity) < 1) errs.quantity = t.services.errQuantityPositive;
+    if (!day) errs.day = t.services.errDayRequired;
+    if (!night) errs.night = t.services.errNightRequired;
+    return errs;
+  };
+
   const handleAdd = async () => {
-    if (selectedServices.length === 0) return;
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+    setErrors({});
     await onAdd({
       serviceName: selectedServices.join(', '),
       dateFrom: dateFrom ? `${dateFrom.getFullYear()}-${String(dateFrom.getMonth() + 1).padStart(2, '0')}-${String(dateFrom.getDate()).padStart(2, '0')}` : undefined,
       dateTo: dateTo ? `${dateTo.getFullYear()}-${String(dateTo.getMonth() + 1).padStart(2, '0')}-${String(dateTo.getDate()).padStart(2, '0')}` : undefined,
       buyPrice: buyPrice ? Number(buyPrice) : undefined,
-      sellPrice: sellPrice ? Number(sellPrice) : undefined,
+      sellPrice: Number(sellPrice),
       quantity: quantity ? parseInt(quantity, 10) || 1 : 1,
       days: (Number(day) || 0) + (Number(night) || 0),
       notes: [day ? 'Day' : '', night ? 'Night' : ''].filter(Boolean).join(', ') || undefined,
@@ -219,17 +278,19 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           {/* Service Name — multi-select with checkboxes */}
           <div className="flex flex-col gap-[6px]" ref={dropdownRef}>
             <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-              {t.services.serviceName}
+              {t.services.serviceName}<span className="text-red-500 ml-0.5">*</span>
             </label>
             <div className="relative">
               {/* Trigger */}
               <div
-                onClick={() => setShowDropdown((v) => !v)}
+                onClick={() => { setShowDropdown((v) => !v); if (errors.service) setErrors((e) => ({ ...e, service: undefined })); }}
                 className={cn(
                   'w-full min-h-[41px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
-                  showDropdown
-                    ? 'border-sett-primary ring-2 ring-sett-primary/20'
-                    : 'border-[#686868]/40 hover:border-sett-primary/40'
+                  errors.service
+                    ? 'border-red-400 ring-2 ring-red-200'
+                    : showDropdown
+                      ? 'border-sett-primary ring-2 ring-sett-primary/20'
+                      : 'border-[#686868]/40 hover:border-sett-primary/40'
                 )}
               >
                 {selectedServices.length === 0 ? (
@@ -318,20 +379,23 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
                 </div>
               )}
             </div>
+            {errors.service && (
+              <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.service}</p>
+            )}
           </div>
 
           {/* Date From / Date To */}
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.dateFrom}
+                {t.services.dateFrom}<span className="text-red-500 ml-0.5">*</span>
               </label>
               <div className="sett-datepicker">
                 <DatePicker
                   selected={dateFrom}
-                  onChange={(date: Date | null) => setDateFrom(date)}
-                  minDate={new Date()}
-                  maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                  onChange={(date: Date | null) => { setDateFrom(date); setErrors((e) => ({ ...e, dateFrom: undefined, dateTo: undefined })); }}
+                  minDate={bookingStartDate ? new Date(bookingStartDate) : new Date()}
+                  maxDate={bookingEndDate ? new Date(bookingEndDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                   dateFormat="MM/dd/yyyy"
                   placeholderText="MM/DD/YYYY"
                   popperClassName="sett-datepicker-popper"
@@ -339,20 +403,23 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
                   wrapperClassName="w-full"
                   todayButton="Today"
                   showPopperArrow={false}
-                  customInput={<DateInput />}
+                  customInput={<DateInput hasError={!!errors.dateFrom} />}
                 />
               </div>
+              {errors.dateFrom && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.dateFrom}</p>
+              )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.dateTo}
+                {t.services.dateTo}<span className="text-red-500 ml-0.5">*</span>
               </label>
               <div className="sett-datepicker">
                 <DatePicker
                   selected={dateTo}
-                  onChange={(date: Date | null) => setDateTo(date)}
-                  minDate={dateFrom ?? new Date()}
-                  maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                  onChange={(date: Date | null) => { setDateTo(date); setErrors((e) => ({ ...e, dateTo: undefined })); }}
+                  minDate={dateFrom ?? (bookingStartDate ? new Date(bookingStartDate) : new Date())}
+                  maxDate={bookingEndDate ? new Date(bookingEndDate) : new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                   dateFormat="MM/dd/yyyy"
                   placeholderText="MM/DD/YYYY"
                   popperClassName="sett-datepicker-popper"
@@ -360,9 +427,12 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
                   wrapperClassName="w-full"
                   todayButton="Today"
                   showPopperArrow={false}
-                  customInput={<DateInput />}
+                  customInput={<DateInput hasError={!!errors.dateTo} />}
                 />
               </div>
+              {errors.dateTo && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.dateTo}</p>
+              )}
             </div>
           </div>
 
@@ -370,7 +440,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.buyPrice} (€)
+                {t.services.buyPrice} (€)<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -378,13 +448,18 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
                 step={0.01}
                 placeholder="0"
                 value={buyPrice}
-                onChange={(e) => handleBuyChange(e.target.value)}
-                className={inputCls}
+                onChange={(e) => { handleBuyChange(e.target.value); if (errors.buyPrice) setErrors((err) => ({ ...err, buyPrice: undefined })); }}
+                onKeyDown={blockMinus}
+                onWheel={blurOnWheel}
+                className={errors.buyPrice ? errorInputCls : inputCls}
               />
+              {errors.buyPrice && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.buyPrice}</p>
+              )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.sellPrice} (€)
+                {t.services.sellPrice} (€)<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -392,9 +467,14 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
                 step={0.01}
                 placeholder="0"
                 value={sellPrice}
-                onChange={(e) => setSellPrice(e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value))))}
-                className={inputCls}
+                onChange={(e) => { setSellPrice(e.target.value === '' ? '' : String(Math.max(0, Number(e.target.value)))); if (errors.sellPrice) setErrors((err) => ({ ...err, sellPrice: undefined })); }}
+                onKeyDown={blockMinus}
+                onWheel={blurOnWheel}
+                className={errors.sellPrice ? errorInputCls : inputCls}
               />
+              {errors.sellPrice && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.sellPrice}</p>
+              )}
             </div>
           </div>
 
@@ -402,7 +482,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.markupPct}
+                {t.services.markupPct}<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -410,22 +490,32 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
                 step={0.5}
                 placeholder="0"
                 value={markup}
-                onChange={(e) => handleMarkupChange(e.target.value)}
-                className={inputCls}
+                onChange={(e) => { handleMarkupChange(e.target.value); if (errors.markup) setErrors((err) => ({ ...err, markup: undefined })); }}
+                onKeyDown={blockMinus}
+                onWheel={blurOnWheel}
+                className={errors.markup ? errorInputCls : inputCls}
               />
+              {errors.markup && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.markup}</p>
+              )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.quantity}
+                {t.services.quantity}<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
                 type="number"
                 min={1}
                 placeholder="0"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value === '' ? '' : String(Math.max(1, Number(e.target.value))))}
-                className={inputCls}
+                onChange={(e) => { setQuantity(e.target.value === '' ? '' : String(Math.max(1, Number(e.target.value)))); if (errors.quantity) setErrors((err) => ({ ...err, quantity: undefined })); }}
+                onKeyDown={blockMinus}
+                onWheel={blurOnWheel}
+                className={errors.quantity ? errorInputCls : inputCls}
               />
+              {errors.quantity && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.quantity}</p>
+              )}
             </div>
           </div>
 
@@ -433,29 +523,39 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.day}
+                {t.services.day}<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
                 type="number"
                 min={0}
                 placeholder="0"
                 value={day}
-                onChange={(e) => setDay(e.target.value)}
-                className={inputCls}
+                onChange={(e) => { setDay(e.target.value); if (errors.day) setErrors((err) => ({ ...err, day: undefined })); }}
+                onKeyDown={blockMinus}
+                onWheel={blurOnWheel}
+                className={errors.day ? errorInputCls : inputCls}
               />
+              {errors.day && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.day}</p>
+              )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
               <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.night}
+                {t.services.night}<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
                 type="number"
                 min={0}
                 placeholder="0"
                 value={night}
-                onChange={(e) => setNight(e.target.value)}
-                className={inputCls}
+                onChange={(e) => { setNight(e.target.value); if (errors.night) setErrors((err) => ({ ...err, night: undefined })); }}
+                onKeyDown={blockMinus}
+                onWheel={blurOnWheel}
+                className={errors.night ? errorInputCls : inputCls}
               />
+              {errors.night && (
+                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.night}</p>
+              )}
             </div>
           </div>
         </div>
@@ -486,7 +586,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData }
           <button
             type="button"
             onClick={handleAdd}
-            disabled={isLoading || selectedServices.length === 0}
+            disabled={isLoading}
             style={{
               width: 198,
               height: 41,

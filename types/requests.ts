@@ -13,6 +13,7 @@ export interface CreateBookingRequestPayload {
   budgetRange?: string;
   groupType?: string;
   groupSize?: number;
+  averageAge?: number;
   currencyCode?: string;
   nationalityCode?: string;
 
@@ -28,6 +29,7 @@ export interface CreateBookingRequestPayload {
   lastName: string;
   contactEmail: string;
   contactPhone: string;
+  contactPhoneCountryCode?: string;
   guestListFileKey?: string;
   customerNotes?: string | null;
 

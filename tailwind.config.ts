@@ -147,8 +147,38 @@ const config: Config = {
 
       /* ── Spacing ── */
       spacing: {
-        sidebar: '250px',     // Sidebar width (guidelines §5.4: 240–280px)
-        header: '68px',       // Header height
+        sidebar: '250px',           // Expanded sidebar width (guidelines §5.4: 240–280px)
+        'sidebar-collapsed': '72px', // Collapsed icon-rail width
+        header: '68px',              // Header height
+      },
+
+      /* ── Motion tokens (reusable across pages) ──
+       * Use these instead of magic cubic-bezier strings so timing stays
+       * consistent across the product. */
+      transitionTimingFunction: {
+        'sett-out':    'cubic-bezier(0.22, 1, 0.36, 1)',     // smooth deceleration — default for one-way reveals
+        'sett-in-out': 'cubic-bezier(0.65, 0, 0.35, 1)',     // symmetric — two-way state changes (sidebar width)
+        'sett-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',  // gentle overshoot — delightful micro-moments
+      },
+      transitionDuration: {
+        '180': '180ms',
+        '280': '280ms',
+        '320': '320ms',
+        '420': '420ms',
+      },
+      keyframes: {
+        'fade-in-right': {
+          '0%':   { opacity: '0', transform: 'translateX(-4px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'tooltip-in': {
+          '0%':   { opacity: '0', transform: 'translateX(-6px) scale(0.96)' },
+          '100%': { opacity: '1', transform: 'translateX(0) scale(1)' },
+        },
+      },
+      animation: {
+        'fade-in-right': 'fade-in-right 280ms cubic-bezier(0.22, 1, 0.36, 1) both',
+        'tooltip-in':    'tooltip-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both',
       },
     },
   },

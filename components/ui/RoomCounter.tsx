@@ -13,7 +13,7 @@ interface RoomCounterProps {
 export function RoomCounter({ label, value, onChange, max }: RoomCounterProps) {
   const isMaxReached = max !== undefined && value >= max;
   return (
-    <div className="border border-sett-border-light rounded-[14px] bg-white py-5 px-4 flex flex-col items-center gap-[14px]">
+    <div className="border border-sett-border-light rounded-[14px] bg-white py-5 px-4 flex flex-col items-center justify-between gap-[14px] min-h-[110px]">
       <span className="font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase text-center">
         {label}
       </span>

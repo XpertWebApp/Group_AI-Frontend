@@ -1,30 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { proposalsApi } from '@/lib/api/proposals';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { formatDateEU } from '@/lib/dateFormatter';
 import type { Proposal } from '@/types';
+import { useRefreshOnNotification } from '@/lib/notifications/useRefreshOnNotification';
 
 export default function ProposalsListPage() {
   const { t } = useLanguage();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    proposalsApi.list().then((list) => {
-      if (!cancelled) {
-        setProposals(list);
-        setLoading(false);
-      }
-    }).catch(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => { cancelled = true; };
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const list = await proposalsApi.list();
+      setProposals(list);
+    } catch {
+      // keep previous
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    reload(false);
+  }, [reload]);
+
+  useRefreshOnNotification(
+    () => reload(true),
+    { match: /proposal|offer|booking|request/i },
+  );
 
   if (loading) {
     return (
@@ -86,7 +96,7 @@ export default function ProposalsListPage() {
                     {p.totalSell != null ? Number(p.totalSell).toFixed(2) : '—'}
                   </td>
                   <td className="px-4 py-3 text-body text-sett-text-secondary">
-                    {new Date(p.createdAt).toLocaleDateString()}
+                    {formatDateEU(p.createdAt)}
                   </td>
                   <td className="px-4 py-3">
                     <Link
