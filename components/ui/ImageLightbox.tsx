@@ -119,21 +119,39 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
       aria-modal="true"
       aria-label="Hotel image gallery"
     >
-      {/* Top bar — counter + close.
+      {/* Top bar — counter (left) + hotel name (centre) + close (right).
           Use solid-dark backings (not translucent white) so the controls stay
-          legible against bright photos (white-walled hotels, pale skies, etc.). */}
-      <div className="flex items-center justify-between px-2 sm:px-4 pb-3 z-10">
+          legible against bright photos (white-walled hotels, pale skies, etc.).
+          The hotel name takes the centre `flex-1` so it can absorb the rest of
+          the row's width; it truncates with ellipsis on long names and hides
+          entirely on very narrow viewports so the counter + close stay usable. */}
+      <div className="flex items-center gap-3 px-2 sm:px-4 pb-3 z-10">
         {showCarousel ? (
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[13px] font-semibold text-white tabular-nums shadow-lg">
+          <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[13px] font-semibold text-white tabular-nums shadow-lg">
             {idx + 1} <span className="text-white/55 mx-1.5">/</span> {total}
           </span>
         ) : (
-          <span />
+          // Spacer with the same width as the counter would have, so the close
+          // button stays anchored to the right edge when there's only one image.
+          <span className="shrink-0 w-12" aria-hidden />
         )}
+
+        {/* Hotel name — centred, truncates on overflow. `alt` is the hotel
+            name (call sites pass hotel.hotelName). Hidden on `xs` so the
+            counter + close still have room to breathe on narrow screens. */}
+        {alt && (
+          <h2
+            className="hidden sm:flex flex-1 items-center justify-center min-w-0 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[14px] font-semibold text-white shadow-lg"
+            title={alt}
+          >
+            <span className="truncate">{alt}</span>
+          </h2>
+        )}
+
         <button
           type="button"
           onClick={onClose}
-          className="p-2.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 hover:bg-black/85 hover:ring-white/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary shadow-lg"
+          className="shrink-0 ml-auto sm:ml-0 p-2.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 hover:bg-black/85 hover:ring-white/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary shadow-lg"
           aria-label="Close"
         >
           <X className="w-5 h-5 text-white" />

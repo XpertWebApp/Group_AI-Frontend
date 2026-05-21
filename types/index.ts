@@ -66,7 +66,12 @@ export interface BookingRequest {
   checkinDate: string;
   checkoutDate?: string | null;
   nights: number;
+  // Legacy single-select star rating (kept for back-compat with older rows and Wix webhook).
+  // Always equals starRatings[0] when starRatings is present.
   starRating?: number | null;
+  // Multi-select hotel category — new canonical field. Use `selectedStars(req)` from
+  // lib/utils/starRatings to read with automatic legacy fallback.
+  starRatings?: number[] | null;
   budgetRange?: string | null;
   budget?: number | null;
   groupType?: string | null;

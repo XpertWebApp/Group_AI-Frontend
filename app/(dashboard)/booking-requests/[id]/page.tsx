@@ -42,6 +42,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU, formatDateTimeEU } from '@/lib/dateFormatter';
 import { formatPriceEU, formatCurrencyEU, formatPercentageEU, formatNumberEU } from '@/lib/numberFormatter';
 import { cn } from '@/lib/utils/cn';
+import { selectedStars } from '@/lib/utils/starRatings';
 import { getGroupTypeLabel, groupTypeRequiresAge } from '@/lib/utils/groupType';
 import toast from 'react-hot-toast';
 
@@ -830,13 +831,40 @@ export default function RequestDetailPage() {
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                           {t.offer.hotelCategory}
                         </p>
-                        {/* value row */}
-                        <div className="flex items-center gap-2 flex-nowrap">
-                          <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary whitespace-nowrap">
-                            ({request.starRating}-Star)
-                          </span>
-                          {request.starRating && <StarRating rating={request.starRating} />}
-                        </div>
+                        {/* value row — multi-select aware. If multiple categories
+                            are saved, render them as comma-separated `3★, 4★`. */}
+                        {(() => {
+                          const stars = selectedStars(request);
+                          if (stars.length === 0) {
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-accent">—</span>
+                              </div>
+                            );
+                          }
+                          if (stars.length === 1) {
+                            return (
+                              <div className="flex items-center gap-2 flex-nowrap">
+                                <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary whitespace-nowrap">
+                                  ({stars[0]}-Star)
+                                </span>
+                                <StarRating rating={stars[0]} />
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              {stars.map((s) => (
+                                <span
+                                  key={s}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-none"
+                                >
+                                  {s}★
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                       {/* Vertical divider */}
                       <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />

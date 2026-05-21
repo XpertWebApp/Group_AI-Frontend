@@ -9,7 +9,10 @@ export interface CreateBookingRequestPayload {
   checkinDate: string;
   checkoutDate?: string;
   nights?: number;
+  /** Legacy single-select star rating. Send alongside `starRatings` during migration. */
   starRating?: number;
+  /** Multi-select hotel category (1..6, half-steps allowed). 1-6 entries, no duplicates. */
+  starRatings?: number[];
   budgetRange?: string;
   groupType?: string;
   groupSize?: number;

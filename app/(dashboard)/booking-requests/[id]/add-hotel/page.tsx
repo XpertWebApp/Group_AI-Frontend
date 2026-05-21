@@ -6,7 +6,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus,
+  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus, Search,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
@@ -25,6 +25,7 @@ import { hotelsApi } from '@/lib/api/hotels';
 import { formatDateEU } from '@/lib/dateFormatter';
 import { cn } from '@/lib/utils/cn';
 import { groupTypeRequiresAge } from '@/lib/utils/groupType';
+import { selectedStars, hotelStarBucket, hotelMatchesSelectedStars } from '@/lib/utils/starRatings';
 import type {
   HotelSearchResult,
   HotelSearchPhase,
@@ -264,6 +265,33 @@ export default function AddHotelPage() {
   useEffect(() => { alternativesFetchedRef.current = alternativesFetched; }, [alternativesFetched]);
   useEffect(() => { alternativesLoadingRef.current = alternativesLoading; }, [alternativesLoading]);
 
+  // While a "Search More" batch is polling, the backend's /status response
+  // sometimes returns only the new batch's jobs (without the prior batch's
+  // COMPLETED ones), so naively replacing completedResults from each poll
+  // wipes the visible list and the skeleton flashes back. We track the
+  // mode + a snapshot of prior results in refs (poll closure has [] deps
+  // and would otherwise read stale state) so the poll can union rather
+  // than overwrite. See feedback_poll_closure_refs.md.
+  const searchMoreActiveRef = useRef(false);
+  const completedResultsRef = useRef<HotelSearchResult[]>([]);
+  useEffect(() => { completedResultsRef.current = completedResults; }, [completedResults]);
+
+  // Stream-order tracking: first poll to see a given hotelCode stamps an
+  // incrementing arrival index. Render-time we sort descending by this so
+  // newly-arrived hotels appear at the top of the list (user doesn't have
+  // to scroll to see them stream in). Already-displayed cards keep their
+  // arrival stamp so they don't shuffle on later polls.
+  const arrivalOrderRef = useRef<Map<string, number>>(new Map());
+  const arrivalCounterRef = useRef(0);
+  const stampArrivals = useCallback((hotels: HotelSearchResult[]) => {
+    for (const h of hotels) {
+      if (!arrivalOrderRef.current.has(h.hotelCode)) {
+        arrivalCounterRef.current += 1;
+        arrivalOrderRef.current.set(h.hotelCode, arrivalCounterRef.current);
+      }
+    }
+  }, []);
+
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState(3000);
@@ -298,8 +326,17 @@ export default function AddHotelPage() {
         if (!mountedRef.current) return;
         if (updatedRequest) {
           setRequest(updatedRequest);
-          // If backend says needs_manual_handling, watcher is done exhausting ladder
-          if (updatedRequest.status === 'needs_manual_handling') {
+          // If backend says needs_manual_handling, watcher is done exhausting ladder.
+          // BUT: if the user just clicked "Show Alternatives" from the manual-request
+          // screen, the backend request will still read needs_manual_handling until
+          // the alternatives finish — flipping back to the manual card here would
+          // wipe the alternatives polling UI mid-flight. Skip the revert while
+          // alternatives are loading or have been fetched in this session.
+          if (
+            updatedRequest.status === 'needs_manual_handling' &&
+            !alternativesLoadingRef.current &&
+            !alternativesFetchedRef.current
+          ) {
             // Mark search as exhausted since backend confirmed watcher finished
             setSearchExhausted(true);
             setManualRequestOnly(true);
@@ -366,6 +403,7 @@ export default function AddHotelPage() {
       const finalHotels = status.jobs
         .filter((j) => j.status === 'COMPLETED' && j.resultJson)
         .map((j) => j.resultJson!);
+      stampArrivals(finalHotels);
       setCompletedResults(finalHotels);
       const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
       setSearchSummary({
@@ -428,10 +466,16 @@ export default function AddHotelPage() {
             if (req?.status === 'needs_manual_handling') {
               hasBackendSignal = true;
               setSearchExhausted(true);
-              // When backend marks as needs_manual_handling, show the manual request card
               if (!mountedRef.current) return;
-              setManualRequestOnly(true);
-              setPhase('done');
+              // When backend says needs_manual_handling, normally we show the
+              // manual-request card. BUT: when the user clicked Show Alternatives
+              // from that same screen, the backend status stays needs_manual_handling
+              // while alternatives are running. Reverting here would blank the UI
+              // mid-flight. Skip the flip while alternatives are loading/fetched.
+              if (!alternativesLoadingRef.current && !alternativesFetchedRef.current) {
+                setManualRequestOnly(true);
+                setPhase('done');
+              }
             }
           } catch {
             // Silently ignore request status fetch errors
@@ -490,17 +534,38 @@ export default function AddHotelPage() {
         // values from the initial render.
         const altFetched = alternativesFetchedRef.current;
         const altLoading = alternativesLoadingRef.current;
+
+        // During Search More, the backend may transiently return only the new
+        // batch's jobs. Merge with what's already on screen (by hotelCode) so
+        // the visible list grows monotonically and never flashes the skeleton.
+        const applyHotelResults = (next: HotelSearchResult[]) => {
+          // Stamp arrival order before committing — render-time sort uses this
+          // to surface newest hotels at the top of the list.
+          stampArrivals(next);
+          if (searchMoreActiveRef.current) {
+            const prev = completedResultsRef.current;
+            const byCode = new Map<string, HotelSearchResult>();
+            for (const h of prev) byCode.set(h.hotelCode, h);
+            for (const h of next) byCode.set(h.hotelCode, h);
+            setCompletedResults(Array.from(byCode.values()));
+          } else {
+            setCompletedResults(next);
+          }
+        };
+
         // Stream alternative hotels into the UI as they arrive — but keep the
         // "loading" spinner up until ALL alternative probes have drained, so the
         // user understands more results may still be coming. (Previously we
         // cleared the spinner on the first alternative, then polling terminated
-        // before the rest arrived.)
+        // before the rest arrived.) Also clear the spinner when probes finish
+        // with zero alternatives so the UI can flip to the empty-state card.
         if (altFetched && altLoading) {
           const altsProbesDone = status.summary.queued === 0 && status.summary.running === 0;
+          const altsBackendDone = status.summary.phase === 'settled' || status.summary.phase === 'exhausted';
           const hasAlt = results.some(h => h.searchKind === 'alternative');
-          if (hasAlt && altsProbesDone) {
+          if (altsProbesDone && (hasAlt || altsBackendDone)) {
             setAlternativesLoading(false);
-            setCompletedResults(results);
+            applyHotelResults(results);
           }
         }
 
@@ -510,12 +575,12 @@ export default function AddHotelPage() {
           // For alternatives, update immediately without throttling
           if (results.length !== lastHotelCountRef.current) {
             lastHotelCountRef.current = results.length;
-            setCompletedResults(results);
+            applyHotelResults(results);
           }
         } else if (!hotelUpdateThrottledRef.current && results.length !== lastHotelCountRef.current) {
           // For main search, apply throttling
           lastHotelCountRef.current = results.length;
-          setCompletedResults(results);
+          applyHotelResults(results);
 
           // Mark as throttled for next 1 second
           hotelUpdateThrottledRef.current = true;
@@ -552,26 +617,30 @@ export default function AddHotelPage() {
         // Terminal logic depends on which search mode we're in:
         //
         // ── Alternatives mode (altFetched === true) ──
-        //   The main search's `phase` may still be 'settled' from before the user
-        //   clicked Show Alternatives — that doesn't mean alternatives are done.
-        //   The only reliable "alternatives finished" signal is: no more probes
-        //   queued or running AND at least one alternative has actually arrived.
-        //   We ignore `phase` here entirely because the watcher's phase value is
-        //   tied to the main search lifecycle, not alternatives.
+        //   Terminal = no more probes queued/running AND the backend has settled
+        //   or exhausted. We do NOT require an alternative to actually appear in
+        //   results: a destination with zero viable rooms (e.g. all probes return
+        //   SKIPPED_INSUFFICIENT) is a valid terminal-with-zero outcome and the
+        //   UI needs to flip to the empty state instead of polling forever.
         //
         // ── Main search mode ──
         //   Use `summary.phase` per backend's handover ('settled' / 'exhausted'
         //   are terminal; 'in_progress' keeps polling).
         const hasAlternativeInResults = results.some(h => h.searchKind === 'alternative');
         const altsProbesDrained = status.summary.queued === 0 && status.summary.running === 0;
+        const altsBackendTerminal = backendPhase === 'settled' || backendPhase === 'exhausted';
 
         const isSearchDone = altFetched
-          // Alternatives mode: terminal = probes drained AND at least one alt visible
-          ? altsProbesDrained && hasAlternativeInResults
+          // Alternatives mode: probes drained AND backend has signed off.
+          ? altsProbesDrained && altsBackendTerminal
           // Main mode: rely on backend phase signal (with legacy fallback)
           : (phaseTerminal || legacyTerminal);
 
-        const showEmptyState = !altFetched && (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
+        // Empty-state covers both modes: main-search exhausted with nothing,
+        // OR alternatives finished and zero alternative hotels actually arrived.
+        const showEmptyState = altFetched
+          ? (altsProbesDrained && altsBackendTerminal && !hasAlternativeInResults && results.length === 0)
+          : (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
 
         if (status.summary.total === 0) {
           // No jobs queued yet — keep polling
@@ -594,6 +663,8 @@ export default function AddHotelPage() {
           // the button re-renders correctly (visible if more batches available,
           // hidden if the destination is now drained).
           setSearchingMore(false);
+          // Search More batch finished — go back to replace-mode for future polls.
+          searchMoreActiveRef.current = false;
           if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
 
           // Only show "No Hotels Found" if search exhausted with zero results
@@ -699,6 +770,10 @@ export default function AddHotelPage() {
     setSearchSummary(null);
     setCanSearchMore(false);
     setSearchingMore(false);
+    searchMoreActiveRef.current = false;
+    // Reset arrival order so the next stream starts fresh.
+    arrivalOrderRef.current = new Map();
+    arrivalCounterRef.current = 0;
     setSearchingWiderArea(false);
     previousTotalRef.current = 0;
     if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
@@ -755,6 +830,10 @@ export default function AddHotelPage() {
         if (destinationId !== undefined) {
           localStorage.setItem(`lastSearchDest_${requestId}`, String(destinationId));
         }
+        // Resuming an existing search: stamp arrivals so all already-found
+        // hotels get a baseline index. Subsequent poll updates will stamp
+        // newer hotels with higher indices and render them first.
+        stampArrivals(completedHotels);
         setCompletedResults(completedHotels);
         setSearchSummary({
           total: status.summary.total,
@@ -798,10 +877,17 @@ export default function AddHotelPage() {
     startNewSearch();
   }, [requestId, startPollingFallback, startNewSearch]);
 
+  // Kick off the search exactly once per requestId. We deliberately do NOT
+  // depend on `request` here: the polling status-check effect calls
+  // setRequest() periodically to detect needs_manual_handling, and rerunning
+  // runSearch on every such update would wipe completedResults and flash the
+  // skeleton (this is what made "Search More" look like a fresh search).
+  const searchKickedOffForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (request) {
-      runSearch(request.destinationId);
-    }
+    if (!request) return;
+    if (searchKickedOffForRef.current === request.id) return;
+    searchKickedOffForRef.current = request.id;
+    runSearch(request.destinationId);
   }, [request, runSearch]);
 
   // Restart search from scratch
@@ -815,6 +901,8 @@ export default function AddHotelPage() {
     setDestinationFallback(null);
     setManualRequestOnly(false);
     setPhase('searching');
+    arrivalOrderRef.current = new Map();
+    arrivalCounterRef.current = 0;
     // Clear localStorage to force a fresh search
     localStorage.removeItem(`lastSearchDest_${requestId}`);
     // Directly start a new search via API
@@ -962,6 +1050,57 @@ export default function AddHotelPage() {
     }
   }, [requestId, relaxation, request, startPollingFallback, locale, t]);
 
+  // Wrapper for the "No Hotels Available" screen. Triggers the same relaxed-
+  // criteria search, then decides what to show next:
+  //   - alternatives queued → drop the manual card, flip to polling so the
+  //     streaming alternatives grid replaces the empty-state screen.
+  //   - zero candidates → keep the manual card in place; handleShowAlternatives
+  //     toasts the user so they understand why nothing changed.
+  const handleShowAlternativesFromManual = useCallback(async () => {
+    setAlternativesLoading(true);
+    // Sync the ref immediately so the polling status-check effect (which fires
+    // the moment we flip phase to 'polling' below) doesn't read stale `false`
+    // and revert manualRequestOnly back to true.
+    alternativesLoadingRef.current = true;
+    try {
+      const resp = await requestsApi.startHotelSearchAlternatives(requestId, {
+        appliedLevel: relaxation?.level ?? 'exact',
+        currencyCode: request?.currencyCode || 'EUR',
+        nationalityCode: request?.nationalityCode || undefined,
+        lang: locale === 'de' ? 'de' : 'en',
+      });
+      if (resp.totalCandidates === 0) {
+        toast.error(t.addHotel.noAlternativesFound);
+        setAlternativesLoading(false);
+        return;
+      }
+      // Got candidates — surrender the empty-state UI and let the poll stream
+      // alternatives into completedResults.
+      setManualRequestOnly(false);
+      setAlternativesFetched(true);
+      // Sync the fetched ref immediately. The first poll fires synchronously
+      // inside startPollingFallback() below; without this, that poll reads
+      // `altFetched = false` from the stale ref, takes the main-search terminal
+      // branch (request is still needs_manual_handling), flips manualRequestOnly
+      // and phase back, and the screen ends up blank. See feedback memory on
+      // poll-closure refs.
+      alternativesFetchedRef.current = true;
+      setAlternativesExpanded(true);
+      setPhase('polling');
+      startPollingFallback(requestId);
+      // Safety: same 90s fail-safe as the main alternatives handler.
+      setTimeout(() => {
+        if (alternativesLoadingRef.current) {
+          setAlternativesLoading(false);
+          toast.error(t.addHotel.noAlternativesFound);
+        }
+      }, 90000);
+    } catch {
+      toast.error('Failed to fetch alternatives');
+      setAlternativesLoading(false);
+    }
+  }, [requestId, relaxation, request, locale, t, startPollingFallback]);
+
   // "Search More" — fetches the next ~200 hotels at the same destination + star
   // rating. Reuses the existing polling loop: new hotels stream into the same
   // `completedResults` array as `jobs[]` grows on the /status response.
@@ -969,6 +1108,10 @@ export default function AddHotelPage() {
     setSearchingMore(true);
     // Optimistically hide the button while we wait for the decision + first poll.
     setCanSearchMore(false);
+    // Tell the poll loop to UNION new results with what's already on screen,
+    // instead of replacing — otherwise an interim /status response with only
+    // the new batch's jobs blanks out the previously-loaded cards.
+    searchMoreActiveRef.current = true;
     try {
       const resp = await requestsApi.startHotelSearchMore(requestId, {
         currencyCode: request?.currencyCode || 'EUR',
@@ -1096,20 +1239,21 @@ export default function AddHotelPage() {
     }, {})
   );
 
-  // Split results into 3 buckets: main, star-mismatch, and true alternatives
-  // Coerce starRating to number — live API may return it as a string or decimal (e.g. "4.5")
-  // Use Math.round so that 4.5 → 5, 3.5 → 4, matching whole-number filter options
-  const hotelStars = (h: { starRating: number }) => Math.round(Number(h.starRating));
-  const requestedStars = Math.round(Number(request?.starRating ?? 0));
+  // Split results into 3 buckets: main, star-mismatch, and true alternatives.
+  // Now multi-aware: a hotel "matches" if its rounded star bucket is in the
+  // user's selected categories (whatever they ticked in the form).
+  const hotelStars = (h: { starRating: number }) => hotelStarBucket(h);
+  const requestedStarBuckets = selectedStars(request ?? {}).map((s) => Math.round(s));
+  const hasRequestedStars = requestedStarBuckets.length > 0;
 
-  // Main results: searchKind=main OR (no searchKind AND star rating matches)
+  // Main results: searchKind=main OR (no searchKind AND star rating matches any selected category)
   const mainResults = deduplicatedResults.filter(
-    (h) => h.searchKind === 'main' || (!h.searchKind && (!requestedStars || hotelStars(h) === requestedStars))
+    (h) => h.searchKind === 'main' || (!h.searchKind && (!hasRequestedStars || hotelMatchesSelectedStars(h, requestedStarBuckets)))
   );
 
-  // Star mismatch results: no searchKind AND star rating doesn't match (old relaxation)
+  // Star mismatch results: no searchKind AND star rating doesn't match any selected category
   const starMismatchResults = deduplicatedResults.filter(
-    (h) => !h.searchKind && requestedStars && hotelStars(h) !== requestedStars
+    (h) => !h.searchKind && hasRequestedStars && !hotelMatchesSelectedStars(h, requestedStarBuckets)
   );
 
   // True alternatives: searchKind=alternative (from alternatives endpoint)
@@ -1137,29 +1281,125 @@ export default function AddHotelPage() {
   // sent by backend but isn't meaningful, so we don't render the badge.
   const isYouthOrSchoolGroup = groupTypeRequiresAge(request?.groupType);
 
+  // Sort by descending arrival order so newly-streamed hotels appear at the
+  // top of each section. Cards that arrived together (same poll tick) tie-break
+  // on their relative order within `completedResults`, which keeps groups stable.
+  // Hotels without an arrival stamp (defensive — shouldn't normally happen)
+  // fall to the bottom.
+  const byNewestFirst = (a: HotelSearchResult, b: HotelSearchResult) => {
+    const ai = arrivalOrderRef.current.get(a.hotelCode) ?? 0;
+    const bi = arrivalOrderRef.current.get(b.hotelCode) ?? 0;
+    return bi - ai;
+  };
+
   // Apply filters separately to main and star-mismatch results (not to true alternatives)
-  const filteredMainResults = applyFilters(mainResults);
-  const filteredStarMismatchResults = applyFilters(starMismatchResults);
+  const filteredMainResults = [...applyFilters(mainResults)].sort(byNewestFirst);
+  const filteredStarMismatchResults = [...applyFilters(starMismatchResults)].sort(byNewestFirst);
   // True alternatives use raw list (no star/price/amenity filters applied)
-  const filteredAltResults = trueAltResults;
+  const filteredAltResults = [...trueAltResults].sort(byNewestFirst);
   // Combine: main results first, then star-mismatch, then true alternatives
   const filteredResults = [...filteredMainResults, ...filteredStarMismatchResults, ...filteredAltResults];
 
-  // Compute "Show Alternatives" button visibility locally
-  // Show button only when 1-4 main hotels succeeded and alternatives not yet fetched
-  const TERMINAL_STATUSES = new Set(['COMPLETED', 'SKIPPED_INSUFFICIENT', 'FAILED']);
-  const mainProbeJobs = completedResults.filter((h) => h.searchKind !== 'alternative') || [];
-  const allMainProbesTerminal = mainProbeJobs.length > 0 && mainProbeJobs.every((h) => {
-    // Check if this hotel was from a completed probe (searchKind=main or no searchKind)
-    return !h.searchKind || h.searchKind === 'main';
-  });
+  // Compute "Show Alternatives" button visibility locally.
+  // Per Oliver's directive: show the button whenever the search has settled
+  // and the main result count hasn't met the 50-hotel target. The user can
+  // then widen the net via the alternatives endpoint. Hide once alternatives
+  // are already being fetched, or when manual-handling is required.
+  const SHOW_ALTERNATIVES_TARGET = 50;
   const mainSuccessfulCount = completedResults.filter((h) => h.searchKind !== 'alternative').length;
   const shouldShowAlternativesButton =
-    allMainProbesTerminal &&
+    // Wait for the search to finish before offering the action so the count is stable.
+    phase === 'done' &&
+    // Need at least one main result so the button appears in context with hotels above it.
     mainSuccessfulCount >= 1 &&
-    mainSuccessfulCount <= 4 &&
+    // Below the target = there's still headroom to widen.
+    mainSuccessfulCount < SHOW_ALTERNATIVES_TARGET &&
     !alternativesFetched &&
     !manualRequestOnly;
+
+  // Search More slot — two renderings of the same state:
+  //   - `searchMoreSlot`        : full-width pill, used at the bottom of the list.
+  //   - `searchMoreInlineSlot`  : compact button sized to sit inside the
+  //     main-results header row, alongside the Search Again icon. Both share
+  //     the same searchingMore / canSearchMore gating so they appear in lockstep.
+  const searchMoreSlot = searchingMore ? (
+    <div
+      className="flex items-center justify-center gap-2.5 py-4 px-5 rounded-[14px] border border-sett-primary/25 bg-sett-primary/5 animate-sidebar-fade-up"
+      role="status"
+      aria-live="polite"
+    >
+      <svg className="w-4 h-4 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      <span className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+        {t.addHotel.searchingMore}
+      </span>
+    </div>
+  ) : canSearchMore && phase === 'done' ? (
+    <div className="flex justify-center py-3 animate-sidebar-fade-up">
+      <button
+        type="button"
+        onClick={handleSearchMore}
+        className="group relative flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-gradient-to-r from-sett-primary via-sett-primary to-sett-green-dark font-montserrat text-[14px] font-bold uppercase tracking-[0.04em] transition-transform duration-200 hover:-translate-y-[1px] animate-button-glow-pulse overflow-hidden"
+      >
+        {/* Hover-state overlay: reverses the gradient direction so the dark
+            green sweeps across on hover, giving a soft fade rather than a flat
+            color swap. */}
+        <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-sett-green-dark via-sett-green-dark to-sett-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Soft white sheen sweeping across the surface — adds the "flash"
+            on top of the base gradient. */}
+        <span
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-button-text-shine pointer-events-none"
+        />
+        <Search className="w-4 h-4 relative z-10 text-sett-navy group-hover:text-white transition-colors" />
+        {/* Text shine: stays dark navy the whole time. The middle stop uses
+            a slightly darker navy so a subtle highlight reads as a glint
+            traveling across the letters — never blowing out to white where
+            it would disappear into the green button surface. */}
+        <span
+          className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-sett-navy via-sett-navy/60 to-sett-navy animate-button-text-shine group-hover:from-white group-hover:via-white group-hover:to-white"
+        >
+          {t.addHotel.searchMore}
+        </span>
+      </button>
+    </div>
+  ) : null;
+
+  const searchMoreInlineSlot = searchingMore ? (
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] border border-sett-primary/25 bg-sett-primary/5 shrink-0"
+      role="status"
+      aria-live="polite"
+    >
+      <svg className="w-3.5 h-3.5 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      <span className="font-montserrat text-[12px] font-semibold text-sett-text-primary whitespace-nowrap">
+        {t.addHotel.searchingMore}
+      </span>
+    </div>
+  ) : canSearchMore && phase === 'done' ? (
+    <button
+      type="button"
+      onClick={handleSearchMore}
+      className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-gradient-to-r from-sett-primary via-sett-primary to-sett-green-dark font-montserrat text-[12px] font-bold uppercase tracking-[0.04em] transition-transform duration-200 hover:-translate-y-[1px] animate-button-glow-pulse shrink-0 whitespace-nowrap overflow-hidden"
+    >
+      <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-sett-green-dark via-sett-green-dark to-sett-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <span
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-button-text-shine pointer-events-none"
+      />
+      <Search className="w-3.5 h-3.5 relative z-10 text-sett-navy group-hover:text-white transition-colors" />
+      <span
+        className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-sett-navy via-sett-navy/60 to-sett-navy animate-button-text-shine group-hover:from-white group-hover:via-white group-hover:to-white"
+      >
+        {t.addHotel.searchMore}
+      </span>
+    </button>
+  ) : null;
 
   return (
     <div className="flex flex-col min-h-full xl:h-full xl:overflow-hidden">
@@ -1348,8 +1588,10 @@ export default function AddHotelPage() {
           );
         })()}
 
-        {/* Skeleton — searching/polling with no results yet */}
-        {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && (
+        {/* Skeleton — searching/polling with no results yet.
+            Suppressed during "Search More" so a transient empty poll response
+            doesn't blank out the already-loaded cards. */}
+        {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && !searchingMore && (
           <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
             {/* Left sidebar skeleton — hidden on mobile */}
             <div className="hidden xl:block xl:w-[300px] shrink-0 xl:overflow-y-auto">
@@ -1664,6 +1906,8 @@ export default function AddHotelPage() {
                 requestRef={request?.referenceNumber?.toString() ?? requestId}
                 onSent={() => toast.success(t.addHotel.manualRequestSent)}
                 onEditTripDetails={handleEditTripDetails}
+                onShowAlternatives={handleShowAlternativesFromManual}
+                alternativesLoading={alternativesLoading}
               />
             </div>
           </div>
@@ -1815,7 +2059,7 @@ export default function AddHotelPage() {
                       {t.addHotel.starRating}
                     </label>
                     <div className="flex flex-col gap-3">
-                      {[5, 4, 3].map((star) => (
+                      {[5, 4, 3, 2, 1].map((star) => (
                         <label
                           key={star}
                           className={cn(
@@ -1968,18 +2212,21 @@ export default function AddHotelPage() {
                           <Check className="w-4 h-4 text-white" strokeWidth={3} />
                         </div>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h2 className="font-montserrat text-[16px] font-bold text-sett-text-primary">
                           {t.addHotel.hotelsMatchingRequest}
                         </h2>
                         <p className="font-montserrat text-[12px] text-sett-text-secondary mt-0.5">
-                          {requestedStars ? `${requestedStars} star hotel${requestedStars !== 1 ? 's' : ''} found` : 'Hotels matching your criteria'}
+                          {hasRequestedStars
+                            ? `${requestedStarBuckets.map((s) => `${s}★`).join(', ')} hotels found`
+                            : 'Hotels matching your criteria'}
                         </p>
                       </div>
+                      {searchMoreInlineSlot}
                       <button
                         type="button"
                         onClick={handleRestartSearch}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                        className="p-2 rounded-full hover:bg-gray-100 transition-colors shrink-0"
                         title="Search again"
                       >
                         <RotateCcw className="w-4 h-4 text-sett-text-secondary hover:text-sett-text-primary transition-colors" />
@@ -2013,34 +2260,10 @@ export default function AddHotelPage() {
                   </div>
                 )}
 
-                {/* Search More button — appears when the backend has paginated
-                    results available AND the current search is settled. Hidden
-                    (not disabled) when canSearchMore is false. */}
-                {canSearchMore && phase === 'done' && (
-                  <div className="flex justify-center py-3 animate-sidebar-fade-up">
-                    <button
-                      type="button"
-                      onClick={handleSearchMore}
-                      disabled={searchingMore}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-sett-primary text-sett-navy font-montserrat text-[14px] font-bold uppercase tracking-[0.04em] hover:bg-sett-green-dark hover:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_2px_8px_0_rgba(170,199,55,0.25)]"
-                    >
-                      {searchingMore ? (
-                        <>
-                          <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          {t.addHotel.searchingMore}
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4" />
-                          {t.addHotel.searchMore}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
+                {/* Search More slot (bottom copy) — fallback for users who scroll
+                    to the natural end of the list. Top copy lives above the main
+                    results section so the CTA is reachable without scrolling. */}
+                {searchMoreSlot}
 
                 {/* Show Alternatives button — computed locally when 1-4 main hotels succeeded */}
                 {shouldShowAlternativesButton && (
@@ -2336,7 +2559,22 @@ function SearchBanner({ type, message, onDismiss }: {
 
 /* ─────────────── Manual Request Card ─────────────── */
 
-function ManualRequestCard({ requestRef, onSent, onEditTripDetails }: { requestRef: string; onSent: () => void; onEditTripDetails: () => void }) {
+function ManualRequestCard({
+  requestRef,
+  onSent,
+  onEditTripDetails,
+  onShowAlternatives,
+  alternativesLoading,
+}: {
+  requestRef: string;
+  onSent: () => void;
+  onEditTripDetails: () => void;
+  /** Optional: when provided, renders a secondary CTA that triggers a
+   *  relaxed-criteria search. Useful when the main search exhausted with
+   *  no matches but alternatives might still surface hotels. */
+  onShowAlternatives?: () => void;
+  alternativesLoading?: boolean;
+}) {
   const { t } = useLanguage();
   return (
     <div className="relative overflow-hidden flex flex-col items-center justify-center py-16 px-6 text-center bg-white rounded-[14px] border border-sett-border-light shadow-card">
@@ -2355,14 +2593,40 @@ function ManualRequestCard({ requestRef, onSent, onEditTripDetails }: { requestR
         {t.addHotel.manualRequestMsg}
       </p>
 
-      <button
-        type="button"
-        onClick={onEditTripDetails}
-        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-white bg-sett-primary hover:bg-sett-primary-hover transition-colors shadow-button"
-      >
-        <SquarePen className="w-4 h-4" />
-        {t.addHotel.editTripDetailsBtn}
-      </button>
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <button
+          type="button"
+          onClick={onEditTripDetails}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-white bg-sett-primary hover:bg-sett-primary-hover transition-colors shadow-button"
+        >
+          <SquarePen className="w-4 h-4" />
+          {t.addHotel.editTripDetailsBtn}
+        </button>
+
+        {onShowAlternatives && (
+          <button
+            type="button"
+            onClick={onShowAlternatives}
+            disabled={alternativesLoading}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-sett-primary border border-sett-primary hover:bg-sett-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {alternativesLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {t.addHotel.searchingAlternatives}
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                {t.addHotel.showAlternatives}
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -2647,12 +2911,21 @@ function HotelResultCard({
                   <span
                     key={facility.id}
                     // Each chip pops in with a small stagger (capped at 8 so cards
-                    // with 20+ facilities don't drag the cascade out)
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in"
+                    // with 20+ facilities don't drag the cascade out).
+                    // Hover micro-interaction: chip lifts + scales slightly, the
+                    // border deepens to the brand green, and the icon nudges
+                    // upward. Uses an eased spring curve so the motion feels
+                    // organic instead of mechanical. `will-change` keeps the
+                    // transform on the GPU so cards with many chips stay smooth.
+                    className="group/amenity inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in cursor-default origin-center will-change-transform transition-[transform,box-shadow,border-color,background-color] duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 hover:scale-[1.25] hover:bg-white hover:border-sett-primary hover:shadow-[0_6px_18px_-3px_rgba(170,199,55,0.5)] hover:z-10 relative"
                     style={{ animationDelay: `${240 + Math.min(i, 7) * 30}ms` }}
                   >
-                    {AmenityIcon && <AmenityIcon className="w-3 h-3" />}
-                    {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                    {AmenityIcon && (
+                      <AmenityIcon className="w-3 h-3 transition-transform duration-300 ease-out group-hover/amenity:-translate-y-0.5 group-hover/amenity:rotate-[-10deg] group-hover/amenity:text-sett-green-dark" />
+                    )}
+                    <span className="transition-colors duration-200 group-hover/amenity:text-sett-green-dark">
+                      {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                    </span>
                   </span>
                 );
               })}

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { ChevronDown, X as XIcon } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -25,6 +26,7 @@ import {
   buildGroupTypeOptions,
   groupTypeRequiresAge,
 } from '@/lib/utils/groupType';
+import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
 
 interface FormData {
   // Step 1: Trip Details
@@ -32,7 +34,8 @@ interface FormData {
   destination: string;
   checkInDate: string;
   checkOutDate: string;
-  hotelCategory: string;
+  /** Multi-select hotel category codes ("1".."5"). Empty = none ticked yet. */
+  hotelCategories: string[];
   budgetRange: string;
   groupType: string;
   groupSize: string;
@@ -67,7 +70,7 @@ const defaultFormData: FormData = {
   destination: '',
   checkInDate: '',
   checkOutDate: '',
-  hotelCategory: '',
+  hotelCategories: [],
   budgetRange: '',
   groupType: '',
   groupSize: '',
@@ -164,7 +167,7 @@ function getStepProgress(step: number, data: FormData): number {
       data.checkOutDate <= maxDate &&
       (!data.checkInDate || data.checkOutDate > data.checkInDate)
     );
-    checks.push(!!data.hotelCategory);
+    checks.push(data.hotelCategories.length > 0);
     checks.push(!!data.groupType);
     checks.push(!!data.groupSize.trim() && Number(data.groupSize) > 0);
     if (groupTypeRequiresAge(data.groupType)) {
@@ -238,7 +241,9 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     if (data.checkInDate && data.checkOutDate && data.checkOutDate <= data.checkInDate) {
       errors.checkOutDate = t.createForm.checkOutAfterCheckIn;
     }
-    if (!data.hotelCategory) errors.hotelCategory = t.createForm.hotelCategoryRequired;
+    if (data.hotelCategories.length === 0) {
+      errors.hotelCategories = t.createForm.hotelCategoryRequired;
+    }
     if (!data.groupType) errors.groupType = t.createForm.groupTypeRequired;
     if (!data.groupSize.trim()) {
       errors.groupSize = t.createForm.groupSizeRequired;
@@ -332,8 +337,22 @@ function CreateBookingRequestPageInner() {
     try {
       const saved = sessionStorage.getItem(SESSION_KEY);
       if (saved) {
-        const { formData: savedForm } = JSON.parse(saved) as { formData: FormData };
-        return { ...defaultFormData, ...savedForm, nameListFile: null };
+        // Older drafts stored a single-value `hotelCategory: string`. Migrate
+        // that into the new `hotelCategories: string[]` so the dropdown
+        // pre-ticks correctly without throwing away the user's prior pick.
+        const parsed = JSON.parse(saved) as { formData: Partial<FormData> & { hotelCategory?: string } };
+        const savedForm = parsed.formData ?? {};
+        const migratedCategories: string[] = Array.isArray(savedForm.hotelCategories)
+          ? savedForm.hotelCategories
+          : savedForm.hotelCategory
+            ? [savedForm.hotelCategory]
+            : [];
+        return {
+          ...defaultFormData,
+          ...savedForm,
+          hotelCategories: migratedCategories,
+          nameListFile: null,
+        };
       }
     } catch {}
     return defaultFormData;
@@ -361,8 +380,19 @@ function CreateBookingRequestPageInner() {
     try {
       const saved = sessionStorage.getItem(`createFormDraft_${draft}`);
       if (saved) {
-        const parsed = JSON.parse(saved) as FormData;
-        setFormData({ ...defaultFormData, ...parsed, nameListFile: null });
+        // Same legacy-field migration as the SESSION_KEY restore path above.
+        const parsed = JSON.parse(saved) as Partial<FormData> & { hotelCategory?: string };
+        const migratedCategories: string[] = Array.isArray(parsed.hotelCategories)
+          ? parsed.hotelCategories
+          : parsed.hotelCategory
+            ? [parsed.hotelCategory]
+            : [];
+        setFormData({
+          ...defaultFormData,
+          ...parsed,
+          hotelCategories: migratedCategories,
+          nameListFile: null,
+        });
         setDraftRequestId(draft);
       }
     } catch {
@@ -441,7 +471,14 @@ function CreateBookingRequestPageInner() {
         destinationName: formData.destination,
         checkinDate: formData.checkInDate,
         checkoutDate: formData.checkOutDate || undefined,
-        starRating: formData.hotelCategory ? Number(formData.hotelCategory) : undefined,
+        // Send both fields during the migration window. Backend prefers `starRatings`
+        // when both are present; legacy single field stays for Wix-webhook compat.
+        starRatings: formData.hotelCategories.length > 0
+          ? formData.hotelCategories.map(Number).sort((a, b) => a - b)
+          : undefined,
+        starRating: formData.hotelCategories.length > 0
+          ? Number(formData.hotelCategories[0])
+          : undefined,
         budgetRange: formData.budgetRange || undefined,
         groupType: formData.groupType || undefined,
         groupSize: formData.groupSize ? Number(formData.groupSize) : undefined,
@@ -698,6 +735,28 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const justSelectedRef = useRef(false);
   const userTypingRef = useRef(false);
 
+  // Hotel-category multi-select dropdown state. Same UX pattern as AddServiceModal —
+  // chips inside the trigger, checkbox dropdown below.
+  const [hotelCatDropdownOpen, setHotelCatDropdownOpen] = useState(false);
+  const hotelCatWrapperRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hotelCatDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (hotelCatWrapperRef.current && !hotelCatWrapperRef.current.contains(e.target as Node)) {
+        setHotelCatDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [hotelCatDropdownOpen]);
+
+  const toggleHotelCategory = (value: string) => {
+    const next = formData.hotelCategories.includes(value)
+      ? formData.hotelCategories.filter((v) => v !== value)
+      : [...formData.hotelCategories, value].sort();
+    updateField('hotelCategories', next);
+  };
+
   // Sync destQuery when formData.destination is restored from sessionStorage draft
   useEffect(() => {
     if (formData.destination && !userTypingRef.current) {
@@ -857,6 +916,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
               />
             </div>
             <FieldError message={errors.checkInDate} />
+            {/* Passive hint — always visible below the field so the user is
+                warned BEFORE picking a risky near-date. */}
+            <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
+              {t.createForm.checkInDateHint}
+            </p>
           </div>
           <div className="animate-field-fade-in" style={{ animationDelay: '220ms' }}>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
@@ -883,18 +947,160 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
         </div>
 
-        {/* Hotel Category / Budget */}
+        {/* Free-cancellation contextual banner — appears only when the user has
+            picked a check-in date within the next 14 days. The backend filters
+            search results to free-cancellation rates only, so near-date requests
+            return fewer hotels. We surface this to the user so they understand
+            why their result set may be small (and can choose a later date if
+            their group allows it). */}
+        <FreeCancellationDateBanner checkInDate={formData.checkInDate} />
+
+        {/* Hotel Category (multi-select dropdown) / Budget.
+            Same UX pattern as the AddServiceModal: chips inside the trigger,
+            checkbox dropdown below. Backend's ±1 relaxation widens further
+            automatically — the helper text below the field explains this. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label={`${t.createForm.hotelCategory} *`}
-            options={hotelCategoryOptions}
-            value={formData.hotelCategory}
-            onChange={(e) => updateField('hotelCategory', e.target.value)}
-            placeholder={t.createForm.selectHotelCategory}
-            error={errors.hotelCategory}
-            className="animate-field-fade-in"
+          {/* When the dropdown is open, lift the wrapper's z-index so the
+              panel renders above sibling form fields below (Group Type, etc.).
+              Same pattern as the shared Select component — without this, the
+              panel is painted behind later siblings on the page. */}
+          <div
+            className={cn(
+              'animate-field-fade-in',
+              hotelCatDropdownOpen && 'relative z-[9999]',
+            )}
             style={{ animationDelay: '280ms' }}
-          />
+            ref={hotelCatWrapperRef}
+          >
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+              {t.createForm.hotelCategory} <span className="text-sett-destructive">*</span>
+            </label>
+            <div className="relative">
+              {/* Trigger — shows selected categories as chips, or the placeholder */}
+              <div
+                role="combobox"
+                aria-haspopup="listbox"
+                aria-expanded={hotelCatDropdownOpen}
+                aria-controls="hotel-category-listbox"
+                tabIndex={0}
+                onClick={() => setHotelCatDropdownOpen((v) => !v)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setHotelCatDropdownOpen((v) => !v);
+                  }
+                }}
+                className={cn(
+                  // Match the shared Select component's radius (14px) so
+                  // Hotel Category lines up visually with the other dropdowns
+                  // (Budget Range, Group Type) in the same form.
+                  'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
+                  errors.hotelCategories
+                    ? 'border-sett-destructive'
+                    : hotelCatDropdownOpen
+                      ? 'border-sett-primary ring-2 ring-sett-primary/20'
+                      : 'border-sett-border-light hover:border-sett-primary/40',
+                )}
+              >
+                {formData.hotelCategories.length === 0 ? (
+                  <span className="font-montserrat text-[14px] font-normal text-sett-text-accent flex-1">
+                    {t.createForm.selectHotelCategory}
+                  </span>
+                ) : (
+                  <>
+                    {hotelCategoryOptions
+                      .filter((o) => formData.hotelCategories.includes(o.value))
+                      .map((opt) => (
+                        <span
+                          key={opt.value}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-none"
+                        >
+                          {opt.node}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleHotelCategory(opt.value);
+                            }}
+                            className="ml-0.5 hover:text-sett-green-dark transition-colors"
+                            aria-label={`Remove ${opt.label}`}
+                          >
+                            <XIcon className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                  </>
+                )}
+                <ChevronDown
+                  className={cn(
+                    'shrink-0 w-4 h-4 ml-auto text-sett-text-muted transition-transform duration-200',
+                    hotelCatDropdownOpen && 'rotate-180',
+                  )}
+                />
+              </div>
+
+              {/* Dropdown panel */}
+              {hotelCatDropdownOpen && (
+                <div
+                  id="hotel-category-listbox"
+                  role="listbox"
+                  aria-multiselectable="true"
+                  className="absolute z-20 w-full mt-1.5 bg-white border border-sett-border-light rounded-[14px] shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden animate-sidebar-fade-up"
+                >
+                  <div className="px-3.5 py-2.5 border-b border-sett-border-light">
+                    <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent">
+                      {t.createForm.hotelCategory}
+                    </p>
+                  </div>
+                  <div
+                    className="max-h-[240px] overflow-y-auto py-1.5"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
+                  >
+                    {hotelCategoryOptions.map((opt) => {
+                      const isSelected = formData.hotelCategories.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => toggleHotelCategory(opt.value)}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                            isSelected
+                              ? 'bg-sett-light-green-bg text-sett-primary font-medium'
+                              : 'text-sett-text-primary hover:bg-sett-fill',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'w-4 h-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-colors',
+                              isSelected
+                                ? 'bg-sett-primary border-sett-primary'
+                                : 'bg-white border-sett-border',
+                            )}
+                          >
+                            {isSelected && (
+                              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                          {opt.node}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
+              {t.createForm.hotelCategoryHint}
+            </p>
+            {errors.hotelCategories && (
+              <p className="mt-1 text-caption text-sett-destructive">{errors.hotelCategories}</p>
+            )}
+          </div>
           <Select
             label={`${t.createForm.budgetRange} ${t.createForm.optional}`}
             options={budgetRangeOptions}
