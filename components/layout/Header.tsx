@@ -100,7 +100,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
             type="button"
             onClick={openMobileSidebar}
             className="lg:hidden p-2 -ml-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-            aria-label="Open menu"
+            aria-label={t.common.openMenu}
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -136,7 +136,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
           {/* Language toggle — prominent per §7.4 */}
           <div className="relative group">
             <LanguageToggle />
-            <Tooltip>Switch Language</Tooltip>
+            <Tooltip>{t.common.switchLanguage}</Tooltip>
           </div>
 
           {/* Vertical divider */}
@@ -147,7 +147,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
               type="button"
               onClick={onRefresh}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              aria-label="Refresh"
+              aria-label={t.common.refresh}
             />
           )}
 
@@ -171,7 +171,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
               type="button"
               onClick={() => setNotificationsOpen(true)}
               className="relative p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+              aria-label={unreadCount > 0 ? `${t.common.notifications} (${unreadCount})` : t.common.notifications}
             >
               <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'animate-bell-shake' : ''}`} />
               {unreadCount > 0 && (
@@ -183,7 +183,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
                 </>
               )}
             </button>
-            <Tooltip>Notifications</Tooltip>
+            <Tooltip>{t.common.notifications}</Tooltip>
           </div>
 
           {/* Divider before user */}
@@ -251,7 +251,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 font-montserrat text-[13px] font-medium text-sett-text-primary hover:bg-sett-background transition-colors text-left"
                     >
                       <LogOut className="w-4 h-4 text-sett-text-accent" />
-                      Logout
+                      {t.common.logout}
                     </button>
                   )}
                 </div>

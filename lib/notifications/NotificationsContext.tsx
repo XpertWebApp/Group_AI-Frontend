@@ -104,7 +104,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     inFlightRef.current = true;
     if (!silent) setLoading(true);
     try {
-      const data = await dashboardApi.getNotifications({ limit: PAGE_LIMIT });
+      // Background poll — always opt out of the global error toast so a
+      // transient 5xx during the 30s cadence doesn't pop a banner at the user.
+      // Failures still reject; the catch below absorbs them quietly.
+      const data = await dashboardApi.getNotifications(
+        { limit: PAGE_LIMIT },
+        { silent: true },
+      );
       const incoming = data.notifications ?? [];
 
       dlog('poll done', { incoming: incoming.length, firstLoad: isFirstLoadRef.current, listeners: listenersRef.current.size });

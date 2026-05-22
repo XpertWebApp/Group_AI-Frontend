@@ -181,6 +181,11 @@ export interface ProposalHotel {
   address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;
+  /** Deep-link to the hotel in SETTHub. Persisted at add-time from the
+   *  search-result payload so the request summary page can make the hotel
+   *  name clickable (opens in a new tab). May be null for hotels added
+   *  before this field was tracked. */
+  sethubDetailsUrl?: string | null;
   createdAt: string;
   includedInTotal?: boolean;
 }

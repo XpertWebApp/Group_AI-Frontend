@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
 import { ChevronDown, X } from 'lucide-react';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { requestsApi } from '@/lib/api/requests';
@@ -67,17 +68,18 @@ interface FormState {
   customerNotes: string;
 }
 
-/* ── Shared label style matching create form ── */
+/* ── Shared label style — §5.5 form labels: Montserrat 600, 12px, uppercase,
+   letter-spacing 0.05em, navy. */
 const labelCls =
-  'block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5';
+  'block font-montserrat text-[12px] font-semibold leading-tight text-sett-navy uppercase tracking-[0.05em] mb-1';
 
-/* ── Shared input style matching create form ── */
+/* ── Shared input style ── */
 const inputCls =
-  'w-full p-3 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:ring-2 focus:ring-sett-primary transition-colors';
+  'w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] bg-white font-montserrat text-[13px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] transition-colors';
 
-/* ── Shared textarea style matching create form ── */
+/* ── Shared textarea style ── */
 const textareaCls =
-  'w-full px-3 py-2.5 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary transition-colors resize-none min-h-[80px]';
+  'w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] bg-white font-montserrat text-[13px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] transition-colors resize-none min-h-[64px]';
 
 /* ── Section header matching create form ── */
 function StarDisplay({ rating, label }: { rating: number; label: string }) {
@@ -108,12 +110,12 @@ function StarDisplay({ rating, label }: { rating: number; label: string }) {
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="flex items-start gap-3 mb-5">
-      <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5 shrink-0" />
+    <div className="flex items-start gap-2.5 mb-3">
+      <div className="w-1 h-8 bg-sett-primary rounded-full mt-0.5 shrink-0" />
       <div>
-        <h3 className="font-montserrat text-[16px] font-bold text-sett-text-primary leading-tight">{title}</h3>
+        <h3 className="font-montserrat text-[14px] font-bold text-sett-text-primary leading-tight">{title}</h3>
         {subtitle && (
-          <p className="font-montserrat text-[13px] text-sett-text-accent mt-0.5">{subtitle}</p>
+          <p className="font-montserrat text-[12px] text-sett-text-accent mt-0.5 leading-snug">{subtitle}</p>
         )}
       </div>
     </div>
@@ -135,10 +137,10 @@ function RadioOption({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal transition-colors flex-1',
+        'flex items-center gap-2 px-3 py-2 rounded-[4px] border font-montserrat text-[13px] font-normal leading-normal transition-colors flex-1',
         selected
-          ? 'border-sett-primary/40 bg-sett-light-green-bg text-sett-text-primary'
-          : 'border-sett-border-light bg-white text-sett-text-primary hover:border-sett-primary/40'
+          ? 'border-sett-primary bg-[#F5F9E8] text-sett-navy'
+          : 'border-[#D0D0D0] bg-white text-sett-navy hover:border-sett-primary/60'
       )}
     >
       {selected ? (
@@ -247,6 +249,32 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     }));
   };
 
+  // Anchors used to scroll the modal body so the date input is positioned with
+  // enough room for the calendar popper to fit fully below it.
+  const checkinAnchorRef = useRef<HTMLInputElement>(null);
+  const checkoutAnchorRef = useRef<HTMLInputElement>(null);
+
+  // When the user opens a calendar, gently scroll the modal so the input sits
+  // near the top — guarantees enough vertical room below for the calendar
+  // popper, even at 150% zoom where the calendar's footprint is taller than
+  // half the modal.
+  const ensureDatePickerVisible = useCallback((which: 'checkin' | 'checkout') => {
+    const container = scrollContainerRef.current;
+    const anchor = which === 'checkin' ? checkinAnchorRef.current : checkoutAnchorRef.current;
+    if (!container || !anchor) return;
+    // Defer to next frame so the popper has a chance to mount and measure.
+    requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      // Target: keep the input ~24px below the top of the scroll area.
+      const desiredOffsetFromTop = 24;
+      const delta = anchorRect.top - containerRect.top - desiredOffsetFromTop;
+      if (Math.abs(delta) > 4) {
+        container.scrollBy({ top: delta, behavior: 'smooth' });
+      }
+    });
+  }, []);
+
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -321,19 +349,11 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close datepickers when modal scrolls to keep calendar in view
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    const handleScroll = () => {
-      // Trigger a document click to close any open datepicker
-      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    };
-
-    scrollContainer.addEventListener('scroll', handleScroll);
-    return () => scrollContainer.removeEventListener('scroll', handleScroll);
-  }, []);
+  // We deliberately do NOT close datepickers on every scroll anymore — the
+  // calendar now lives inside the modal body and may need the modal to scroll
+  // to fit fully on screen. Closing on programmatic scroll defeated that.
+  // (Outside-click and Escape still close the calendar via react-datepicker's
+  // own listeners.)
 
   const handleDestinationInputChange = useCallback((value: string) => {
     justSelectedRef.current = false;
@@ -565,42 +585,47 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     ? (toCanonicalGroupType(form.groupType) ?? form.groupType)
     : '';
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <ModalOverlay open={open} onClose={onClose}>
       <div
-        className="bg-white rounded-[14px] w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]"
-        style={{ boxShadow: '0px 4px 20px 0px #00000014' }}
+        className="bg-white w-full max-w-xl mx-4 flex flex-col max-h-[90vh] overflow-hidden"
+        style={{
+          borderRadius: 8, // §5.3 panel
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
       >
+        {/* §5.3 emphasis accent — 3px green strip at top */}
+        <div aria-hidden className="h-[3px] w-full bg-sett-primary shrink-0" />
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-sett-border-light">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E0E0E0]">
           <div>
-            <h2 className="font-montserrat text-[18px] font-semibold leading-none text-sett-text-primary">
+            <h2 className="font-montserrat text-[18px] font-bold leading-tight text-sett-navy">
               {t.offer.editRequestTitle}
             </h2>
-            <p className="font-montserrat text-[13px] text-sett-text-accent mt-1">
+            <p className="font-montserrat text-[13px] text-sett-grey mt-1 leading-snug">
               {t.offer.editRequestDesc}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-[10px] hover:bg-[#F7F7F7] transition-colors"
+            className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors shrink-0"
+            aria-label="Close"
           >
-            <X className="w-5 h-5 text-sett-text-accent" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Scrollable body */}
         <div
           ref={scrollContainerRef}
-          className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-7"
+          className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-5"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
         >
 
           {/* ── Trip Details ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <SectionHeader
               title={t.offer.editTripDetails}
               subtitle={t.createForm.tripDetailsSubtitle}
@@ -638,10 +663,10 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   ))}
                 </ul>
               )}
-              {fieldErrors.destinationName && <p className="mt-1 text-caption text-red-500">{fieldErrors.destinationName}</p>}
+              {fieldErrors.destinationName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.destinationName}</p>}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Check-in */}
               <div>
                 <label className={labelCls}>{t.offer.editCheckIn}</label>
@@ -650,21 +675,21 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     selected={form.checkinDate ? new Date(form.checkinDate) : null}
                     onChange={(date: Date | null) =>
                       setField('checkinDate', date
-                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                        : '')
+                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
                     }
+                    onCalendarOpen={() => ensureDatePickerVisible('checkin')}
                     minDate={new Date()}
                     maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                     dateFormat="dd.MM.yyyy"
                     placeholderText="DD.MM.YYYY"
-                    popperClassName="sett-datepicker-popper"
+                    popperClassName="sett-datepicker-popper sett-datepicker-popper--in-modal"
                     popperPlacement="bottom-start"
                     wrapperClassName="w-full"
                     showPopperArrow={false}
-                    customInput={<DateInput />}
+                    customInput={<DateInput ref={checkinAnchorRef} />}
                   />
                 </div>
-                {fieldErrors.checkinDate && <p className="mt-1 text-caption text-red-500">{fieldErrors.checkinDate}</p>}
+                {fieldErrors.checkinDate && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.checkinDate}</p>}
                 {/* Passive hint matching the Create form. */}
                 <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
                   {t.createForm.checkInDateHint}
@@ -679,21 +704,21 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     selected={form.checkoutDate ? new Date(form.checkoutDate) : null}
                     onChange={(date: Date | null) =>
                       setField('checkoutDate', date
-                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                        : '')
+                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
                     }
+                    onCalendarOpen={() => ensureDatePickerVisible('checkout')}
                     minDate={form.checkinDate ? new Date(form.checkinDate) : new Date()}
                     maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                     dateFormat="dd.MM.yyyy"
                     placeholderText="DD.MM.YYYY"
-                    popperClassName="sett-datepicker-popper"
+                    popperClassName="sett-datepicker-popper sett-datepicker-popper--in-modal"
                     popperPlacement="bottom-start"
                     wrapperClassName="w-full"
                     showPopperArrow={false}
-                    customInput={<DateInput />}
+                    customInput={<DateInput ref={checkoutAnchorRef} />}
                   />
                 </div>
-                {fieldErrors.checkoutDate && <p className="mt-1 text-caption text-red-500">{fieldErrors.checkoutDate}</p>}
+                {fieldErrors.checkoutDate && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.checkoutDate}</p>}
               </div>
             </div>
 
@@ -728,7 +753,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     className={cn(
                       'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
                       fieldErrors.starRatings
-                        ? 'border-red-400'
+                        ? 'border-[#CC3333]'
                         : hotelCatDropdownOpen
                           ? 'border-sett-primary ring-2 ring-sett-primary/20'
                           : 'border-sett-border-light hover:border-sett-primary/40',
@@ -828,7 +853,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
                   {t.createForm.hotelCategoryHint}
                 </p>
-                {fieldErrors.starRatings && <p className="mt-1 text-caption text-red-500">{fieldErrors.starRatings}</p>}
+                {fieldErrors.starRatings && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.starRatings}</p>}
               </div>
               <div>
                 <Select
@@ -841,7 +866,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Select
                   label={t.offer.editGroupType}
@@ -856,7 +881,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   }}
                   placeholder={t.createForm.selectGroupType}
                 />
-                {fieldErrors.groupType && <p className="mt-1 text-caption text-red-500">{fieldErrors.groupType}</p>}
+                {fieldErrors.groupType && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.groupType}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editGroupSize}</label>
@@ -869,12 +894,12 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   placeholder="e.g. 45"
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                {fieldErrors.groupSize && <p className="mt-1 text-caption text-red-500">{fieldErrors.groupSize}</p>}
+                {fieldErrors.groupSize && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.groupSize}</p>}
               </div>
             </div>
 
             {groupTypeRequiresAge(form.groupType) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{t.createForm.averageAge}</label>
                   <input
@@ -897,20 +922,20 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     placeholder={t.createForm.averageAgePlaceholder}
                     onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   />
-                  {fieldErrors.averageAge && <p className="mt-1 text-caption text-red-500">{fieldErrors.averageAge}</p>}
+                  {fieldErrors.averageAge && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.averageAge}</p>}
                 </div>
               </div>
             )}
           </div>
 
           {/* ── Room & Accommodations ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <SectionHeader
               title={t.offer.editRoomAccommodations}
               subtitle={t.createForm.roomSubtitle}
             />
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <RoomCounter
                 label={t.createForm.singleRoom}
                 value={form.single}
@@ -942,8 +967,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 onChange={(v) => setField('quadruple', v)}
               />
             </div>
-            {fieldErrors.rooms && <p className="mt-1 text-caption text-red-500">{fieldErrors.rooms}</p>}
-            {fieldErrors.bedConfig && <p className="mt-1 text-caption text-red-500">{fieldErrors.bedConfig}</p>}
+            {fieldErrors.rooms && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.rooms}</p>}
+            {fieldErrors.bedConfig && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.bedConfig}</p>}
 
             {/* Bed configuration for double rooms */}
             {form.double > 0 && (
@@ -951,7 +976,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 <h4 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-4">
                   {t.offer.bedConfiguration}
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <RoomCounter
                     label={t.offer.standardDoubleBed}
                     value={form.standardDoubleBeds}
@@ -1034,13 +1059,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
           </div>
 
           {/* ── Customer Details ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <SectionHeader
               title={t.offer.editCustomerDetails}
               subtitle={t.createForm.customerSubtitle}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>{t.offer.editCompanyName}</label>
                 <input
@@ -1049,7 +1074,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('companyName', e.target.value)}
                   placeholder="Company name"
                 />
-                {fieldErrors.companyName && <p className="mt-1 text-caption text-red-500">{fieldErrors.companyName}</p>}
+                {fieldErrors.companyName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.companyName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editFirstName}</label>
@@ -1059,7 +1084,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('firstName', e.target.value)}
                   placeholder="First name"
                 />
-                {fieldErrors.firstName && <p className="mt-1 text-caption text-red-500">{fieldErrors.firstName}</p>}
+                {fieldErrors.firstName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.firstName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editLastName}</label>
@@ -1069,7 +1094,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('lastName', e.target.value)}
                   placeholder="Last name"
                 />
-                {fieldErrors.lastName && <p className="mt-1 text-caption text-red-500">{fieldErrors.lastName}</p>}
+                {fieldErrors.lastName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.lastName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editEmail}</label>
@@ -1080,7 +1105,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   onChange={(e) => setField('contactEmail', e.target.value)}
                   placeholder="email@example.com"
                 />
-                {fieldErrors.contactEmail && <p className="mt-1 text-caption text-red-500">{fieldErrors.contactEmail}</p>}
+                {fieldErrors.contactEmail && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.contactEmail}</p>}
               </div>
               <div>
                 <PhoneInputSplit
@@ -1111,13 +1136,13 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-sett-border-light">
+        {/* Footer — §5.1 buttons */}
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[#E0E0E0]">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="inline-flex py-3 px-5 justify-center items-center rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] font-semibold leading-normal text-sett-text-secondary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#EBEBEB] hover:text-sett-text-primary hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms] disabled:opacity-50"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] border-2 border-sett-primary bg-transparent font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-primary hover:bg-sett-primary/5 active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
             {t.modals.cancel}
           </button>
@@ -1125,7 +1150,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex py-3 px-5 justify-center items-center rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[14px] font-semibold leading-normal text-white transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-sett-primary-hover hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms] disabled:opacity-50"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] bg-sett-primary hover:bg-sett-green-dark font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-navy active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
             {saving ? (
               <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -1135,6 +1160,6 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

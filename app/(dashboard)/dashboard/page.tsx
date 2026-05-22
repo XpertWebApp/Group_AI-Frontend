@@ -34,6 +34,7 @@ export default function DashboardPage() {
       completed: t.requests.completed,
       cancelled: t.requests.cancelled,
       approved: t.requests.approved,
+      needs_manual_handling: t.requests.needsManualHandling,
     };
     return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
@@ -52,9 +53,13 @@ export default function DashboardPage() {
   const loadDashboard = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
+      // When `silent` is true (background refresh triggered by a notification),
+      // suppress the global error-toast for these calls too — the user didn't
+      // explicitly ask for the refresh, so a transient failure shouldn't pop
+      // a banner. The initial page load still surfaces errors normally.
       const [statsData, offersData] = await Promise.all([
-        dashboardApi.getStats(),
-        dashboardApi.getRecentOffers(10),
+        dashboardApi.getStats({ silent }),
+        dashboardApi.getRecentOffers(10, { silent }),
       ]);
       if (statsData) setStats(statsData);
       setOffers(offersData);

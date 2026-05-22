@@ -28,10 +28,12 @@ import {
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
+import { HotelName } from '@/components/ui/HotelName';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { EditRequestModal } from '@/components/forms/EditRequestModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
@@ -50,7 +52,37 @@ function formatDate(dateStr: string | null | undefined): string {
   return formatDateEU(dateStr);
 }
 
-function formatRoomType(type: string): string {
+/**
+ * Map an API-shaped room-type code (e.g. "StandardDoubleBeds", "twin_beds",
+ * "single") to the user's current locale. `tAddHotel` is the addHotel slice
+ * of the i18n bundle — passed in so this stays a pure function (not a hook).
+ *
+ * Falls back to a generated CamelCase split when the code isn't known, so a
+ * new server-side room type still renders sanely.
+ */
+function formatRoomType(
+  type: string,
+  tAddHotel?: {
+    roomSingle: string; roomDouble: string; roomTriple: string;
+    roomQuadruple: string; roomSuite: string; roomSuites: string;
+    standardDoubleBed: string; twinBed: string;
+  },
+): string {
+  if (tAddHotel) {
+    const normalized = type.toLowerCase().replace(/[_\s]/g, '');
+    const map: Record<string, string> = {
+      twinbeds: tAddHotel.twinBed,
+      twin: tAddHotel.twinBed,
+      standarddoublebeds: tAddHotel.standardDoubleBed,
+      single: tAddHotel.roomSingle,
+      double: tAddHotel.roomDouble,
+      triple: tAddHotel.roomTriple,
+      quadruple: tAddHotel.roomQuadruple,
+      suite: tAddHotel.roomSuite,
+      suites: tAddHotel.roomSuites,
+    };
+    if (map[normalized]) return map[normalized];
+  }
   return type
     .replace(/_+/g, ' ')
     .replace(/([A-Z])/g, ' $1')
@@ -61,13 +93,17 @@ function formatRoomType(type: string): string {
     .join(' ');
 }
 
-function getRoomLabel(type: string, detail: any): string {
+function getRoomLabel(
+  type: string,
+  detail: any,
+  tAddHotel?: Parameters<typeof formatRoomType>[1],
+): string {
   // If actual descriptions are available from the hotel, use those
   if (detail.actualDescriptions && detail.actualDescriptions.length > 0) {
     return detail.actualDescriptions[0];
   }
-  // Otherwise, use the requested room type
-  return formatRoomType(type);
+  // Otherwise, use the requested room type (localized when t is provided)
+  return formatRoomType(type, tAddHotel);
 }
 
 function formatPhone(code: string | null | undefined, num: string | null | undefined): string {
@@ -1152,8 +1188,11 @@ export default function RequestDetailPage() {
                       <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                         {t.offer.termsConditions}
                       </p>
+                      {/* `sett-rich-editor` restores ul/ol markers that Tailwind
+                          preflight strips — same hook used by the RichTextEditor
+                          so what the user typed renders identically here. */}
                       <div
-                        className="font-montserrat text-[14px] font-semibold text-sett-text-primary"
+                        className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
                         dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
                       />
@@ -1168,7 +1207,7 @@ export default function RequestDetailPage() {
                         {t.offer.cancellationConditions}
                       </p>
                       <div
-                        className="font-montserrat text-[14px] font-semibold text-sett-text-primary"
+                        className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
                         dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
                       />
@@ -1323,6 +1362,23 @@ export default function RequestDetailPage() {
                               proposalStatus={proposal!.status}
                             />
                           ))}
+                          {/* Subtotal row — visual parity with the hotel
+                              breakdown. Sums only the services included in
+                              the proposal total (excluded ones are dimmed
+                              in the row above and skipped here). */}
+                          <tr className="bg-sett-fill">
+                            <td colSpan={7} className="px-4 py-3 text-right text-label text-sett-text-accent uppercase tracking-wide font-semibold">
+                              {t.contract.subtotal}
+                            </td>
+                            <td className="px-4 py-3 text-right text-body font-bold text-sett-text-primary">
+                              {formatPriceEU(
+                                services
+                                  .filter((s) => s.includedInTotal !== false)
+                                  .reduce((sum, s) => sum + Number(s.sellPrice ?? 0) * (s.quantity ?? 1), 0)
+                              )}
+                            </td>
+                            <td />
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -1477,19 +1533,19 @@ export default function RequestDetailPage() {
                                 {breakdown.hotelName}
                               </h5>
                               <div className="flex items-center justify-between">
-                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Purchase</span>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">{t.offer.purchase}</span>
                                 <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#071C42' }}>
                                   €{formatPriceEU(breakdown.buy)}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Sell</span>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">{t.offer.sell}</span>
                                 <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#071C42' }}>
                                   €{formatPriceEU(breakdown.sell)}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid #D1D5DB' }}>
-                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Margin</span>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">{t.requests.margin}</span>
                                 <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#667F00' }}>
                                   €{formatPriceEU(breakdown.margin)}
                                 </span>
@@ -1609,58 +1665,70 @@ export default function RequestDetailPage() {
           />
 
           {/* Approve & Send Modal */}
-          {sendOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white rounded-[14px] border border-sett-border-light w-full max-w-md mx-4 p-6">
+          <ModalOverlay
+            open={sendOpen}
+            onClose={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
+          >
+              <div
+                className="bg-white w-full max-w-md mx-4 flex flex-col overflow-hidden"
+                style={{
+                  borderRadius: 8, // §5.3 panel
+                  border: '1px solid #E0E0E0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                }}
+              >
+                {/* §5.3 accent strip */}
+                <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
+                <div className="px-5 py-5">
                 <div className="flex items-start justify-between mb-5">
-                  <div className="flex flex-col gap-1">
-                    <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary leading-none">
+                  <div className="flex flex-col gap-1.5">
+                    <h3 className="font-montserrat text-[18px] font-bold text-sett-navy leading-tight">
                       {offerHistory.length === 0
                         ? t.offer.sendInitialOffer
                         : offerHistory.length === 1
                           ? t.offer.sendFinalOffer
                           : t.offer.sendRevision}
                     </h3>
-                    <p className="font-montserrat text-[14px] text-sett-text-secondary">
+                    <p className="font-montserrat text-[13px] text-sett-grey leading-snug">
                       {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
-                    className="p-1.5 rounded-lg hover:bg-[#F7F7F7] text-[#686868] transition-colors -mt-1"
+                    className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors -mt-1"
                     aria-label="Close"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {sendError && (
-                  <div className="flex flex-col gap-2 mb-4 p-3 rounded-[10px] bg-red-50 border border-red-200">
+                  <div className="flex flex-col gap-2 mb-4 p-3 rounded-[4px]" style={{ background: '#FCEBEB', border: '1px solid #CC3333' }}>
                     <div className="flex items-start gap-2">
-                      <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-                      <p className="font-montserrat text-[13px] text-red-700">{sendError}</p>
+                      <XCircle className="w-4 h-4 text-[#CC3333] mt-0.5 shrink-0" />
+                      <p className="font-montserrat text-[13px] text-[#CC3333]">{sendError}</p>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
-                      {t.offer.emailsLabel} <span className="text-red-500">*</span>
+                    <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-navy mb-1.5">
+                      {t.offer.emailsLabel} <span className="text-[#CC3333]">*</span>
                     </label>
-                    {/* Multi-email chip input */}
+                    {/* Multi-email chip input — §5.5 input */}
                     <div
-                      className={`min-h-[42px] w-full px-2 py-1.5 rounded-[10px] border flex flex-wrap gap-1.5 cursor-text ${sendEmailError
-                        ? 'border-red-500 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-200'
-                        : 'border-sett-border-light focus-within:border-sett-primary focus-within:ring-2 focus-within:ring-sett-primary/10'
+                      className={`min-h-[41px] w-full px-2 py-1.5 rounded-[4px] border flex flex-wrap gap-1.5 cursor-text transition-[border-color,box-shadow] duration-150 ${sendEmailError
+                        ? 'border-[#CC3333] focus-within:shadow-[0_0_0_3px_rgba(204,51,51,0.15)]'
+                        : 'border-[#D0D0D0] focus-within:border-sett-primary focus-within:shadow-[0_0_0_3px_rgba(170,199,55,0.15)]'
                         }`}
                       onClick={() => emailInputRef.current?.focus()}
                     >
                       {sendEmails.map((email, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-sett-primary/10 text-sett-primary rounded-[6px] font-montserrat text-[13px] max-w-full"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#F5F9E8] border border-sett-primary text-sett-navy rounded-[4px] font-montserrat text-[13px] font-semibold max-w-full"
                         >
                           <span className="truncate max-w-[200px]">{email}</span>
                           <button
@@ -1670,7 +1738,7 @@ export default function RequestDetailPage() {
                               setSendEmails((prev) => prev.filter((_, i) => i !== idx));
                               if (sendEmailError) setSendEmailError('');
                             }}
-                            className="shrink-0 text-sett-primary hover:text-red-500 ml-0.5 focus:outline-none"
+                            className="shrink-0 text-sett-navy hover:text-sett-green-dark ml-0.5 focus:outline-none"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                           </button>
@@ -1685,34 +1753,34 @@ export default function RequestDetailPage() {
                           onKeyDown={handleEmailInputKeyDown}
                           onBlur={handleEmailInputBlur}
                           placeholder={sendEmails.length === 0 ? t.offer.addEmailPlaceholder : ''}
-                          className="flex-1 min-w-[180px] px-1 py-0.5 font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none bg-transparent"
+                          className="flex-1 min-w-[180px] px-1 py-0.5 font-montserrat text-[14px] text-sett-navy placeholder:text-sett-grey focus:outline-none bg-transparent"
                         />
                       )}
                     </div>
                     {sendEmailError && (
-                      <p className="mt-1 font-montserrat text-[12px] text-red-500">{sendEmailError}</p>
+                      <p className="mt-1 font-montserrat text-[12px] text-[#CC3333]">{sendEmailError}</p>
                     )}
-                    <p className="mt-1 font-montserrat text-[12px] text-sett-text-accent">{t.offer.emailsMaxLimit}</p>
+                    <p className="mt-1 font-montserrat text-[12px] text-sett-grey">{t.offer.emailsMaxLimit}</p>
                   </div>
                   <div>
-                    <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
-                      {t.offer.adminNotes} <span className="font-normal text-sett-text-accent">{t.offer.adminNotesOptional}</span>
+                    <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-navy mb-1.5">
+                      {t.offer.adminNotes} <span className="font-normal text-sett-grey normal-case tracking-normal">{t.offer.adminNotesOptional}</span>
                     </label>
                     <textarea
                       value={sendNotes}
                       onChange={(e) => setSendNotes(e.target.value)}
                       placeholder={t.offer.notesPlaceholder}
                       rows={3}
-                      className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none focus:border-sett-primary resize-none"
+                      className="w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] font-montserrat text-[14px] text-sett-navy placeholder:text-sett-grey focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] resize-none transition-[border-color,box-shadow] duration-150"
                     />
                   </div>
                 </div>
-
-                <div className="flex gap-4 mt-6">
+                </div>
+                <div className="h-px bg-[#E0E0E0] mx-5" />
+                <div className="flex gap-3 px-5 py-4 justify-end">
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1"
                     onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
@@ -1721,11 +1789,10 @@ export default function RequestDetailPage() {
                   <Button
                     variant="primary"
                     size="sm"
-                    className="flex-1"
                     onClick={handleApproveAndSend}
                     isLoading={actionLoading}
                   >
-                    <Send className="w-5 h-5" />
+                    <Send className="w-4 h-4" />
                     {offerHistory.length === 0
                       ? t.offer.sendInitialOffer
                       : offerHistory.length === 1
@@ -1734,8 +1801,7 @@ export default function RequestDetailPage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
+          </ModalOverlay>
 
           <ConfirmModal
             open={declineOpen}
@@ -2108,11 +2174,23 @@ function HotelCard({
     <div className={`bg-sett-card rounded-[16px] border transition-opacity overflow-hidden ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
       {/* Unified navy header: identity (left) + controls (right) */}
       <div className="bg-[#1B2B44] rounded-t-[16px] px-3 sm:px-4 py-3 flex items-center gap-3 flex-wrap">
-        {/* Identity: hotel name + stars */}
+        {/* Identity: hotel name + stars.
+            If the persisted hotel has a SETTHub deep link, render the name as
+            a HotelName link (matches the Add Hotel card behavior); otherwise
+            fall back to a plain heading. `HotelName` uses brand-green by
+            default — overridden here with white text + subtle hover bg so it
+            reads on the navy header surface. */}
         <div className="flex items-center gap-2 min-w-0 flex-1 min-h-[28px]">
-          <h4 className="text-body font-bold text-white truncate">
-            {hotel.hotelName || hotel.hotelCode}
-          </h4>
+          {hotel.sethubDetailsUrl ? (
+            <HotelName
+              hotel={{ hotelName: hotel.hotelName || hotel.hotelCode, sethubDetailsUrl: hotel.sethubDetailsUrl }}
+              className="!text-white hover:!text-white active:!text-white hover:!bg-white/10 active:!bg-white/15 !text-body !font-bold min-w-0"
+            />
+          ) : (
+            <h4 className="text-body font-bold text-white truncate">
+              {hotel.hotelName || hotel.hotelCode}
+            </h4>
+          )}
           <div
             className="flex gap-0.5 shrink-0"
             aria-label={`${hotel.starRating ?? 0} of 5 stars`}
@@ -2256,7 +2334,7 @@ function HotelCard({
                   const total = sell * qty * nights;
                   return (
                     <tr key={type} className="border-b border-sett-border last:border-0">
-                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{getRoomLabel(type, detail)}</td>
+                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{getRoomLabel(type, detail, t.addHotel)}</td>
                       <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
                         {formatPriceEU(net)}
                       </td>
@@ -2300,7 +2378,7 @@ function HotelCard({
               const total = sell * qty * nights;
               return (
                 <div key={type} className="p-3 space-y-2">
-                  <p className="text-body font-medium text-sett-text-primary">{getRoomLabel(type, detail)}</p>
+                  <p className="text-body font-medium text-sett-text-primary">{getRoomLabel(type, detail, t.addHotel)}</p>
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>
@@ -2369,7 +2447,7 @@ function HotelCard({
       {/* Hotel Breakdown — Total Sell */}
       <div className="px-4 py-3 border-t border-sett-border/50 bg-[#F9FAFB]">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-sett-text-accent font-medium">Total Sell</span>
+          <span className="text-sett-text-accent font-medium">{t.offer.totalSell}</span>
           <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
             Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
               (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
@@ -2520,23 +2598,23 @@ function ServiceCard({
           </div>
         )}
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>
           <p className="text-sett-text-primary mt-0.5">{formatPriceEU(buy)}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Markup</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.markup}</span>
           <p className="text-sett-text-primary mt-0.5">{formatPercentageEU(markup, 0)}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Sell</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.sell}</span>
           <p className="text-sett-text-primary mt-0.5">{formatPriceEU(sell)}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Qty</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.qty}</span>
           <p className="text-sett-text-primary mt-0.5">{qty}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Total</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.total}</span>
           <p className="text-sett-primary font-semibold mt-0.5">{formatPriceEU(total)}</p>
         </div>
       </div>

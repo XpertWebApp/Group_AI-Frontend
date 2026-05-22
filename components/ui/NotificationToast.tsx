@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Notification } from '@/types';
 import { translations, type Locale } from '@/lib/i18n/translations';
+import { formatNotification } from '@/lib/notifications/formatNotification';
 
 function currentLocale(): Locale {
   if (typeof window === 'undefined') return 'en';
@@ -68,6 +69,8 @@ function NotificationToastBody({ t, n, locale }: { t: Toast; n: Notification; lo
   const kind = pickIconKind(n.type);
   const { Icon, bg, fg } = ICON_MAP[kind];
   const href = pickHref(n);
+  // Localized title/body — falls back to BE-provided strings for unknown types.
+  const { title: localTitle, body: localBody } = formatNotification(n, tt);
 
   const handleClick = () => {
     toast.dismiss(t.id);
@@ -106,7 +109,7 @@ function NotificationToastBody({ t, n, locale }: { t: Toast; n: Notification; lo
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary leading-snug">
-              {n.title}
+              {localTitle}
             </p>
             <button
               type="button"
@@ -117,9 +120,9 @@ function NotificationToastBody({ t, n, locale }: { t: Toast; n: Notification; lo
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-          {n.body && (
+          {localBody && (
             <p className="font-montserrat text-[13px] text-sett-text-secondary mt-0.5 leading-relaxed line-clamp-2">
-              {n.body}
+              {localBody}
             </p>
           )}
           <div className="flex items-center justify-between mt-2">

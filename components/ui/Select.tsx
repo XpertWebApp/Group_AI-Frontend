@@ -95,7 +95,7 @@ export function Select({
   const updateDropdownPosition = useCallback(() => {
     if (!open || !triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const dropdownHeight = 260; // max-h-[240px] + padding
+    const dropdownHeight = 232; // max-h-[220px] + padding + border
 
     const baseStyle: React.CSSProperties = {
       position: positionMode,
@@ -247,18 +247,18 @@ export function Select({
           style={dropdownStyle}
           className="rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
         >
-          <div className="max-h-[240px] overflow-y-auto py-1.5">
+          <div className="max-h-[220px] overflow-y-auto py-1">
             {placeholder && (
               <button
                 type="button"
                 onClick={() => handleSelect('')}
                 className={cn(
-                  'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                  'w-full flex items-center justify-between px-3 py-1.5 font-montserrat text-[13px] leading-tight transition-colors',
                   !value ? 'text-sett-primary font-medium bg-sett-light-green-bg' : 'text-sett-text-accent hover:bg-[#F7F7F7]'
                 )}
               >
                 <span>{placeholder}</span>
-                {!value && <Check className="w-4 h-4 text-sett-primary shrink-0" />}
+                {!value && <Check className="w-3.5 h-3.5 text-sett-primary shrink-0" />}
               </button>
             )}
             {options.map((opt) => {
@@ -270,7 +270,7 @@ export function Select({
                   data-selected={isSelected}
                   onClick={() => handleSelect(opt.value)}
                   className={cn(
-                    'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                    'w-full flex items-center justify-between px-3 py-1.5 font-montserrat text-[13px] leading-tight transition-colors',
                     isSelected
                       ? 'text-sett-primary font-medium bg-sett-light-green-bg'
                       : 'text-sett-text-primary hover:bg-[#F7F7F7]'
@@ -280,7 +280,7 @@ export function Select({
                     ? <span className="flex items-center gap-2">{opt.node}</span>
                     : <span className="truncate">{opt.label}</span>
                   }
-                  {isSelected && <Check className="w-4 h-4 text-sett-primary shrink-0 ml-2" />}
+                  {isSelected && <Check className="w-3.5 h-3.5 text-sett-primary shrink-0 ml-2" />}
                 </button>
               );
             })}
@@ -296,18 +296,18 @@ export function Select({
           style={dropdownStyle}
           className="rounded-[14px] border border-sett-border-light bg-white shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
         >
-          <div className="max-h-[240px] overflow-y-auto py-1.5">
+          <div className="max-h-[220px] overflow-y-auto py-1">
             {placeholder && (
               <button
                 type="button"
                 onClick={() => handleSelect('')}
                 className={cn(
-                  'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                  'w-full flex items-center justify-between px-3 py-1.5 font-montserrat text-[13px] leading-tight transition-colors',
                   !value ? 'text-sett-primary font-medium bg-sett-light-green-bg' : 'text-sett-text-accent hover:bg-[#F7F7F7]'
                 )}
               >
                 <span>{placeholder}</span>
-                {!value && <Check className="w-4 h-4 text-sett-primary shrink-0" />}
+                {!value && <Check className="w-3.5 h-3.5 text-sett-primary shrink-0" />}
               </button>
             )}
             {options.map((opt) => {
@@ -319,7 +319,7 @@ export function Select({
                   data-selected={isSelected}
                   onClick={() => handleSelect(opt.value)}
                   className={cn(
-                    'w-full flex items-center justify-between px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                    'w-full flex items-center justify-between px-3 py-1.5 font-montserrat text-[13px] leading-tight transition-colors',
                     isSelected
                       ? 'text-sett-primary font-medium bg-sett-light-green-bg'
                       : 'text-sett-text-primary hover:bg-[#F7F7F7]'
@@ -329,7 +329,7 @@ export function Select({
                     ? <span className="flex items-center gap-2">{opt.node}</span>
                     : <span className="truncate">{opt.label}</span>
                   }
-                  {isSelected && <Check className="w-4 h-4 text-sett-primary shrink-0 ml-2" />}
+                  {isSelected && <Check className="w-3.5 h-3.5 text-sett-primary shrink-0 ml-2" />}
                 </button>
               );
             })}

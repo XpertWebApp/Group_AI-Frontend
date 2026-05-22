@@ -31,26 +31,37 @@ export interface NotificationsResponse {
   unreadCount: number;
 }
 
+// Silent option: when true, the request opts out of the global axios
+// error-toast interceptor. Use it for background polls (notifications,
+// auto-refresh) so transient 5xx errors don't pop a toast at the user.
+type SilentOpt = { silent?: boolean };
+
 export const dashboardApi = {
-  async getStats(): Promise<DashboardStatsResponse | null> {
-    const { data } = await apiClient.get<ApiResponse<DashboardStatsResponse>>('/dashboard/stats');
+  async getStats(opts: SilentOpt = {}): Promise<DashboardStatsResponse | null> {
+    const { data } = await apiClient.get<ApiResponse<DashboardStatsResponse>>(
+      '/dashboard/stats',
+      { _suppressToast: opts.silent },
+    );
     if (!data.success || !data.data) return null;
     return data.data;
   },
 
-  async getRecentOffers(limit = 10): Promise<RecentOffer[]> {
+  async getRecentOffers(limit = 10, opts: SilentOpt = {}): Promise<RecentOffer[]> {
     const { data } = await apiClient.get<ApiResponse<RecentOffer[]>>(
       '/dashboard/recent-offers',
-      { params: { limit } }
+      { params: { limit }, _suppressToast: opts.silent }
     );
     if (!data.success || !Array.isArray(data.data)) return [];
     return data.data;
   },
 
-  async getNotifications(params?: { unread?: boolean; limit?: number }): Promise<NotificationsResponse> {
+  async getNotifications(
+    params?: { unread?: boolean; limit?: number },
+    opts: SilentOpt = {},
+  ): Promise<NotificationsResponse> {
     const { data } = await apiClient.get<ApiResponse<NotificationsResponse>>(
       '/dashboard/notifications',
-      { params }
+      { params, _suppressToast: opts.silent }
     );
     if (!data.success || !data.data) return { notifications: [], unreadCount: 0 };
     // Handle both array and object response shapes

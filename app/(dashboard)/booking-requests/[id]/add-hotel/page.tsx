@@ -10,7 +10,9 @@ import {
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
-  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, Users, type LucideIcon,
+  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, Users,
+  Phone, Shirt, ShoppingBag, Scissors, Car, Stethoscope, MoveVertical,
+  type LucideIcon,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -43,23 +45,34 @@ const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds instead of 3 to reduce AP
 const AMENITY_ICON_MAP: Record<string, LucideIcon> = {
   'air conditioning': Snowflake,
   'bar': Wine,
+  'bar(s)': Wine,
+  'bars': Wine,
   'bathroom with bath': Bath,
   'bathroom with shower': ShowerHead,
   'business center': Briefcase,
   'business centre': Briefcase,
   'disabled access': Accessibility,
   'internet': Wifi,
+  'internet access': Wifi,
   'wi-fi': Wifi,
   'wifi': Wifi,
+  'wlan': Wifi,
+  'wlan access': Wifi,
   'free wifi': Wifi,
   'non smoking rooms': CigaretteOff,
   'non-smoking rooms': CigaretteOff,
   'smoking rooms': Cigarette,
   'parking': ParkingSquare,
+  'car park': ParkingSquare,
+  'garage': Car,
   'restaurant': UtensilsCrossed,
+  'restaurant(s)': UtensilsCrossed,
+  'restaurants': UtensilsCrossed,
   'safe': ShieldCheck,
+  'hotel safe': ShieldCheck,
   'tv cable / satellite': Tv,
   'tv cable/satellite': Tv,
+  'tv room': Tv,
   'tea / coffee facilities': Coffee,
   'tea/coffee facilities': Coffee,
   'lounge area': Sofa,
@@ -77,12 +90,30 @@ const AMENITY_ICON_MAP: Record<string, LucideIcon> = {
   'spa': Sparkles,
   'laundry': WashingMachine,
   'laundry service': WashingMachine,
+  'laundry facilities': WashingMachine,
   'pets allowed': Dog,
   'pet friendly': Dog,
+  'pets': Dog,
   'garden': Flower2,
   'terrace': TreePine,
   'concierge': ConciergeBell,
   'room service': ConciergeBell,
+  // Newly mapped GIATA entries spotted in the wild — see screenshot from QA.
+  'telephone': Phone,
+  'phone': Phone,
+  'iron / ironing board': Shirt,
+  'iron/ironing board': Shirt,
+  'ironing board': Shirt,
+  'iron': Shirt,
+  'shops': ShoppingBag,
+  'hairdresser': Scissors,
+  'conference room': Briefcase,
+  'medical assistance': Stethoscope,
+  'lifts': MoveVertical,
+  'elevators': MoveVertical,
+  'elevator': MoveVertical,
+  '24-hour reception': ConciergeBell,
+  '24h reception': ConciergeBell,
 };
 
 function getAmenityIcon(name: string): LucideIcon | null {
@@ -165,22 +196,35 @@ function getHotelImageChain(hotel: { imageUrls?: string[]; imageUrl?: string | n
   return chain;
 }
 
-// Known API room type names → human-readable labels
-const ROOM_TYPE_LABELS: Record<string, string> = {
-  twinbeds: 'Twin Rooms',
-  standarddoublebeds: 'Standard Double Rooms',
-  single: 'Single',
-  double: 'Double',
-  twin: 'Twin',
-  triple: 'Triple',
-  quadruple: 'Quadruple',
-  suite: 'Suite',
-  suites: 'Suites',
-};
-
-function formatRoomType(raw: string): string {
-  // Check known map first (case-insensitive)
-  const known = ROOM_TYPE_LABELS[raw.toLowerCase().replace(/[_\s]/g, '')];
+/**
+ * Map an API-shaped room-type code (e.g. "StandardDoubleBeds", "twin_beds",
+ * "Single") to the user's current locale label. Pass the addHotel slice of
+ * translations so the labels respect EN ↔ DE without making this a hook.
+ *
+ * Falls back to a generated camelCase split when the code isn't in our
+ * known set (so a brand-new server-side room type still renders sanely).
+ */
+function formatRoomType(
+  raw: string,
+  tAddHotel: {
+    roomSingle: string; roomDouble: string; roomTriple: string;
+    roomQuadruple: string; roomSuite: string; roomSuites: string;
+    standardDoubleBed: string; twinBed: string;
+  },
+): string {
+  const normalized = raw.toLowerCase().replace(/[_\s]/g, '');
+  const map: Record<string, string> = {
+    twinbeds: tAddHotel.twinBed,
+    twin: tAddHotel.twinBed,
+    standarddoublebeds: tAddHotel.standardDoubleBed,
+    single: tAddHotel.roomSingle,
+    double: tAddHotel.roomDouble,
+    triple: tAddHotel.roomTriple,
+    quadruple: tAddHotel.roomQuadruple,
+    suite: tAddHotel.roomSuite,
+    suites: tAddHotel.roomSuites,
+  };
+  const known = map[normalized];
   if (known) return known;
   // Split camelCase: "TwinBeds" → "Twin Beds", "StandardDoubleBeds" → "Standard Double Beds"
   return raw
@@ -291,6 +335,13 @@ export default function AddHotelPage() {
       }
     }
   }, []);
+
+  // Set by the poll loop the first time an alternative hotel actually shows
+  // up in the results. Used by the 90s safety timeout in handleShowAlternatives
+  // so we don't pop a false "No alternative hotels found" toast in cases where
+  // alternatives DID arrive but the loading-state hand-off didn't clean up the
+  // spinner (e.g. user navigated away, poll throttled at the wrong tick, etc).
+  const hasAlternativeArrivedRef = useRef(false);
 
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
@@ -557,8 +608,15 @@ export default function AddHotelPage() {
         // "loading" spinner up until ALL alternative probes have drained, so the
         // user understands more results may still be coming. (Previously we
         // cleared the spinner on the first alternative, then polling terminated
-        // before the rest arrived.) Also clear the spinner when probes finish
-        // with zero alternatives so the UI can flip to the empty-state card.
+        // before the rest arrived.)
+        // Record (in a ref) whether any alternative has materialized this poll
+        // so the 90s safety timeout in handleShowAlternatives can avoid
+        // toasting "No alternative hotels found" after alternatives in fact
+        // arrived.
+        if (altFetched && results.some(h => h.searchKind === 'alternative')) {
+          hasAlternativeArrivedRef.current = true;
+        }
+
         if (altFetched && altLoading) {
           const altsProbesDone = status.summary.queued === 0 && status.summary.running === 0;
           const altsBackendDone = status.summary.phase === 'settled' || status.summary.phase === 'exhausted';
@@ -1018,6 +1076,9 @@ export default function AddHotelPage() {
 
   // Show alternatives (relaxed criteria search)
   const handleShowAlternatives = useCallback(async () => {
+    // Fresh attempt — reset the "alternative arrived" tracker so the 90s
+    // safety timeout below only fires if no alt actually shows up.
+    hasAlternativeArrivedRef.current = false;
     setAlternativesLoading(true);
     try {
       const resp = await requestsApi.startHotelSearchAlternatives(requestId, {
@@ -1036,12 +1097,17 @@ export default function AddHotelPage() {
       // Start polling for alternatives WITHOUT changing main phase
       // This keeps main results visible while only alternatives section loads
       startPollingFallback(requestId);
-      // Safety: if alternatives never arrive within 90s, stop the spinner so the
-      // user isn't stuck staring at it forever (rare backend-stall edge case).
+      // Safety net: if 90 seconds pass while we're still showing the spinner
+      // AND no alternative ever materialized, stop the spinner and tell the
+      // user. The `hasAlternativeArrivedRef` guard is critical — without it,
+      // a slow poll that DID deliver alternatives but didn't tick again before
+      // 90s would falsely toast "No alternative hotels found".
       setTimeout(() => {
         if (alternativesLoadingRef.current) {
           setAlternativesLoading(false);
-          toast.error(t.addHotel.noAlternativesFound);
+          if (!hasAlternativeArrivedRef.current) {
+            toast.error(t.addHotel.noAlternativesFound);
+          }
         }
       }, 90000);
     } catch {
@@ -1205,6 +1271,9 @@ export default function AddHotelPage() {
         address: hotel.address ?? null,
         addressCity: hotel.addressCity ?? null,
         addressCountry: hotel.addressCountry ?? null,
+        // Persist the SETTHub deep link so the request summary page can make
+        // the hotel name clickable later.
+        sethubDetailsUrl: hotel.sethubDetailsUrl ?? null,
       });
 
       setAddedHotels((prev) => new Set(prev).add(hotel.hotelCode));
@@ -1450,7 +1519,6 @@ export default function AddHotelPage() {
           const pct = searchSummary && searchSummary.total > 0
             ? Math.round((searchSummary.completed / searchSummary.total) * 100)
             : 0;
-          const remaining = searchSummary ? Math.max(0, searchSummary.total - searchSummary.completed) : 0;
           // Inter-batch lull: backend is paginating but no jobs are in flight yet.
           // The numeric % stops being meaningful here (it'll plateau near 100%), so we
           // switch to an indeterminate "still searching" bar until the next batch enqueues.
@@ -1552,27 +1620,13 @@ export default function AddHotelPage() {
                   </div>
                 )}
 
-                {/* Divider */}
-                {searchSummary && <div className="hidden sm:block w-px self-stretch bg-sett-border-light shrink-0" />}
-
-                {/* Right: stat pills */}
-                {searchSummary && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Remaining — show "—" between batches since the count is meaningless there */}
-                    <div className="flex flex-col items-center px-3 py-2 rounded-[10px] border border-sett-border-light min-w-[52px] bg-sett-fill">
-                      <span className="font-montserrat text-[18px] font-bold text-sett-text-primary leading-none tabular-nums">
-                        {isBetweenBatches ? '—' : remaining}
-                      </span>
-                      <span className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent mt-0.5">{t.addHotel.searchRemaining}</span>
-                    </div>
-
-                    {/* Scroll hint badge */}
-                    {searchSummary.hotelsFound > 0 && (
-                      <div className="hidden md:flex items-center gap-1 pl-1 text-sett-primary shrink-0">
-                        <ChevronDown className="w-4 h-4 animate-bounce" />
-                        <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
-                      </div>
-                    )}
+                {/* Right: scroll hint (Remaining pill removed — the number
+                    was misleading because the backend's total grows as the
+                    ring widens, so "Remaining" would shift mid-search). */}
+                {searchSummary && searchSummary.hotelsFound > 0 && (
+                  <div className="hidden md:flex items-center gap-1 text-sett-primary shrink-0">
+                    <ChevronDown className="w-4 h-4 animate-bounce" />
+                    <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
                   </div>
                 )}
               </div>
@@ -2218,8 +2272,8 @@ export default function AddHotelPage() {
                         </h2>
                         <p className="font-montserrat text-[12px] text-sett-text-secondary mt-0.5">
                           {hasRequestedStars
-                            ? `${requestedStarBuckets.map((s) => `${s}★`).join(', ')} hotels found`
-                            : 'Hotels matching your criteria'}
+                            ? t.addHotel.starHotelsFound.replace('{stars}', requestedStarBuckets.map((s) => `${s}★`).join(', '))
+                            : t.addHotel.hotelsMatchingCriteria}
                         </p>
                       </div>
                       {searchMoreInlineSlot}
@@ -2784,9 +2838,13 @@ function HotelResultCard({
 
         {/* ── Hotel Details ── */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">
-          {/* Top: Name, Address, Stars + Add to Offer */}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 flex flex-col gap-2">
+          {/* Top: Name, Address, Stars + Add to Offer.
+              On mobile (< sm) the action column drops below the title block —
+              a full-width CTA reads better than fighting a long German label
+              ("Zum Angebot hinzufügen") for horizontal space against the hotel
+              name. On sm+ the original side-by-side layout returns. */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3">
+            <div className="flex-1 min-w-0 flex flex-col gap-2 w-full sm:w-auto">
               {/* Name on its own row so long titles wrap cleanly without
                   interfering with the stars/badges below. */}
               <div
@@ -2866,13 +2924,15 @@ function HotelResultCard({
               )}
             </div>
 
-            {/* Action area — primary CTA only */}
+            {/* Action area — primary CTA + free-cancellation pill.
+                Full-width on mobile so the long DE label can't collide with
+                the hotel title; right-aligned column on sm+. */}
             <div
-              className="shrink-0 flex flex-col items-end gap-2 animate-fade-in-right"
+              className="shrink-0 w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 animate-fade-in-right"
               style={{ animationDelay: '80ms' }}
             >
               {isAdded ? (
-                <span className="flex items-center gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
+                <span className="flex items-center justify-center sm:justify-end gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
                   <Check className="w-4 h-4" strokeWidth={2.5} /> {t.addHotel.added}
                 </span>
               ) : (
@@ -2881,12 +2941,14 @@ function HotelResultCard({
                   size="sm"
                   onClick={onAddToOffer}
                   isLoading={isAdding}
+                  fullWidth
+                  className="sm:w-auto"
                 >
                   {t.addHotel.addToOffer}
                 </Button>
               )}
               {hasCancellation && (
-                <div className="flex flex-col items-end gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
+                <div className="flex flex-col items-start sm:items-end gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
                   <div className="flex items-center gap-1 font-montserrat text-[12px] text-sett-primary font-semibold">
                     <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
                     <span>{t.addHotel.freeCancellation}</span>
@@ -2962,7 +3024,7 @@ function HotelResultCard({
                       <td className="py-2.5 px-4">
                         <div>
                           <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
-                            {formatRoomType(rt.roomType)}
+                            {formatRoomType(rt.roomType, t.addHotel)}
                           </span>
                           {rt.supplierCode && (
                             <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
@@ -3005,7 +3067,7 @@ function HotelResultCard({
                   <div>
                     <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.roomType}</span>
                     <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize leading-tight">
-                      {formatRoomType(rt.roomType)}
+                      {formatRoomType(rt.roomType, t.addHotel)}
                       {rt.supplierCode && <span className="block text-[11px] text-sett-text-accent mt-0.5">{rt.supplierCode}</span>}
                     </p>
                     {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (

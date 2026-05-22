@@ -587,6 +587,66 @@ input[type="date"]:invalid::-webkit-datetime-edit {
   display: none;
 }
 
+/* ── RichTextEditor — restore list markers + basic block styling ──
+   Tailwind's preflight strips default `<ul>`/`<ol>` markers and margins.
+   Inside the contenteditable surface we want the browser defaults back so
+   document.execCommand('insertOrderedList' | 'insertUnorderedList') actually
+   shows bullets/numbers, and so existing seeded list HTML continues to look
+   correct. Scoped via .sett-rich-editor so we don't affect anything else. */
+.sett-rich-editor ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.25em 0;
+}
+.sett-rich-editor ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 0.25em 0;
+}
+.sett-rich-editor li {
+  margin: 0.15em 0;
+}
+/* Nested lists get tighter spacing + alternating markers. */
+.sett-rich-editor ul ul,
+.sett-rich-editor ol ul {
+  list-style-type: circle;
+  margin: 0;
+}
+.sett-rich-editor ul ol,
+.sett-rich-editor ol ol {
+  list-style-type: lower-alpha;
+  margin: 0;
+}
+
+/* In-modal variant — applied when the calendar lives inside a modal whose
+   body has limited vertical room (e.g. Edit Request modal). A slightly more
+   compact rhythm gives the popper a better chance of fitting fully below the
+   field, even at high browser zoom, before popper's collision logic flips it
+   above. Visual language identical to the default — only proportions change. */
+.sett-datepicker-popper--in-modal .react-datepicker__header {
+  padding: 10px 0 6px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__current-month {
+  font-size: 13px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__day-name {
+  font-size: 11px;
+  width: 1.75rem;
+  line-height: 1.75rem;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__day {
+  width: 1.75rem;
+  line-height: 1.75rem;
+  font-size: 12px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__today-button {
+  font-size: 12px;
+  padding: 7px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__navigation {
+  top: 8px;
+}
+
 /* Contract preview HTML content (terms & cancellation conditions) */
 .contract-html-content ol {
   list-style-type: decimal;

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { BookingRequestFilters } from '@/components/forms/BookingRequestFilters';
@@ -64,27 +64,43 @@ function getLastUpdated(r: BookingRequest): string {
   return formatDate(date);
 }
 
-function matchesDateRange(r: BookingRequest, range: string): boolean {
-  if (!range) return true;
+/**
+ * Convert the date-range dropdown value into a `createdAt` window for the
+ * backend. Returns ISO timestamps inclusive of the period boundaries; empty
+ * for the "all time" value so the request stays unfiltered.
+ *
+ * Pushing this to the backend (rather than filtering in memory) is what lets
+ * the totals/pagination reflect the active filter.
+ */
+function dateRangeToWindow(range: string): { createdFrom?: string; createdTo?: string } {
+  if (!range) return {};
+  // Use the user's *local* year/month to figure out which calendar period they
+  // mean, then construct the window in UTC so the ISO strings we send don't
+  // get shifted by the timezone offset on the way out (e.g. IST users picking
+  // "This Month" in May used to send a window that started on April 30 UTC).
   const now = new Date();
-  const created = new Date(r.createdAt);
-  if (isNaN(created.getTime())) return true;
+  const y = now.getFullYear();
+  const m = now.getMonth();
 
   switch (range) {
-    case 'this_month':
-      return (
-        created.getMonth() === now.getMonth() &&
-        created.getFullYear() === now.getFullYear()
-      );
-    case 'this_quarter': {
-      const q = Math.floor(now.getMonth() / 3);
-      const cq = Math.floor(created.getMonth() / 3);
-      return cq === q && created.getFullYear() === now.getFullYear();
+    case 'this_month': {
+      const from = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0));
+      const to = new Date(Date.UTC(y, m + 1, 0, 23, 59, 59, 999));
+      return { createdFrom: from.toISOString(), createdTo: to.toISOString() };
     }
-    case 'this_year':
-      return created.getFullYear() === now.getFullYear();
+    case 'this_quarter': {
+      const qStart = Math.floor(m / 3) * 3;
+      const from = new Date(Date.UTC(y, qStart, 1, 0, 0, 0, 0));
+      const to = new Date(Date.UTC(y, qStart + 3, 0, 23, 59, 59, 999));
+      return { createdFrom: from.toISOString(), createdTo: to.toISOString() };
+    }
+    case 'this_year': {
+      const from = new Date(Date.UTC(y, 0, 1, 0, 0, 0, 0));
+      const to = new Date(Date.UTC(y, 11, 31, 23, 59, 59, 999));
+      return { createdFrom: from.toISOString(), createdTo: to.toISOString() };
+    }
     default:
-      return true;
+      return {};
   }
 }
 
@@ -127,27 +143,45 @@ export default function BookingRequestsPage() {
   const loadRequests = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const result = await requestsApi.list({
-        page,
-        limit: PAGE_SIZE,
-        search: search.trim() || undefined,
-        status: statusFilter || undefined,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
-      });
+      // Silent auto-refresh (triggered by a notification) opts out of the
+      // global error toast — a background failure shouldn't pop a banner at
+      // the user since they didn't initiate the call. Foreground loads still
+      // surface errors normally.
+      // The toolbar's "This Month / Quarter / Year" filter is meant to filter
+      // by when the request was CREATED (createdAt), not by the trip's
+      // check-in date. `createdFrom`/`createdTo` are the explicit backend
+      // params; the legacy `dateFrom`/`dateTo` remain a check-in filter.
+      const { createdFrom, createdTo } = dateRangeToWindow(dateRange);
+      const result = await requestsApi.list(
+        {
+          page,
+          limit: PAGE_SIZE,
+          search: search.trim() || undefined,
+          status: statusFilter || undefined,
+          createdFrom,
+          createdTo,
+          sortBy: 'createdAt',
+          sortOrder: 'desc',
+        },
+        { silent },
+      );
       setRequests(result.requests);
       if (result.pagination) {
         setServerPagination({
           total: result.pagination.total,
           totalPages: result.pagination.totalPages,
         });
+      } else {
+        // Some non-paginated payload shape — reset so the UI falls back to
+        // the client-side count of the returned rows instead of stale totals.
+        setServerPagination(null);
       }
     } catch {
       // keep empty
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, dateRange]);
 
   // Auto-refresh when a notification arrives that relates to a booking request
   // or proposal/offer (a new offer == a new request from this list's POV).
@@ -208,17 +242,15 @@ export default function BookingRequestsPage() {
     loadRequests();
   }, [loadRequests]);
 
-  /* client-side filtering for dateRange only (not supported by backend) */
-  const filtered = useMemo(() => {
-    if (!dateRange) return requests;
-    return requests.filter((r) => matchesDateRange(r, dateRange));
-  }, [requests, dateRange]);
-
-  /* pagination — prefer server pagination, fallback to client */
-  const totalPages = serverPagination?.totalPages ?? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const totalItems = serverPagination?.total ?? filtered.length;
+  /* Pagination — every filter (search, status, dateRange) is pushed to the
+     backend, so server pagination is the source of truth. The client-side
+     fallback is for when the API returns a non-paginated payload. */
+  const totalPages = serverPagination?.totalPages ?? Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+  const totalItems = serverPagination?.total ?? requests.length;
   const safeCurrentPage = Math.min(page, totalPages);
-  const rows = serverPagination ? filtered : filtered.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
+  const rows = serverPagination
+    ? requests
+    : requests.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
   const start = (safeCurrentPage - 1) * PAGE_SIZE;
 
   // Reset page when filters change
@@ -245,9 +277,13 @@ export default function BookingRequestsPage() {
       <div className="p-4 md:p-6 space-y-6">
         {/* Card with filters + table */}
         <div className="bg-white rounded-[14px] border border-sett-border animate-card-rise-in">
-          {/* Filter bar with refresh button — no overflow-hidden here so Select dropdowns are never clipped */}
+          {/* Toolbar: filters on the left, primary actions on the right.
+              The two action buttons live in their own flex group that never
+              wraps internally, so Create Request and Refresh stay on the same
+              line regardless of zoom level. The whole bar only stacks
+              vertically when the screen is genuinely narrow (lg breakpoint). */}
           <div
-            className="relative z-10 p-3 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-sidebar-fade-up"
+            className="relative z-10 p-3 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 animate-sidebar-fade-up"
             style={{ animationDelay: '120ms' }}
           >
             <div className="flex-1 min-w-0">
@@ -260,16 +296,27 @@ export default function BookingRequestsPage() {
                 onDateRangeChange={setDateRange}
               />
             </div>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              disabled={loading || isRefreshing}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill hover:border-sett-primary/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-              title={t.requests.refresh || 'Refresh requests'}
-            >
-              <RefreshCw className={`w-4 h-4 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{t.requests.refresh || 'Refresh'}</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0 lg:ml-auto">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={loading || isRefreshing}
+                className="shrink-0 inline-flex items-center justify-center gap-2 h-[41px] px-3 sm:px-4 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill hover:border-sett-primary/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                title={t.requests.refresh || 'Refresh requests'}
+              >
+                <RefreshCw className={`w-4 h-4 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{t.requests.refresh || 'Refresh'}</span>
+              </button>
+              <Link href="/booking-requests/create" className="shrink-0">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-2 h-[41px] px-4 rounded-lg bg-sett-primary text-sett-navy hover:bg-sett-green-dark hover:text-white font-montserrat text-[13px] font-bold uppercase tracking-[0.04em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] transition-all duration-200 active:scale-95 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t.nav.createRequest}</span>
+                </button>
+              </Link>
+            </div>
           </div>
 
           {/* Loading skeleton */}
@@ -285,7 +332,7 @@ export default function BookingRequestsPage() {
           )}
 
           {/* Empty state */}
-          {!loading && filtered.length === 0 && (
+          {!loading && requests.length === 0 && (
             <div
               className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border animate-sidebar-fade-up"
               style={{ animationDelay: '320ms' }}
@@ -422,18 +469,28 @@ export default function BookingRequestsPage() {
             </div>
           )}
 
-          {/* ── Mobile/Tablet Card View (below xl) ── */}
+          {/* ── Mobile/Tablet Card View (below xl) ──
+              Compact, three-column metric grid keeps the card short even with
+              long content. Secondary fields (Last Updated, Owner) are folded
+              into a small footer line so they don't bloat each row's height. */}
           {!loading && rows.length > 0 && (
             <div className="xl:hidden divide-y divide-sett-border border-t border-sett-border overflow-hidden">
               {rows.map((row, i) => {
                 const rooms = totalRooms(row.rooms);
                 const { totalSell, margin } = getProposalTotals(row);
+                const ownerLabel = row.assignedUser
+                  ? row.assignedUser.id === currentUserId
+                    ? t.requests.you
+                    : (row.assignedUser.firstName && row.assignedUser.lastName
+                        ? `${row.assignedUser.firstName} ${row.assignedUser.lastName}`
+                        : row.assignedUser.email)
+                  : null;
 
                 return (
                   <Link
                     key={row.id}
                     href={`/booking-requests/${row.id}`}
-                    className="group relative block p-4 transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
+                    className="group relative block px-4 py-3 transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
                     style={{ animationDelay: `${320 + Math.min(i, 6) * 60}ms` }}
                   >
                     {/* Left accent bar — slides in on hover */}
@@ -441,67 +498,75 @@ export default function BookingRequestsPage() {
                       aria-hidden
                       className="pointer-events-none absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
                     />
-                    {/* Top row: ID + Status */}
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-body font-semibold text-sett-text-primary transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5">
-                        #{row.referenceNumber ?? row.id.slice(0, 4)}
-                      </span>
+
+                    {/* Top row: ID + customer + destination on the left, status badge on the right */}
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-body font-semibold text-sett-text-primary transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5">
+                            #{row.referenceNumber ?? row.id.slice(0, 4)}
+                          </span>
+                          <span className="text-sett-text-accent">·</span>
+                          <span className="text-body font-medium text-sett-text-primary truncate">
+                            {customerName(row)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-sett-text-secondary truncate mt-0.5">
+                          {row.destinationName ?? '—'}
+                        </p>
+                      </div>
                       <Badge variant={getStatusBadgeVariant(row.status)}>
                         {statusLabel(row.status)}
                       </Badge>
                     </div>
 
-                    {/* Customer & Destination */}
-                    <p className="text-body font-medium text-sett-text-primary truncate">
-                      {customerName(row)}
-                    </p>
-                    <p className="text-sm text-sett-text-secondary truncate mt-0.5">
-                      {row.destinationName ?? '—'}
-                    </p>
-
-                    {/* Details grid */}
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3 text-sm">
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.checkInOut}</span>
-                        <p className="text-sett-text-primary mt-0.5">
+                    {/* Primary metrics: 3 columns at sm+, 2 at xs */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1.5 text-sm mt-2">
+                      <div className="min-w-0">
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[10px] font-semibold leading-none">{t.requests.checkInOut}</span>
+                        <p className="text-sett-text-primary text-[12px] mt-0.5 truncate">
                           {formatDate(row.checkinDate)} — {formatDate(row.checkoutDate)}
                         </p>
                       </div>
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.rooms}</span>
-                        <p className="text-sett-text-primary mt-0.5">{rooms ?? '—'}</p>
+                      <div className="min-w-0">
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[10px] font-semibold leading-none">{t.requests.rooms}</span>
+                        <p className="text-sett-text-primary text-[12px] mt-0.5">{rooms ?? '—'}</p>
                       </div>
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.group}</span>
-                        <p className="text-sett-text-primary mt-0.5">
-                          {getGroupTypeLabel(row.groupType, t)}
-                          {groupTypeRequiresAge(row.groupType) && row.averageAge != null && (
-                            <span className="block text-sett-text-accent text-[11px] mt-0.5">
-                              {t.offer.averageAge}: {row.averageAge}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.totalSell}</span>
-                        <p className="text-sett-text-primary font-medium mt-0.5">
+                      <div className="min-w-0">
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[10px] font-semibold leading-none">{t.requests.totalSell}</span>
+                        <p className="text-sett-text-primary font-medium text-[12px] mt-0.5 truncate">
                           {totalSell != null ? `€${totalSell.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </p>
                       </div>
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.margin}</span>
-                        <p className="text-sett-primary font-semibold mt-0.5">
+                      <div className="min-w-0">
+                        <span className="text-sett-text-accent uppercase tracking-wide text-[10px] font-semibold leading-none">{t.requests.margin}</span>
+                        <p className="text-sett-primary font-semibold text-[12px] mt-0.5 truncate">
                           {margin != null ? `€${margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                         </p>
                       </div>
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.createdOn}</span>
-                        <p className="text-sett-text-secondary mt-0.5">{formatDate(row.createdAt)}</p>
-                      </div>
-                      <div>
-                        <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.requests.lastUpdated}</span>
-                        <p className="text-sett-text-secondary mt-0.5">{getLastUpdated(row)}</p>
-                      </div>
+                    </div>
+
+                    {/* Footer line: group · owner · created/updated dates. Small
+                        secondary metadata so it doesn't add visual weight. */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] text-sett-text-secondary">
+                      <span>
+                        <span className="text-sett-text-accent uppercase tracking-wide font-semibold mr-1">{t.requests.group}:</span>
+                        {getGroupTypeLabel(row.groupType, t)}
+                        {groupTypeRequiresAge(row.groupType) && row.averageAge != null && (
+                          <span className="text-sett-text-accent"> ({t.offer.averageAge}: {row.averageAge})</span>
+                        )}
+                      </span>
+                      {ownerLabel && (
+                        <span>
+                          <span className="text-sett-text-accent uppercase tracking-wide font-semibold mr-1">{t.requests.owner}:</span>
+                          <span className={row.assignedUser?.id === currentUserId ? 'font-semibold text-sett-primary' : ''}>
+                            {ownerLabel}
+                          </span>
+                        </span>
+                      )}
+                      <span className="ml-auto">
+                        {formatDate(row.createdAt)}
+                      </span>
                     </div>
                   </Link>
                 );
@@ -511,7 +576,7 @@ export default function BookingRequestsPage() {
         </div>
 
         {/* Pagination */}
-        {!loading && filtered.length > 0 && (
+        {!loading && totalItems > 0 && (
           <div
             className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 animate-sidebar-fade-up"
             style={{ animationDelay: '720ms' }}

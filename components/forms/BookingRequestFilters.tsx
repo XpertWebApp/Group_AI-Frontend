@@ -1,9 +1,7 @@
 'use client';
 
 import { Select } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
-import { Search, Plus } from 'lucide-react';
-import Link from 'next/link';
+import { Search } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface BookingRequestFiltersProps {
@@ -46,9 +44,10 @@ export function BookingRequestFilters({
   ];
 
   return (
-    <div className="flex items-center gap-[14px] flex-wrap">
-      {/* Search bar */}
-      <div className="relative w-full flex-1 min-w-[200px] max-w-full md:max-w-[600px]">
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Search bar — grows to fill remaining row width, with a sensible cap
+          so it doesn't dominate when there's lots of horizontal space. */}
+      <div className="relative flex-1 min-w-[200px] max-w-[480px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-secondary" />
         <input
           type="search"
@@ -65,7 +64,7 @@ export function BookingRequestFilters({
         options={dateOptions}
         value={dateRange}
         onChange={(e) => onDateRangeChange(e.target.value)}
-        className="w-[144px]"
+        className="w-[132px] shrink-0"
       />
 
       {/* Status */}
@@ -74,16 +73,8 @@ export function BookingRequestFilters({
         options={statusOptions}
         value={status}
         onChange={(e) => onStatusChange(e.target.value)}
-        className="w-[144px]"
+        className="w-[132px] shrink-0"
       />
-
-      {/* Create button */}
-      <Link href="/booking-requests/create" className="ml-auto">
-        <Button variant="primary" size="md" className="text-white whitespace-nowrap">
-          <Plus className="w-4 h-4 mr-1" />
-          {t.nav.createRequest}
-        </Button>
-      </Link>
     </div>
   );
 }
