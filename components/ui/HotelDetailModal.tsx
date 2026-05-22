@@ -6,6 +6,7 @@ import { hotelsApi } from '@/lib/api/hotels';
 import type { HotelDetail } from '@/lib/api/hotels';
 import { StarRating } from './StarRating';
 import { HotelName } from './HotelName';
+import { ModalOverlay } from './ModalOverlay';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { cn } from '@/lib/utils/cn';
 
@@ -119,12 +120,12 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
     [onClose],
   );
 
+  // Escape + body-scroll lock are handled by ModalOverlay; this effect now
+  // just covers any extra key bindings (arrow keys etc) if added later.
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
     };
   }, [handleKeyDown]);
 
@@ -140,21 +141,26 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
   const translationStale = localizedDescription?.isFallback === true;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-modal-overlay-in"
-      onClick={onClose}
-    >
+    <ModalOverlay open onClose={onClose} className="p-4">
       <div
-        className="bg-white rounded-[14px] w-full max-w-3xl max-h-[90vh] flex flex-col shadow-xl overflow-hidden animate-modal-pop-in"
+        className="bg-white w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-modal-pop-in"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          borderRadius: 8, // §5.3 panel
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
       >
+        {/* §5.3 emphasis accent — 3px green strip at top */}
+        <div aria-hidden className="h-[3px] w-full bg-sett-primary shrink-0" />
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-sett-border-light shrink-0">
-          <h2 className="font-montserrat text-[16px] font-semibold text-sett-text-primary truncate pr-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E0E0E0] shrink-0">
+          {/* §3 H3 — navy bold 18–20px */}
+          <h2 className="font-montserrat text-[18px] font-bold leading-tight text-sett-navy truncate pr-4">
             {sethubDetailsUrl ? (
               <HotelName
                 hotel={{ hotelName: detail?.name ?? hotelName, sethubDetailsUrl }}
-                className="text-sett-text-primary"
+                className="text-sett-navy"
               />
             ) : (
               detail?.name ?? hotelName
@@ -163,9 +169,10 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-[#F7F7F7] transition-colors shrink-0"
+            className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors shrink-0"
+            aria-label="Close"
           >
-            <X className="w-5 h-5 text-sett-text-secondary" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -267,12 +274,12 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
                   <StarRating rating={detail.starRating} />
                 )}
 
-                {/* Short location summary */}
-                {detail.location && (
-                  <p className="font-montserrat text-[13px] text-sett-text-secondary italic">
-                    {detail.location}
-                  </p>
-                )}
+                {/* `detail.location` is intentionally NOT rendered here:
+                    the backend often populates it with the full English
+                    description text, which then showed up duplicated above
+                    the localized "Description" block below. The proper
+                    description (with EN ↔ DE switching) is rendered in its
+                    own section further down via `descriptionText`. */}
 
                 {/* Address */}
                 {(detail.address || detail.addressCity || detail.addressCountry) && (
@@ -311,9 +318,11 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
                 )}
               </div>
 
-              {/* Description — reads descriptions[locale] from the multi-lang payload.
-                  Switching EN↔DE re-renders this without a new API call. */}
-              {(descriptionText || detail.location) && (
+              {/* Description — reads descriptions[locale] from the multi-lang
+                  payload. Switching EN↔DE re-renders this without a new API
+                  call. Falls back to the legacy single `detail.description`
+                  field for hotels synced before the multi-lang payload landed. */}
+              {descriptionText && (
                 <div className="animate-card-rise-in" style={{ animationDelay: '220ms' }}>
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase tracking-wide">
@@ -328,44 +337,50 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
                       </span>
                     )}
                   </div>
-                  {descriptionText ? (
-                    <div
-                      className="font-montserrat text-[14px] text-sett-text-secondary leading-relaxed prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: descriptionText }}
-                    />
-                  ) : (
-                    <p className="font-montserrat text-[14px] text-sett-text-secondary leading-relaxed">
-                      {detail.location}
-                    </p>
-                  )}
+                  <div
+                    className="font-montserrat text-[14px] text-sett-text-secondary leading-relaxed prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: descriptionText }}
+                  />
                 </div>
               )}
 
-              {/* Facilities grouped by category */}
+              {/* Facilities grouped by category — category labels and chip
+                  labels both run through the i18n dictionaries so EN ↔ DE
+                  toggles instantly without re-calling the backend. Unknown
+                  GIATA strings fall back to the original text. */}
               {detail.hotelFacilities && detail.hotelFacilities.length > 0 && (
                 <div className="animate-card-rise-in" style={{ animationDelay: '300ms' }}>
                   <h3 className="font-montserrat text-[14px] font-semibold text-sett-text-primary uppercase tracking-wide mb-3">
                     {t.addHotel.hotelFacilities}
                   </h3>
                   <div className="space-y-4">
-                    {detail.hotelFacilities.map((group, groupIdx) => (
-                      <div key={group.Category}>
-                        <p className="font-montserrat text-[12px] font-semibold text-sett-text-accent uppercase tracking-wide mb-1.5">
-                          {group.Category}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {group.Facilities.map((f, fIdx) => (
-                            <span
-                              key={f}
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in transition-transform hover:scale-105"
-                              style={{ animationDelay: `${340 + groupIdx * 60 + fIdx * 20}ms` }}
-                            >
-                              {f}
-                            </span>
-                          ))}
+                    {detail.hotelFacilities.map((group, groupIdx) => {
+                      const categoryLabel =
+                        t.addHotel.facilityCategoryNames?.[group.Category.toLowerCase().trim()]
+                          ?? group.Category;
+                      return (
+                        <div key={group.Category}>
+                          <p className="font-montserrat text-[12px] font-semibold text-sett-text-accent uppercase tracking-wide mb-1.5">
+                            {categoryLabel}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {group.Facilities.map((f, fIdx) => {
+                              const facilityLabel =
+                                t.addHotel.facilityNames?.[f.toLowerCase().trim()] ?? f;
+                              return (
+                                <span
+                                  key={f}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in transition-transform hover:scale-105"
+                                  style={{ animationDelay: `${340 + groupIdx * 60 + fIdx * 20}ms` }}
+                                >
+                                  {facilityLabel}
+                                </span>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -373,6 +388,6 @@ export function HotelDetailModal({ hotelCode, hotelName, sethubDetailsUrl, onClo
           )}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

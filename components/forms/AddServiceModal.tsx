@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, forwardRef } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ChevronDown, Check, X } from 'lucide-react';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { cn } from '@/lib/utils/cn';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import type { AddProposalServicePayload } from '@/types/proposals';
@@ -35,27 +36,30 @@ interface AddServiceModalProps {
   bookingEndDate?: string | null;
 }
 
-/* ── Shared input className ── */
+/* ── Shared input className — brand spec §5.5 ──
+   1px solid #D0D0D0, radius 4px, focus #AAC737 with green glow,
+   labels above use Montserrat 600 12px navy uppercase letter-spacing 0.05em. */
 const inputCls =
-  'w-full h-[41px] p-3 rounded-[14px] border border-[#686868]/40 bg-white font-montserrat text-[14px] font-normal leading-none text-[#0A0A0A] placeholder:text-[#686868] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-sett-primary';
+  'w-full h-[41px] px-3 py-2 rounded-[4px] border border-[#D0D0D0] bg-white font-montserrat text-[14px] font-normal leading-none text-sett-navy placeholder:text-sett-grey placeholder:font-normal focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] transition-[border-color,box-shadow] duration-150';
 
 /* ── Field wrapper ── */
 function Field({ label, error, required, children }: { label: string; error?: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-[6px]">
-      <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+        {label}{required && <span className="text-[#CC3333] ml-0.5">*</span>}
       </label>
       {children}
       {error && (
-        <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{error}</p>
+        <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{error}</p>
       )}
     </div>
   );
 }
 
+/* Error state — brand spec §5.5: border-color #CC3333 (no red/orange). */
 const errorInputCls =
-  'w-full h-[41px] p-3 rounded-[14px] border border-red-400 bg-white font-montserrat text-[14px] font-normal leading-none text-[#0A0A0A] placeholder:text-[#686868] placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-red-300';
+  'w-full h-[41px] px-3 py-2 rounded-[4px] border border-[#CC3333] bg-white font-montserrat text-[14px] font-normal leading-none text-sett-navy placeholder:text-sett-grey placeholder:font-normal focus:outline-none focus:shadow-[0_0_0_3px_rgba(204,51,51,0.15)] transition-[border-color,box-shadow] duration-150';
 
 /* ── Themed date input ── */
 interface DateInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -233,68 +237,72 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
     });
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      role="dialog"
-      aria-modal="true"
-    >
+    <ModalOverlay open={open} onClose={onClose}>
       <div
         className="bg-white flex flex-col max-h-[90vh] overflow-hidden"
         style={{
-          width: 448,
-          borderRadius: 14,
-          border: '2px solid #68686866',
-          boxShadow: '0px 4px 20px 0px #00000014',
+          width: 480,
+          borderRadius: 8, // §5.3 panels
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
         }}
       >
+        {/* §5.3 accent emphasis: 3px green left-border on the panel + a thin
+            green stripe at the very top to anchor the brand without using a
+            navy header band that would dominate a small modal. */}
+        <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
+
         {/* Header */}
         <div className="flex items-start justify-between px-5 pt-5 pb-4">
-          <div className="flex flex-col gap-[6px]">
-            <h2 className="font-montserrat text-[18px] font-semibold leading-none text-[#0A0A0A]">
+          <div className="flex flex-col gap-1.5 min-w-0">
+            {/* §3 H3 / Subsection — navy, weight 700 */}
+            <h2 className="font-montserrat text-[20px] font-bold leading-tight text-sett-navy">
               {initialData ? t.services.editService : t.services.addService}
             </h2>
-            <p className="font-montserrat text-[14px] font-normal leading-none text-[#686868]">
+            {/* §3 subtitle — grey body, 14px */}
+            <p className="font-montserrat text-[13px] font-normal leading-snug text-sett-grey">
               {initialData ? t.services.editServiceDesc : t.services.addServiceDesc}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-[#F7F7F7] text-[#686868] transition-colors mt-0.5"
+            className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors mt-0.5 shrink-0"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="h-px bg-[#686868]/25 mx-5" />
+        {/* §5.3 1px border (no 25%-grey ad-hoc divider). */}
+        <div className="h-px bg-[#E0E0E0] mx-5" />
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
 
           {/* Service Name — multi-select with checkboxes */}
           <div className="flex flex-col gap-[6px]" ref={dropdownRef}>
-            <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-              {t.services.serviceName}<span className="text-red-500 ml-0.5">*</span>
+            <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+              {t.services.serviceName}<span className="text-[#CC3333] ml-0.5">*</span>
             </label>
             <div className="relative">
-              {/* Trigger */}
+              {/* Trigger — §5.5 form input: 1px solid #D0D0D0, radius 4px,
+                  focus green border + soft green glow. Error uses brand
+                  #CC3333 (not generic red). */}
               <div
                 onClick={() => { setShowDropdown((v) => !v); if (errors.service) setErrors((e) => ({ ...e, service: undefined })); }}
                 className={cn(
-                  'w-full min-h-[41px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
+                  'w-full min-h-[41px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[4px] border bg-white cursor-pointer transition-[border-color,box-shadow] duration-150',
                   errors.service
-                    ? 'border-red-400 ring-2 ring-red-200'
+                    ? 'border-[#CC3333] shadow-[0_0_0_3px_rgba(204,51,51,0.15)]'
                     : showDropdown
-                      ? 'border-sett-primary ring-2 ring-sett-primary/20'
-                      : 'border-[#686868]/40 hover:border-sett-primary/40'
+                      ? 'border-sett-primary shadow-[0_0_0_3px_rgba(170,199,55,0.15)]'
+                      : 'border-[#D0D0D0] hover:border-sett-primary/60'
                 )}
               >
                 {selectedServices.length === 0 ? (
-                  <span className="font-montserrat text-[14px] font-normal leading-none text-[#686868] flex-1">
+                  <span className="font-montserrat text-[14px] font-normal leading-none text-sett-grey flex-1">
                     {t.services.selectServices}
                   </span>
                 ) : (
@@ -302,13 +310,16 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                     {selectedServices.map((svc) => (
                       <span
                         key={svc}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[8px] bg-sett-primary/10 border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-none"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#F5F9E8] border border-sett-primary font-montserrat text-[12px] font-semibold text-sett-navy leading-none"
                       >
-                        {svc}
+                        {/* Display the localized label; the chip's identity
+                            (the value stored in selectedServices and sent to
+                            the backend) stays in canonical English. */}
+                        {t.services.presetLabels?.[svc] ?? svc}
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); toggleService(svc); }}
-                          className="ml-0.5 hover:text-sett-primary/60 transition-colors"
+                          className="ml-0.5 hover:text-sett-green-dark transition-colors"
                           aria-label={`Remove ${svc}`}
                         >
                           <X className="w-3 h-3" />
@@ -319,18 +330,19 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 )}
                 <ChevronDown
                   className={cn(
-                    'shrink-0 w-4 h-4 ml-auto text-[#686868] transition-transform duration-200',
+                    'shrink-0 w-4 h-4 ml-auto text-sett-grey transition-transform duration-200',
                     showDropdown && 'rotate-180'
                   )}
                 />
               </div>
 
-              {/* Dropdown panel */}
+              {/* Dropdown panel — §5.3 card: 1px solid #E0E0E0, radius 8px,
+                  subtle shadow 0 2px 8px rgba(0,0,0,0.08). */}
               {showDropdown && (
-                <div className="absolute z-20 w-full mt-1.5 bg-white border border-sett-border-light rounded-[14px] shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden">
-                  {/* Header */}
-                  <div className="px-3.5 py-2.5 border-b border-sett-border-light">
-                    <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent">
+                <div className="absolute z-20 w-full mt-1.5 bg-white border border-[#E0E0E0] rounded-[8px] shadow-[0_2px_8px_rgba(0,0,0,0.08)] overflow-hidden">
+                  {/* Header — labels: Montserrat 600 / 11–12px / uppercase / navy. */}
+                  <div className="px-3.5 py-2.5 border-b border-[#E0E0E0]">
+                    <p className="font-montserrat text-[11px] font-semibold uppercase tracking-[0.05em] text-sett-navy">
                       {t.services.serviceList}
                     </p>
                   </div>
@@ -352,17 +364,18 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                           className={cn(
                             'w-full flex items-center gap-3 px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
                             isSelected
-                              ? 'bg-sett-light-green-bg text-sett-primary font-medium'
-                              : 'text-sett-text-primary hover:bg-[#F7F7F7]'
+                              ? 'bg-[#F5F9E8] text-sett-navy font-medium' // §5.2 active row tint
+                              : 'text-sett-navy hover:bg-[#F8F9FA]'
                           )}
                         >
-                          {/* Checkbox */}
+                          {/* Checkbox — green bg + white check when active,
+                              1px solid #D0D0D0 when inactive (matches §5.5 inputs). */}
                           <span
                             className={cn(
-                              'w-4 h-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-colors',
+                              'w-4 h-4 shrink-0 rounded-[3px] border flex items-center justify-center transition-colors',
                               isSelected
                                 ? 'bg-sett-primary border-sett-primary'
-                                : 'bg-white border-[#686868]/40'
+                                : 'bg-white border-[#D0D0D0]'
                             )}
                           >
                             {isSelected && (
@@ -371,7 +384,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                               </svg>
                             )}
                           </span>
-                          <span className="truncate">{opt}</span>
+                          <span className="truncate">{t.services.presetLabels?.[opt] ?? opt}</span>
                         </button>
                       );
                     })}
@@ -380,15 +393,15 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
               )}
             </div>
             {errors.service && (
-              <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.service}</p>
+              <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.service}</p>
             )}
           </div>
 
           {/* Date From / Date To */}
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.dateFrom}<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.dateFrom}<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <div className="sett-datepicker">
                 <DatePicker
@@ -401,18 +414,18 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                   popperClassName="sett-datepicker-popper"
                   popperPlacement="bottom-start"
                   wrapperClassName="w-full"
-                  todayButton="Today"
+                  todayButton={t.addHotel.today}
                   showPopperArrow={false}
                   customInput={<DateInput hasError={!!errors.dateFrom} />}
                 />
               </div>
               {errors.dateFrom && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.dateFrom}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.dateFrom}</p>
               )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.dateTo}<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.dateTo}<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <div className="sett-datepicker">
                 <DatePicker
@@ -425,13 +438,13 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                   popperClassName="sett-datepicker-popper"
                   popperPlacement="bottom-end"
                   wrapperClassName="w-full"
-                  todayButton="Today"
+                  todayButton={t.addHotel.today}
                   showPopperArrow={false}
                   customInput={<DateInput hasError={!!errors.dateTo} />}
                 />
               </div>
               {errors.dateTo && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.dateTo}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.dateTo}</p>
               )}
             </div>
           </div>
@@ -439,8 +452,8 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
           {/* Buy Price / Sell Price */}
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.buyPrice} (€)<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.buyPrice} (€)<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -454,12 +467,12 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 className={errors.buyPrice ? errorInputCls : inputCls}
               />
               {errors.buyPrice && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.buyPrice}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.buyPrice}</p>
               )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.sellPrice} (€)<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.sellPrice} (€)<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -473,7 +486,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 className={errors.sellPrice ? errorInputCls : inputCls}
               />
               {errors.sellPrice && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.sellPrice}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.sellPrice}</p>
               )}
             </div>
           </div>
@@ -481,8 +494,8 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
           {/* Markup / Quantity */}
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.markupPct}<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.markupPct}<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -496,12 +509,12 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 className={errors.markup ? errorInputCls : inputCls}
               />
               {errors.markup && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.markup}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.markup}</p>
               )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.quantity}<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.quantity}<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -514,7 +527,7 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 className={errors.quantity ? errorInputCls : inputCls}
               />
               {errors.quantity && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.quantity}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.quantity}</p>
               )}
             </div>
           </div>
@@ -522,8 +535,8 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
           {/* Day / Night — number inputs */}
           <div className="flex justify-between">
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.day}<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.day}<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -536,12 +549,12 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 className={errors.day ? errorInputCls : inputCls}
               />
               {errors.day && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.day}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.day}</p>
               )}
             </div>
             <div className="flex flex-col gap-[6px]" style={{ width: 194 }}>
-              <label className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-normal text-[#0A0A0A]">
-                {t.services.night}<span className="text-red-500 ml-0.5">*</span>
+              <label className="font-montserrat text-[12px] font-semibold leading-none uppercase tracking-[0.05em] text-sett-navy">
+                {t.services.night}<span className="text-[#CC3333] ml-0.5">*</span>
               </label>
               <input
                 type="number"
@@ -554,32 +567,22 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
                 className={errors.night ? errorInputCls : inputCls}
               />
               {errors.night && (
-                <p className="font-montserrat text-[12px] text-red-500 leading-none mt-0.5">{errors.night}</p>
+                <p className="font-montserrat text-[12px] text-[#CC3333] leading-none mt-0.5">{errors.night}</p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="h-px bg-[#686868]/25 mx-5" />
-        {/* Buttons — width:408 height:41 gap:12px */}
-        <div className="flex gap-3 px-5 py-4" style={{ gap: 12 }}>
+        {/* Footer — §5.1 buttons spec: primary CTA #AAC737 bg with NAVY text
+            (not white), radius 4px, uppercase, letter-spacing 0.08em, weight 700.
+            Secondary CTA: transparent bg, green border, green text. */}
+        <div className="h-px bg-[#E0E0E0] mx-5" />
+        <div className="flex gap-3 px-5 py-4 justify-end">
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            style={{
-              width: 198,
-              height: 41,
-              borderRadius: 14,
-              border: '1px solid #68686866',
-              paddingTop: 12,
-              paddingBottom: 12,
-              paddingLeft: 16,
-              paddingRight: 16,
-              background: '#FFFFFF',
-            }}
-            className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-[0.08%] text-[#4A4A4A] hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95 transition-all duration-200"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] border-2 border-sett-primary bg-transparent font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-primary hover:bg-sett-primary/5 active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
             {t.modals.cancel}
           </button>
@@ -587,23 +590,17 @@ export function AddServiceModal({ open, onClose, onAdd, isLoading, initialData, 
             type="button"
             onClick={handleAdd}
             disabled={isLoading}
-            style={{
-              width: 198,
-              height: 41,
-              borderRadius: 14,
-              paddingTop: 12,
-              paddingBottom: 12,
-              paddingLeft: 16,
-              paddingRight: 16,
-              background: '#AAC737',
-              boxShadow: '4px 4px 5px 0px #FFFFFF40 inset, 0px 8px 20px 0px #00000021',
-            }}
-            className="font-montserrat text-[14px] font-semibold leading-none uppercase tracking-[0.08%] text-white hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95 transition-all duration-200 disabled:opacity-60"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] bg-sett-primary hover:bg-sett-green-dark font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-navy active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
-            {isLoading ? 'Saving…' : initialData ? t.services.updateService : t.services.addService}
+            {isLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                {t.services.savingShort ?? 'Saving…'}
+              </span>
+            ) : initialData ? t.services.updateService : t.services.addService}
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

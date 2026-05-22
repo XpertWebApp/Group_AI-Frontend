@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, X, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -111,9 +112,10 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
   const allFailed = total > 0 && failed.size >= total;
   const resolvedSrc = total === 0 || allFailed ? PLACEHOLDER : chain[idx];
 
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
-      className="fixed inset-0 z-[60] bg-black/95 flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] bg-black/95 flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -220,7 +222,8 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -32,7 +32,8 @@ export function ConfirmModal({
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      <p className="text-body text-sett-text-secondary mb-6">{message}</p>
+      {/* §3 body — Montserrat 400 / 14px / grey #686868 */}
+      <p className="font-montserrat text-[14px] leading-relaxed text-sett-grey mb-6">{message}</p>
       <div className="flex gap-3 justify-end">
         <Button variant="secondary" onClick={onClose}>
           {t.modals.cancel}

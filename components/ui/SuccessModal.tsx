@@ -45,17 +45,26 @@ export function SuccessModal({
 
   return (
     <Modal open={open} onClose={onClose} title="">
-      <div className="flex flex-col items-center text-center py-4">
-        <div className="w-16 h-16 rounded-full bg-sett-light-green-bg flex items-center justify-center mb-4">
-          <CheckCircle className="w-8 h-8 text-sett-primary" />
+      {/* §3 H3 title + §3 body, centered with a brand-green success icon. */}
+      <div className="flex flex-col items-center text-center py-2">
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
+          style={{
+            background: '#F5F9E8', // §5.2 active-row tint = soft brand green
+            border: '1px solid #C8E050',
+          }}
+        >
+          <CheckCircle className="w-8 h-8 text-sett-primary" strokeWidth={2.25} />
         </div>
-        <h3 className="text-heading-sm font-bold text-sett-text-primary mb-2">{title}</h3>
-        <p className="text-body text-sett-text-secondary mb-6">{message}</p>
+        <h3 className="font-montserrat text-[20px] font-bold leading-tight text-sett-navy mb-2">
+          {title}
+        </h3>
+        <p className="font-montserrat text-[14px] leading-relaxed text-sett-grey mb-6">{message}</p>
         <Button variant="primary" fullWidth onClick={onClose}>
           {resolvedButtonLabel}
         </Button>
         {autoRedirectSeconds && countdown > 0 && (
-          <p className="text-caption text-sett-text-accent mt-3">
+          <p className="font-montserrat text-[12px] text-sett-grey mt-3">
             {t.modals.redirecting.replace('{seconds}', String(countdown))}
           </p>
         )}

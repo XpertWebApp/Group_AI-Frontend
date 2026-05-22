@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils/cn';
 import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { translations } from '@/lib/i18n/translations';
 import {
   AGE_REQUIRED_GROUP_TYPES,
   AVERAGE_AGE_MAX,
@@ -90,10 +91,11 @@ const defaultFormData: FormData = {
   phoneCountryCode: '+44',
   phone: '',
   specialRequestsCustomer: '',
-  termsAndConditions:
-    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>All prices are per room per night unless otherwise stated</li><li>Prices are subject to availability at time of booking</li><li>Full payment required 30 days before arrival</li><li>Cancellation policy applies as per individual hotel terms</li><li>Group rates are valid for minimum 10 participants</li><li>Final room list required 14 days before arrival</li></ol>',
-  cancellationConditions:
-    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>Cancellations made 14 days or more in advance of the event date will receive a 100% refund.</li><li>Cancellations made within 7 days will incur a 50% fee.</li></ol>',
+  // Defaults for the policy editors are seeded at mount-time from the current
+  // locale via an effect inside the page component (see below). Left blank
+  // here so the i18n layer is the single source of truth for the boilerplate.
+  termsAndConditions: '',
+  cancellationConditions: '',
 };
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
@@ -304,7 +306,12 @@ const SESSION_KEY = 'createFormSession';
 function CreateBookingRequestPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  // Both translations bundles, so we can detect "field still contains the
+  // OTHER locale's default" and re-seed on language switch without
+  // overwriting any edits the user has typed.
+  const enTranslations = translations.en.createForm;
+  const deTranslations = translations.de.createForm;
   const [currentStep, setCurrentStep] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const params = new URLSearchParams(window.location.search);
@@ -380,6 +387,35 @@ function CreateBookingRequestPageInner() {
       // storage full — not critical
     }
   }, [currentStep, formData, draftRequestId]);
+
+  // Seed (and re-seed on language toggle) the boilerplate text in the policy
+  // editors. We only overwrite the field if it's empty OR currently holds the
+  // OTHER locale's default — that way any edit the user has typed is
+  // preserved across language switches.
+  useEffect(() => {
+    setFormData((prev) => {
+      const enTerms = enTranslations.defaultTermsHtml;
+      const deTerms = deTranslations.defaultTermsHtml;
+      const enCancel = enTranslations.defaultCancellationHtml;
+      const deCancel = deTranslations.defaultCancellationHtml;
+      const wantedTerms = locale === 'de' ? deTerms : enTerms;
+      const wantedCancel = locale === 'de' ? deCancel : enCancel;
+
+      const termsIsDefault = !prev.termsAndConditions
+        || prev.termsAndConditions === enTerms
+        || prev.termsAndConditions === deTerms;
+      const cancelIsDefault = !prev.cancellationConditions
+        || prev.cancellationConditions === enCancel
+        || prev.cancellationConditions === deCancel;
+
+      if (!termsIsDefault && !cancelIsDefault) return prev;
+      return {
+        ...prev,
+        termsAndConditions: termsIsDefault ? wantedTerms : prev.termsAndConditions,
+        cancellationConditions: cancelIsDefault ? wantedCancel : prev.cancellationConditions,
+      };
+    });
+  }, [locale, enTranslations, deTranslations]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => {
@@ -851,7 +887,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 popperPlacement="bottom-end"
                 portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
-                todayButton="Today"
+                todayButton={t.addHotel.today}
                 showPopperArrow={false}
                 customInput={<DateInput hasError={!!errors.checkInDate} />}
               />
@@ -874,7 +910,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 popperPlacement="bottom-end"
                 portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
-                todayButton="Today"
+                todayButton={t.addHotel.today}
                 showPopperArrow={false}
                 customInput={<DateInput hasError={!!errors.checkOutDate} />}
               />
@@ -1027,7 +1063,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
       {formData.doubleRooms > 0 && (
         <div className="mt-4 rounded-[14px] border border-sett-border-light bg-sett-fill p-5">
           <h3 className="font-montserrat text-[16px] font-semibold leading-normal text-sett-text-primary mb-4">
-            Select Bed Configuration for Double Room
+            {t.addHotel.selectBedConfiguration}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RoomCounter
