@@ -1027,15 +1027,16 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                   }
                 }}
                 className={cn(
-                  // Match the shared Select component's radius (14px) so
-                  // Hotel Category lines up visually with the other dropdowns
-                  // (Budget Range, Group Type) in the same form.
-                  'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
+                  // §5.5 brand-spec input: 4px radius + #E0E0E0 border, so
+                  // Hotel Category visually matches the Check-in date input
+                  // and the adjacent Budget Range / Group Type / Group Size
+                  // fields on this form.
+                  'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-input border bg-white cursor-pointer transition-all duration-150',
                   errors.hotelCategories
                     ? 'border-sett-destructive'
                     : hotelCatDropdownOpen
-                      ? 'border-sett-primary ring-2 ring-sett-primary/20'
-                      : 'border-sett-border-light hover:border-sett-primary/40',
+                      ? 'border-sett-primary shadow-input-focus'
+                      : 'border-sett-border hover:border-sett-primary/40',
                 )}
               >
                 {formData.hotelCategories.length === 0 ? (
@@ -1145,6 +1146,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.selectBudgetRange}
             className="animate-field-fade-in"
             style={{ animationDelay: '320ms' }}
+            // §5.5 input style so Budget Range matches the Check-in date input
+            // and the sibling fields on this form. Without these overrides the
+            // shared Select defaults to a 14px radius + lighter border.
+            triggerClassName="rounded-input border-sett-border"
           />
         </div>
 
@@ -1166,6 +1171,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             error={errors.groupType}
             className="animate-field-fade-in"
             style={{ animationDelay: '380ms' }}
+            triggerClassName="rounded-input border-sett-border"
           />
           <div className="animate-field-fade-in" style={{ animationDelay: '420ms' }}>
             <Input
@@ -1181,6 +1187,9 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
               error={errors.groupSize}
+              // §5.5 input style so Group Size matches the Check-in date input
+              // and the sibling fields on this form.
+              className="rounded-input"
             />
           </div>
         </div>

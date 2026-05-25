@@ -1099,13 +1099,20 @@ export default function AddHotelPage() {
       startPollingFallback(requestId);
       // Safety net: if 90 seconds pass while we're still showing the spinner
       // AND no alternative ever materialized, stop the spinner and tell the
-      // user. The `hasAlternativeArrivedRef` guard is critical — without it,
-      // a slow poll that DID deliver alternatives but didn't tick again before
-      // 90s would falsely toast "No alternative hotels found".
+      // user. The two guards are critical:
+      //   - hasAlternativeArrivedRef: flipped by the poll when it sees a
+      //     hotel with searchKind === 'alternative'.
+      //   - completedResultsRef.current.length: catches the case where the BE
+      //     returned alternatives without the explicit searchKind tag, so
+      //     they're visible on screen but the type-discriminated ref stayed
+      //     false. Toasting "no alternatives" while results are on screen
+      //     would be false (Offer #447 regression).
       setTimeout(() => {
         if (alternativesLoadingRef.current) {
           setAlternativesLoading(false);
-          if (!hasAlternativeArrivedRef.current) {
+          const altsArrived = hasAlternativeArrivedRef.current
+            || completedResultsRef.current.length > 0;
+          if (!altsArrived) {
             toast.error(t.addHotel.noAlternativesFound);
           }
         }
@@ -1153,12 +1160,22 @@ export default function AddHotelPage() {
       alternativesFetchedRef.current = true;
       setAlternativesExpanded(true);
       setPhase('polling');
+      // Reset the "arrived" tracker — this flow may follow a previous attempt
+      // and we want the 90s safety timer to judge this attempt's results only.
+      hasAlternativeArrivedRef.current = false;
       startPollingFallback(requestId);
-      // Safety: same 90s fail-safe as the main alternatives handler.
+      // Safety: same 90s fail-safe as handleShowAlternatives — guard against
+      // a false "no alternatives" toast when results in fact arrived but the
+      // loading-state hand-off didn't tick in time. Earlier this handler had
+      // no guard at all, which caused the false toast on Offer #447.
       setTimeout(() => {
         if (alternativesLoadingRef.current) {
           setAlternativesLoading(false);
-          toast.error(t.addHotel.noAlternativesFound);
+          const altsArrived = hasAlternativeArrivedRef.current
+            || completedResultsRef.current.length > 0;
+          if (!altsArrived) {
+            toast.error(t.addHotel.noAlternativesFound);
+          }
         }
       }, 90000);
     } catch {
@@ -2844,7 +2861,12 @@ function HotelResultCard({
               ("Zum Angebot hinzufügen") for horizontal space against the hotel
               name. On sm+ the original side-by-side layout returns. */}
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3">
-            <div className="flex-1 min-w-0 flex flex-col gap-2 w-full sm:w-auto">
+            {/* min-w-[220px] guards against character-per-line wrapping when
+                the right action column (wide DE CTA + free-cancellation pill)
+                squeezes the title at narrow widths or 150% browser zoom.
+                Below 220px the parent's sm:flex-wrap drops the action column
+                to the next line instead of collapsing the title. */}
+            <div className="flex-1 min-w-0 sm:min-w-[220px] flex flex-col gap-2 w-full sm:w-auto">
               {/* Name on its own row so long titles wrap cleanly without
                   interfering with the stars/badges below. */}
               <div
@@ -2926,9 +2948,12 @@ function HotelResultCard({
 
             {/* Action area — primary CTA + free-cancellation pill.
                 Full-width on mobile so the long DE label can't collide with
-                the hotel title; right-aligned column on sm+. */}
+                the hotel title; right-aligned column on sm+. The column is
+                NOT shrink-0 — at 150% zoom or narrow widths the parent's
+                sm:flex-wrap drops this block below the title rather than
+                squeezing the title into one-letter-per-line. */}
             <div
-              className="shrink-0 w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 animate-fade-in-right"
+              className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 animate-fade-in-right"
               style={{ animationDelay: '80ms' }}
             >
               {isAdded ? (

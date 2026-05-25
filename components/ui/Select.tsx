@@ -25,6 +25,10 @@ interface SelectProps {
   style?: React.CSSProperties;
   disabled?: boolean;
   name?: string;
+  /** Optional override for the trigger button's class — used when a form needs
+   *  the trigger to follow the §5.5 input style (4px radius, #E0E0E0 border)
+   *  instead of the default rounded-[14px] look. */
+  triggerClassName?: string;
 }
 
 export function Select({
@@ -39,6 +43,7 @@ export function Select({
   variant = 'default',
   disabled,
   name,
+  triggerClassName,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ position: 'absolute', visibility: 'hidden' });
@@ -225,6 +230,7 @@ export function Select({
               : isFilter
                 ? 'border-[#68686833] hover:border-sett-primary/40'
                 : 'border-sett-border-light hover:border-sett-primary/40',
+          triggerClassName,
         )}
       >
         {selectedOption?.node

@@ -11,9 +11,11 @@
  * provided — that way unknown / new notification types still render the
  * server's English copy instead of breaking the UI.
  *
+
  * Placeholder syntax in templates: `{key}` — replaced by `metadata.key` (or
- * known top-level fields like `entityId`). Missing keys leave the placeholder
- * intact so missing data is obvious during QA rather than silently dropping.
+ * known top-level fields like `entityId`). If any placeholder is missing
+ * from metadata we fall back to the BE-supplied string for that field rather
+ * than render literal `{customer}` to the user.
  */
 
 import type { Notification } from '@/types';
@@ -39,12 +41,24 @@ function metaValue(n: Notification, key: string): string | null {
   return null;
 }
 
-/** Replace every {placeholder} in a template using the notification's metadata. */
-function interpolate(template: string, n: Notification): string {
-  return template.replace(/\{(\w+)\}/g, (raw, key: string) => {
+/**
+ * Replace every {placeholder} in a template using the notification's metadata.
+ * Returns `null` when any referenced placeholder is missing — caller should
+ * then fall back to the BE-supplied string instead of rendering a half-filled
+ * template (avoids leaking literal "{customer}" / "#{reference}" to the user
+ * when the BE notification's metadata is incomplete).
+ */
+function interpolate(template: string, n: Notification): string | null {
+  let missing = false;
+  const out = template.replace(/\{(\w+)\}/g, (raw, key: string) => {
     const v = metaValue(n, key);
-    return v ?? raw;
+    if (v == null) {
+      missing = true;
+      return raw;
+    }
+    return v;
   });
+  return missing ? null : out;
 }
 
 /**
@@ -70,18 +84,20 @@ export function formatNotification(
   const key = canonType(n.type);
   const tpl = templates[key];
 
-  // TEMP DEBUG — log the actual BE type so we can map it.
-  if (typeof window !== 'undefined') {
-    console.log('[formatNotification] raw type=', JSON.stringify(n.type), 'canon key=', key, 'template found?', !!tpl, 'metadata=', n.metadata);
-  }
-
   if (!tpl) {
     // Unknown type — fall back to whatever the backend already provided.
     return { title: n.title ?? '', body: n.body ?? '' };
   }
 
+  // Per-field fallback: if a template's placeholders aren't all filled, use
+  // the BE-supplied string for that field. Title and body fall back
+  // independently so a working title isn't lost when only body metadata is
+  // missing (and vice versa).
+  const renderedTitle = tpl.title ? interpolate(tpl.title, n) : null;
+  const renderedBody = tpl.body ? interpolate(tpl.body, n) : null;
+
   return {
-    title: tpl.title ? interpolate(tpl.title, n) : n.title ?? '',
-    body: tpl.body ? interpolate(tpl.body, n) : n.body ?? '',
+    title: renderedTitle ?? n.title ?? '',
+    body: renderedBody ?? n.body ?? '',
   };
 }
