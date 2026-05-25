@@ -28,6 +28,8 @@ import {
   groupTypeRequiresAge,
 } from '@/lib/utils/groupType';
 import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
+import { OdooCompanyPicker } from '@/components/forms/OdooCompanyPicker';
+import { detectCountryCode } from '@/lib/constants/countryCodes';
 
 interface FormData {
   // Step 1: Trip Details
@@ -54,6 +56,9 @@ interface FormData {
   specialRequestsRooms: string;
   // Step 3: Customer Details
   companyName: string;
+  // Linked Odoo `res.partner` id (null until staff picks a match in the
+  // OdooCompanyPicker). Required at send-offer time post-cutover.
+  odooContactId: number | null;
   nameListFile: File | null;
   firstName: string;
   lastName: string;
@@ -87,6 +92,7 @@ const defaultFormData: FormData = {
   hotelLocation: 'central',
   specialRequestsRooms: '',
   companyName: '',
+  odooContactId: null,
   nameListFile: null,
   firstName: '',
   lastName: '',
@@ -539,6 +545,7 @@ function CreateBookingRequestPageInner() {
         specialRequirements: formData.specialRequestsRooms || undefined,
         // Step 3: Customer Details
         companyName: formData.companyName,
+        odooContactId: formData.odooContactId,
         firstName: formData.firstName,
         lastName: formData.lastName,
         contactEmail: formData.email,
@@ -1027,15 +1034,16 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                   }
                 }}
                 className={cn(
-                  // Match the shared Select component's radius (14px) so
-                  // Hotel Category lines up visually with the other dropdowns
-                  // (Budget Range, Group Type) in the same form.
-                  'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
+                  // §5.5 brand-spec input: 4px radius + #E0E0E0 border, so
+                  // Hotel Category visually matches the Check-in date input
+                  // and the adjacent Budget Range / Group Type / Group Size
+                  // fields on this form.
+                  'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-input border bg-white cursor-pointer transition-all duration-150',
                   errors.hotelCategories
                     ? 'border-sett-destructive'
                     : hotelCatDropdownOpen
-                      ? 'border-sett-primary ring-2 ring-sett-primary/20'
-                      : 'border-sett-border-light hover:border-sett-primary/40',
+                      ? 'border-sett-primary shadow-input-focus'
+                      : 'border-sett-border hover:border-sett-primary/40',
                 )}
               >
                 {formData.hotelCategories.length === 0 ? (
@@ -1145,6 +1153,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.selectBudgetRange}
             className="animate-field-fade-in"
             style={{ animationDelay: '320ms' }}
+            // §5.5 input style so Budget Range matches the Check-in date input
+            // and the sibling fields on this form. Without these overrides the
+            // shared Select defaults to a 14px radius + lighter border.
+            triggerClassName="rounded-input border-sett-border"
           />
         </div>
 
@@ -1166,6 +1178,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             error={errors.groupType}
             className="animate-field-fade-in"
             style={{ animationDelay: '380ms' }}
+            triggerClassName="rounded-input border-sett-border"
           />
           <div className="animate-field-fade-in" style={{ animationDelay: '420ms' }}>
             <Input
@@ -1181,6 +1194,9 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
               error={errors.groupSize}
+              // §5.5 input style so Group Size matches the Check-in date input
+              // and the sibling fields on this form.
+              className="rounded-input"
             />
           </div>
         </div>
@@ -1377,19 +1393,35 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
       />
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
-              {t.createForm.companyName} <span className="text-sett-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder={t.createForm.companyNamePlaceholder}
-              value={formData.companyName}
-              onChange={(e) => updateField('companyName', e.target.value)}
-              className={inputClass(!!errors.companyName)}
-            />
-            <FieldError message={errors.companyName} />
-          </div>
+          {/* §BackendGuidelines.md — live Odoo company picker. Replaces the
+              previous plain free-text input. companyName + odooContactId are
+              kept in form state and POSTed together. onPicked autofills
+              Email + Phone from the Odoo row, but only when the fields are
+              still empty — never overwrite staff input. */}
+          <OdooCompanyPicker
+            value={{ companyName: formData.companyName, odooContactId: formData.odooContactId }}
+            onChange={(next) => {
+              updateField('companyName', next.companyName);
+              updateField('odooContactId', next.odooContactId);
+            }}
+            onPicked={(row) => {
+              if (!formData.email.trim() && row.email) {
+                updateField('email', row.email);
+              }
+              if (!formData.phone.trim() && row.phone) {
+                const split = detectCountryCode(row.phone);
+                if (split) {
+                  updateField('phoneCountryCode', split.code);
+                  updateField('phone', split.number);
+                } else {
+                  updateField('phone', row.phone);
+                }
+              }
+            }}
+            label={t.createForm.companyName}
+            required
+            error={errors.companyName}
+          />
           <div>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.nameList}

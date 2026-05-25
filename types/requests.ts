@@ -28,6 +28,9 @@ export interface CreateBookingRequestPayload {
 
   // Step 3: Customer Details
   companyName: string;
+  // Linked Odoo `res.partner` id — sent when staff picked a match in the
+  // OdooCompanyPicker. Null/omitted means "free text only".
+  odooContactId?: number | null;
   firstName: string;
   lastName: string;
   contactEmail: string;

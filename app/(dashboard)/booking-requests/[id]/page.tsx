@@ -35,6 +35,8 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
+import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
+import { isOdooLinkRequired, isOdooContactRequiredError } from '@/lib/utils/odooGate';
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -205,6 +207,10 @@ export default function RequestDetailPage() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editRequestOpen, setEditRequestOpen] = useState(false);
+  // ODOO_CONTACT_REQUIRED gate modal — opens when staff try to send a
+  // post-cutover offer without linking an Odoo company (§2.3).
+  const [odooGateOpen, setOdooGateOpen] = useState(false);
+  const [odooGateMessage, setOdooGateMessage] = useState<string | undefined>(undefined);
   const [selectedHotelsForBreakdown, setSelectedHotelsForBreakdown] = useState<Set<string>>(new Set());
 
   const toggleHotelBreakdownSelection = (hotelId: string) => {
@@ -606,7 +612,14 @@ export default function RequestDetailPage() {
         const status = err.response?.status;
         if (proposalData) setProposal((p) => p ? { ...p, ...proposalData } : p);
 
-        if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
+        if (errorCode === 'ODOO_CONTACT_REQUIRED' || isOdooContactRequiredError(err)) {
+          // Gate fired despite our pre-disable (e.g. race with a recent
+          // unlink). Close the send dialog and open the dedicated blocking
+          // modal, preserving the BE-supplied user-facing sentence.
+          setSendOpen(false);
+          setOdooGateMessage(backendMessage);
+          setOdooGateOpen(true);
+        } else if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
           setSendError(emailError || t.toasts.emailSendFailed);
         } else if (errorCode === 'SMTP_NOT_CONFIGURED') {
           setSendError(emailError || t.toasts.smtpNotConfigured);
@@ -1579,26 +1592,47 @@ export default function RequestDetailPage() {
                     <Save className="w-4 h-4" />
                     {t.offer.saveDraft}
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      const status = (proposal?.status ?? request.status).toLowerCase();
-                      if (status === 'approved') setApproveStepDone(true);
-                      if (sendEmails.length === 0 && request.contactEmail) {
-                        setSendEmails([request.contactEmail]);
-                      }
-                      setSendOpen(true);
-                    }}
-                    disabled={['declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
-                  >
-                    <Send className="w-4 h-4" />
-                    {offerHistory.length === 0
-                      ? t.offer.sendInitialOffer
-                      : offerHistory.length === 1
-                        ? t.offer.sendFinalOffer
-                        : t.offer.sendRevision}
-                  </Button>
+                  {/* The Send-Offer trigger is pre-disabled when the Odoo
+                      gate would fire (§2.3 — post-cutover request with no
+                      odooContactId). Hovering the wrapper exposes a tooltip
+                      explaining how to unblock. The BE still enforces; this is
+                      pure UX so staff never see a 400 in the modal. */}
+                  {(() => {
+                    const sendBlockedByOdoo = isOdooLinkRequired(request);
+                    const statusBlocked = ['declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase());
+                    return (
+                      <span
+                        title={sendBlockedByOdoo ? t.odooPicker.sendBlockedTooltip : undefined}
+                        className={cn('contents')}
+                      >
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            if (sendBlockedByOdoo) {
+                              setOdooGateMessage(undefined);
+                              setOdooGateOpen(true);
+                              return;
+                            }
+                            const status = (proposal?.status ?? request.status).toLowerCase();
+                            if (status === 'approved') setApproveStepDone(true);
+                            if (sendEmails.length === 0 && request.contactEmail) {
+                              setSendEmails([request.contactEmail]);
+                            }
+                            setSendOpen(true);
+                          }}
+                          disabled={statusBlocked || sendBlockedByOdoo}
+                        >
+                          <Send className="w-4 h-4" />
+                          {offerHistory.length === 0
+                            ? t.offer.sendInitialOffer
+                            : offerHistory.length === 1
+                              ? t.offer.sendFinalOffer
+                              : t.offer.sendRevision}
+                        </Button>
+                      </span>
+                    );
+                  })()}
                   <Button
                     variant="destructive"
                     size="sm"
@@ -1802,6 +1836,15 @@ export default function RequestDetailPage() {
                 </div>
               </div>
           </ModalOverlay>
+
+          {/* Odoo link-required gate — pre-emptive (clicked a disabled Send)
+              and reactive (BE returned 400 ODOO_CONTACT_REQUIRED). */}
+          <OdooLinkRequiredModal
+            open={odooGateOpen}
+            onClose={() => setOdooGateOpen(false)}
+            onOpenRequest={() => setEditRequestOpen(true)}
+            bodyOverride={odooGateMessage}
+          />
 
           <ConfirmModal
             open={declineOpen}

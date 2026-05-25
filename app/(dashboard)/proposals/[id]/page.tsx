@@ -11,6 +11,8 @@ import { AddHotelModal } from '@/components/forms/AddHotelModal';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { proposalsApi } from '@/lib/api/proposals';
+import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
+import { isOdooContactRequiredError } from '@/lib/utils/odooGate';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU } from '@/lib/dateFormatter';
 import type { Proposal, ProposalHotel, ProposalService } from '@/types';
@@ -27,6 +29,12 @@ export default function ProposalPage() {
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ type: 'hotel' | 'service'; id: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  // Odoo gate (§2.3) — opened reactively when the BE returns 400 ODOO_CONTACT_REQUIRED.
+  // This page doesn't have direct access to the request, so we rely on the
+  // BE-supplied message verbatim and route staff back to the booking-request
+  // detail to link a company.
+  const [odooGateOpen, setOdooGateOpen] = useState(false);
+  const [odooGateMessage, setOdooGateMessage] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,11 +163,15 @@ export default function ProposalPage() {
       const ax = await import('axios');
       if (ax.isAxiosError(err)) {
         const errorCode = err.response?.data?.error as string | undefined;
+        const backendMessage = err.response?.data?.message as string | undefined;
         const emailError = err.response?.data?.data?.emailError as string | undefined;
         const proposalData = err.response?.data?.data?.proposal;
         if (proposalData) setProposal(proposalData);
 
-        if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
+        if (errorCode === 'ODOO_CONTACT_REQUIRED' || isOdooContactRequiredError(err)) {
+          setOdooGateMessage(backendMessage);
+          setOdooGateOpen(true);
+        } else if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
           toast.error(emailError || t.toasts.emailSendFailed, { duration: 8000 });
         } else if (errorCode === 'SMTP_NOT_CONFIGURED') {
           toast.error(emailError || t.toasts.smtpNotConfigured, { duration: 8000 });
@@ -422,6 +434,14 @@ export default function ProposalPage() {
         }}
         title="Remove item?"
         message="This action cannot be undone."
+      />
+      <OdooLinkRequiredModal
+        open={odooGateOpen}
+        onClose={() => setOdooGateOpen(false)}
+        onOpenRequest={() => {
+          if (proposal?.requestId) router.push(`/booking-requests/${proposal.requestId}`);
+        }}
+        bodyOverride={odooGateMessage}
       />
     </div>
   );
