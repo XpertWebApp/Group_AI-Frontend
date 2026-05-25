@@ -298,6 +298,11 @@ export default function AddHotelPage() {
   const hotelUpdateThrottledRef = useRef(false);
   const previousTotalRef = useRef(0);
   const widerAreaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the 90-second alternatives-safety setTimeout(s) so they can be
+  // cancelled on unmount — otherwise the user navigates back to Request
+  // Summary mid-search and gets a "No alternative hotels found" toast 90s
+  // later, even though they already left the page.
+  const altsSafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestStatusCheckRef = useRef(0);
   const isPollingActiveRef = useRef(false);
   // Mirror alternatives state into refs so the long-lived poll closure (created
@@ -439,6 +444,10 @@ export default function AddHotelPage() {
       mountedRef.current = false;
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
+      // Cancel the alternatives-safety timer so it can't fire a false
+      // "No alternative hotels found" toast on whatever page the user
+      // navigated to (Request Summary, Dashboard, etc.).
+      if (altsSafetyTimerRef.current) clearTimeout(altsSafetyTimerRef.current);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -1087,8 +1096,15 @@ export default function AddHotelPage() {
         nationalityCode: request?.nationalityCode || undefined,
         lang: locale === 'de' ? 'de' : 'en',
       });
+      // totalCandidates === 0 means the BE found nothing new to probe THIS
+      // attempt. But if hotels are already visible from a prior attempt,
+      // toasting "no alternatives found" is false from the user's POV —
+      // they're looking at alternatives on screen right now. Only toast when
+      // the results list is also empty.
       if (resp.totalCandidates === 0) {
-        toast.error(t.addHotel.noAlternativesFound);
+        if (completedResultsRef.current.length === 0) {
+          toast.error(t.addHotel.noAlternativesFound);
+        }
         setAlternativesLoading(false);
         return;
       }
@@ -1107,7 +1123,14 @@ export default function AddHotelPage() {
       //     they're visible on screen but the type-discriminated ref stayed
       //     false. Toasting "no alternatives" while results are on screen
       //     would be false (Offer #447 regression).
-      setTimeout(() => {
+      // Cancel any previous safety timer (e.g. from a prior Show Alternatives
+      // click) before scheduling a new one so the older one can't fire late.
+      if (altsSafetyTimerRef.current) clearTimeout(altsSafetyTimerRef.current);
+      altsSafetyTimerRef.current = setTimeout(() => {
+        // If the user navigated away, do nothing — no spinner to clear and
+        // no page to toast on. Without this guard the toast appears on
+        // Request Summary 90s after the user backed out mid-search.
+        if (!mountedRef.current) return;
         if (alternativesLoadingRef.current) {
           setAlternativesLoading(false);
           const altsArrived = hasAlternativeArrivedRef.current
@@ -1143,7 +1166,11 @@ export default function AddHotelPage() {
         lang: locale === 'de' ? 'de' : 'en',
       });
       if (resp.totalCandidates === 0) {
-        toast.error(t.addHotel.noAlternativesFound);
+        // Same logic as handleShowAlternatives — don't false-toast when
+        // hotels are already visible from a prior attempt.
+        if (completedResultsRef.current.length === 0) {
+          toast.error(t.addHotel.noAlternativesFound);
+        }
         setAlternativesLoading(false);
         return;
       }
@@ -1168,7 +1195,11 @@ export default function AddHotelPage() {
       // a false "no alternatives" toast when results in fact arrived but the
       // loading-state hand-off didn't tick in time. Earlier this handler had
       // no guard at all, which caused the false toast on Offer #447.
-      setTimeout(() => {
+      if (altsSafetyTimerRef.current) clearTimeout(altsSafetyTimerRef.current);
+      altsSafetyTimerRef.current = setTimeout(() => {
+        // Same unmount guard as handleShowAlternatives — don't toast on a
+        // page the user has already left.
+        if (!mountedRef.current) return;
         if (alternativesLoadingRef.current) {
           setAlternativesLoading(false);
           const altsArrived = hasAlternativeArrivedRef.current
