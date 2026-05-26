@@ -2092,6 +2092,117 @@ export default function AddHotelPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Desktop Only Filters */}
+                  <div className="hidden xl-wide:block space-y-5 pt-5 border-t border-sett-border-light">
+                    {/* Star Rating */}
+                    <div className="flex flex-col gap-3">
+                      <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        {t.addHotel.starRating}
+                      </label>
+                      <div className="flex flex-col gap-3">
+                        {[5, 4, 3, 2, 1].map((star) => (
+                          <label
+                            key={star}
+                            className={cn(
+                              'flex items-center gap-3 cursor-pointer transition-opacity',
+                              starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
+                            )}
+                            onClick={() => toggleStar(star)}
+                          >
+                            <span className={cn(
+                              'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                              starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                            )}>
+                              {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
+                            </span>
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: star }).map((_, i) => (
+                                <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
+                              ))}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Price Per Night */}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.pricePerNight}
+                        </label>
+                        <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
+                          style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
+                          &euro;{maxPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="relative pt-1 pb-1">
+                        <input
+                          type="range"
+                          min={0}
+                          max={3000}
+                          step={50}
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(Number(e.target.value))}
+                          style={{
+                            background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
+                          }}
+                          className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Amenities */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.amenities}
+                        </label>
+                        {availableFacilities.length > 6 && (
+                          <button
+                            type="button"
+                            className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                            onClick={() => setShowAllAmenities((prev) => !prev)}
+                          >
+                            {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
+                          const AmenityIcon = getAmenityIcon(facility.name);
+                          return (
+                            <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                              <span className={cn(
+                                'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                                amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                              )}
+                                onClick={() => toggleAmenity(facility.id)}
+                              >
+                                {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                              </span>
+                              {AmenityIcon && (
+                                <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
+                              )}
+                              <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                                {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -2112,8 +2223,8 @@ export default function AddHotelPage() {
         {/* Normal results grid — show results as soon as they arrive, even while polling */}
         {completedResults.length > 0 && !manualRequestOnly && (
           <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
-            {/* ── Sticky Header Filter Bar ── */}
-            <div className="sticky top-[64px] z-20 py-2 -mx-4 px-4 md:-mx-6 md:px-6 bg-sett-background/80 backdrop-blur-sm transition-all duration-300">
+            {/* ── Sticky Header Filter Bar (Mobile Only) ── */}
+            <div className="xl-wide:hidden sticky top-[64px] z-20 py-2 -mx-4 px-4 md:-mx-6 md:px-6 bg-sett-background/80 backdrop-blur-sm transition-all duration-300">
               <div className="flex flex-wrap items-center gap-2">
                 <FilterDropdown
                   label={t.addHotel.starRating}
@@ -2344,6 +2455,117 @@ export default function AddHotelPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Desktop Only Filters */}
+                  <div className="hidden xl-wide:block space-y-5 pt-5 border-t border-sett-border-light">
+                    {/* Star Rating */}
+                    <div className="flex flex-col gap-3">
+                      <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        {t.addHotel.starRating}
+                      </label>
+                      <div className="flex flex-col gap-3">
+                        {[5, 4, 3, 2, 1].map((star) => (
+                          <label
+                            key={star}
+                            className={cn(
+                              'flex items-center gap-3 cursor-pointer transition-opacity',
+                              starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
+                            )}
+                            onClick={() => toggleStar(star)}
+                          >
+                            <span className={cn(
+                              'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                              starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                            )}>
+                              {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
+                            </span>
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: star }).map((_, i) => (
+                                <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
+                              ))}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Price Per Night */}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.pricePerNight}
+                        </label>
+                        <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
+                          style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
+                          &euro;{maxPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="relative pt-1 pb-1">
+                        <input
+                          type="range"
+                          min={0}
+                          max={3000}
+                          step={50}
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(Number(e.target.value))}
+                          style={{
+                            background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
+                          }}
+                          className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Amenities */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.amenities}
+                        </label>
+                        {availableFacilities.length > 6 && (
+                          <button
+                            type="button"
+                            className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                            onClick={() => setShowAllAmenities((prev) => !prev)}
+                          >
+                            {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
+                          const AmenityIcon = getAmenityIcon(facility.name);
+                          return (
+                            <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                              <span className={cn(
+                                'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                                amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                              )}
+                                onClick={() => toggleAmenity(facility.id)}
+                              >
+                                {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                              </span>
+                              {AmenityIcon && (
+                                <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
+                              )}
+                              <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                                {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -3058,11 +3280,11 @@ function HotelResultCard({
                 sm:flex-wrap drops this block below the title rather than
                 squeezing the title into one-letter-per-line. */}
             <div
-              className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 animate-fade-in-right"
+              className="w-full sm:w-auto flex flex-col items-start gap-2 animate-fade-in-right"
               style={{ animationDelay: '80ms' }}
             >
               {isAdded ? (
-                <span className="flex items-center justify-center sm:justify-end gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
+                <span className="flex items-center gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
                   <Check className="w-4 h-4" strokeWidth={2.5} /> {t.addHotel.added}
                 </span>
               ) : (
@@ -3071,14 +3293,13 @@ function HotelResultCard({
                   size="sm"
                   onClick={onAddToOffer}
                   isLoading={isAdding}
-                  fullWidth
-                  className="sm:w-auto"
+                  className="min-w-[140px]"
                 >
                   {t.addHotel.addToOffer}
                 </Button>
               )}
               {hasCancellation && (
-                <div className="flex flex-col items-start sm:items-end gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
+                <div className="flex flex-col items-start gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
                   <div className="flex items-center gap-1 font-montserrat text-[12px] text-sett-primary font-semibold">
                     <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
                     <span>{t.addHotel.freeCancellation}</span>
