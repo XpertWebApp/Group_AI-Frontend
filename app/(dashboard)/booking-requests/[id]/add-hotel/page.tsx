@@ -1519,11 +1519,11 @@ export default function AddHotelPage() {
   ) : null;
 
   return (
-    <div className="flex flex-col min-h-full xl:h-full xl:overflow-hidden">
+    <div className="flex flex-col min-h-full xl-wide:h-full xl-wide:overflow-hidden">
       <Header title={t.createForm.title} />
 
       <div
-        className="p-4 md:p-6 flex-1 xl:min-h-0 flex flex-col gap-6"
+        className="p-4 md:p-6 flex-1 xl-wide:min-h-0 flex flex-col gap-6"
         onWheel={(e) => {
           if (!hotelListRef.current) return;
           const target = e.target as Node;
@@ -1540,7 +1540,7 @@ export default function AddHotelPage() {
         }}
       >
         {/* Breadcrumb */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:shrink-0 animate-sidebar-fade-up">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl-wide:shrink-0 animate-sidebar-fade-up">
           <button
             type="button"
             onClick={() => router.push(`/booking-requests/${requestId}`)}
@@ -1694,9 +1694,9 @@ export default function AddHotelPage() {
             Suppressed during "Search More" so a transient empty poll response
             doesn't blank out the already-loaded cards. */}
         {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && !searchingMore && (
-          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
+          <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
             {/* Left sidebar skeleton — hidden on mobile */}
-            <div className="hidden xl:block xl:w-[300px] shrink-0 xl:overflow-y-auto">
+            <div className="hidden xl-wide:block xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto">
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-pulse">
                 {/* Section title */}
                 <div className="h-4 w-24 rounded bg-sett-border mb-5" />
@@ -1749,7 +1749,7 @@ export default function AddHotelPage() {
             </div>
 
             {/* Right hotel cards skeleton */}
-            <div className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1 space-y-4">
+            <div className="flex-1 min-w-0 xl-wide:overflow-y-auto xl-wide:pr-1 space-y-4">
               {[1, 2, 3].map((n) => (
                 <div key={n} className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden animate-pulse">
                   <div className="flex flex-col sm:flex-row">
@@ -1863,12 +1863,12 @@ export default function AddHotelPage() {
 
         {/* Manual request card + sidebar — when no hotels found */}
         {phase === 'done' && manualRequestOnly && (
-          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
+          <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
             {/* ── Mobile/tablet sidebar toggle ── */}
             <button
               type="button"
               onClick={() => setFiltersOpen(!filtersOpen)}
-              className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+              className="xl-wide:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
             >
               <SlidersHorizontal className="w-4 h-4" />
               {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
@@ -1876,8 +1876,8 @@ export default function AddHotelPage() {
 
             {/* ── Left Sidebar: Trip Details + Filters (always visible in manual mode) ── */}
             <aside ref={sidebarRef} className={cn(
-              'xl:w-[300px] shrink-0 xl:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden xl:block'
+              'xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto',
+              filtersOpen ? 'block' : 'hidden xl-wide:block'
             )}>
               <div
                 className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-card-rise-in"
@@ -2017,12 +2017,12 @@ export default function AddHotelPage() {
 
         {/* Normal results grid — show results as soon as they arrive, even while polling */}
         {completedResults.length > 0 && !manualRequestOnly && (
-          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
+          <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
             {/* ── Mobile/tablet filter toggle ── */}
             <button
               type="button"
               onClick={() => setFiltersOpen(!filtersOpen)}
-              className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
+              className="xl-wide:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
             >
               <SlidersHorizontal className="w-4 h-4" />
               {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
@@ -2033,8 +2033,8 @@ export default function AddHotelPage() {
 
             {/* ── Left Sidebar: Trip Details + Filters ── */}
             <aside ref={sidebarRef} className={cn(
-              'xl:w-[300px] shrink-0 xl:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden xl:block'
+              'xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto',
+              filtersOpen ? 'block' : 'hidden xl-wide:block'
             )}>
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
@@ -2275,9 +2275,9 @@ export default function AddHotelPage() {
             </aside>
 
             {/* ── Right: Hotel Results ── */}
-            <div ref={hotelListRef} className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1">
+            <div ref={hotelListRef} className="flex-1 min-w-0 xl-wide:overflow-y-auto xl-wide:pr-1">
               <p
-                className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0 animate-sidebar-fade-up"
+                className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl-wide:shrink-0 animate-sidebar-fade-up"
                 style={{ animationDelay: '220ms' }}
               >
                 {filteredResults.length < deduplicatedResults.length
@@ -2301,7 +2301,7 @@ export default function AddHotelPage() {
                 </div>
               )}
 
-              <div className="space-y-5 pb-6 xl:overflow-visible">
+              <div className="space-y-5 pb-6 xl-wide:overflow-visible">
                 {/* Main Results Section Header */}
                 {filteredMainResults.length > 0 && (
                   <div className="mb-1">
@@ -2565,7 +2565,7 @@ export default function AddHotelPage() {
       >
         {/* Backdrop blur strip */}
         <div
-          className="max-w-5xl mx-4 md:mx-6 xl:mx-auto mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
+          className="max-w-5xl mx-4 md:mx-6 xl-wide:mx-auto mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
           style={{
             background: 'rgba(255,255,255,0.97)',
             boxShadow: '0 -4px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(170,199,55,0.15)',
@@ -3050,26 +3050,44 @@ function HotelResultCard({
             </div>
           )}
 
-          {/* ── Room Table (desktop) ── */}
+          {/* ── Room Table (desktop) ──
+              Column-width tuning for the 1280–1327px viewport range:
+                - The card sits inside the text-flex column (~660px at this
+                  width with the 300px sidebar). The table previously used
+                  uniform px-4 + uncapped first column, so the description
+                  text on Room Type ate all the space and the PER NIGHT cell
+                  was clipped.
+                - Fixed widths on the right three columns + whitespace-nowrap
+                  on the price guarantees PER NIGHT is always fully readable.
+                - First column gets max-width on the description so it can
+                  wrap to two lines instead of pushing the price out.
+                - Container keeps overflow-x-auto as a safety net for even
+                  narrower viewports. */}
           <div
-            className="hidden xl:block mt-4 overflow-x-auto animate-sidebar-fade-up"
+            className="hidden xl-wide:block mt-4 overflow-x-auto animate-sidebar-fade-up"
             style={{ animationDelay: '320ms' }}
           >
             <div className="border border-sett-border-light rounded-[14px] overflow-hidden">
+              {/* Switched back to auto-layout (no table-fixed) so the first
+                  column can grow to fit "Standard Double Rooms" without
+                  character-per-line wrapping. Whitespace-nowrap on the right
+                  three columns keeps headers + price on a single line, and
+                  the parent's overflow-x-auto lets the table scroll if the
+                  combined width exceeds the available space. */}
               <table className="w-full">
                 <thead>
                   {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
                   <tr className="bg-sett-navy">
-                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-3 whitespace-nowrap">
                       {t.addHotel.roomType}
                     </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-2 whitespace-nowrap">
                       {t.addHotel.rooms}
                     </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-2 whitespace-nowrap">
                       {t.addHotel.rateBasis}
                     </th>
-                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-3 whitespace-nowrap">
                       {t.addHotel.perNight}
                     </th>
                   </tr>
@@ -3077,7 +3095,7 @@ function HotelResultCard({
                 <tbody>
                   {roomTypes.map((rt, i) => (
                     <tr key={i} className="border-t border-sett-border-light">
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-3 align-top">
                         <div>
                           <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
                             {formatRoomType(rt.roomType, t.addHotel)}
@@ -3090,19 +3108,19 @@ function HotelResultCard({
                         </div>
                         {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
                           <div className="mt-1">
-                            <div className="text-[12px] text-sett-text-accent">
+                            <div className="text-[12px] text-sett-text-accent break-words">
                               ↳ {rt.actualDescriptions[0]}
                             </div>
                           </div>
                         )}
                       </td>
-                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
+                      <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary whitespace-nowrap align-top">
                         {rt.roomsAllocated}
                       </td>
-                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
+                      <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize whitespace-nowrap align-top">
                         {getMealTypeLabel(rt.mealName || rt.mealType || '', (t.addHotel.mealTypes as any))}
                       </td>
-                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                      <td className="py-2.5 px-3 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary whitespace-nowrap align-top">
                         &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
                       </td>
                     </tr>
@@ -3114,7 +3132,7 @@ function HotelResultCard({
 
           {/* ── Room cards (mobile) ── */}
           <div
-            className="xl:hidden mt-4 space-y-2 animate-sidebar-fade-up"
+            className="xl-wide:hidden mt-4 space-y-2 animate-sidebar-fade-up"
             style={{ animationDelay: '320ms' }}
           >
             {roomTypes.map((rt, i) => (

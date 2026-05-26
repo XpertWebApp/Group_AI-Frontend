@@ -39,6 +39,20 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      /* ── Custom screen breakpoints ──
+         `xl-wide` (1376px) is used on the Add Hotel page to keep the filters
+         collapsed (behind the Show Filters toggle) until there's enough
+         horizontal room for the trip-details sidebar + result cards + the
+         hotel pricing table to all fit without clipping the PER NIGHT column.
+         Tailwind's stock `xl` (1280px) activated the sidebar layout too
+         early at common 1920×1080 @ 150% zoom (1280px CSS viewport), and
+         even at 1328px the PER NIGHT column still got squeezed because the
+         result card's text-content column wasn't wide enough. 1376px is the
+         first width at which the full table fits without horizontal clipping
+         on the hotel-result cards in this layout. */
+      screens: {
+        'xl-wide': '1376px',
+      },
       /* ── Brand Colors ── */
       colors: {
         sett: {
