@@ -780,16 +780,15 @@ export default function RequestDetailPage() {
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
-                      {t.offer.requestSummary}
-                    </h2>
-                    {!['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase()) && (
-                      <button type="button" onClick={() => setEditRequestOpen(true)} className="p-0.5 rounded hover:opacity-70 transition-opacity">
-                        <SquarePen className="w-4 h-4 text-sett-primary" />
-                      </button>
-                    )}
-                  </div>
+                  {/* Edit-icon dedup: the button next to the Trip Details
+                      subsection (a few lines below) is the canonical entry
+                      point — it sits beside the data the user actually
+                      edits. The previously-rendered duplicate next to the
+                      Request Summary title was removed to avoid two
+                      identically-behaving controls in the same eyeline. */}
+                  <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
+                    {t.offer.requestSummary}
+                  </h2>
                   <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-secondary mt-0.5">
                     {t.offer.bookingDetails}
                   </p>
@@ -827,14 +826,38 @@ export default function RequestDetailPage() {
                       {t.offer.tripDetails}
                     </h3>
                     {!['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase()) && (
-                      <button
-                        type="button"
-                        onClick={() => setEditRequestOpen(true)}
-                        className="p-0.5 rounded hover:opacity-70 transition-opacity"
-                        aria-label={t.common.edit}
-                      >
-                        <SquarePen className="w-4 h-4 text-sett-primary" />
-                      </button>
+                      <span className="relative group/edit inline-flex">
+                        <button
+                          type="button"
+                          onClick={() => setEditRequestOpen(true)}
+                          // Two layered hover effects:
+                          //  - background pill tints green so the hit target is
+                          //    visually obvious before the click.
+                          //  - icon scales up + rotates a touch and the button
+                          //    nudges right so the action feels responsive.
+                          // Active state presses down for tactile feedback.
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-[8px] text-sett-primary hover:bg-sett-light-green-bg hover:text-sett-green-dark hover:translate-x-0.5 active:scale-95 transition-[background-color,color,transform] duration-200 ease-sett-out focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-1"
+                          aria-label={t.offer.editRequestTitle}
+                          title={t.offer.editRequestTitle}
+                        >
+                          <SquarePen className="w-4 h-4 transition-transform duration-200 ease-sett-out group-hover/edit:scale-110 group-hover/edit:rotate-[-4deg]" />
+                        </button>
+                        {/* Custom tooltip — visible on hover/focus, hidden by
+                            default. Uses the brand navy panel so it reads
+                            against any backdrop. Native title= above provides
+                            the same text for accessibility tools / mobile
+                            long-press / users who land via keyboard nav. */}
+                        <span
+                          role="tooltip"
+                          className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-md bg-sett-navy text-white text-[11px] font-medium font-montserrat px-2 py-1 shadow-lg ring-1 ring-white/10 opacity-0 translate-y-[-2px] transition-all duration-180 ease-sett-out group-hover/edit:opacity-100 group-hover/edit:translate-y-0 group-focus-within/edit:opacity-100 group-focus-within/edit:translate-y-0"
+                        >
+                          {t.offer.editRequestTitle}
+                          <span
+                            aria-hidden
+                            className="absolute left-1/2 -translate-x-1/2 bottom-full border-4 border-transparent border-b-sett-navy"
+                          />
+                        </span>
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-[10px] flex-wrap">
