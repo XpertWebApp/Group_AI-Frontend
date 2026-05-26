@@ -392,7 +392,7 @@ export const translations = {
     // ── Add Hotel / Hotel Search Page ──
     addHotel: {
       title: 'Add Hotel',
-      offer:'Offer',
+      offer: 'Offer',
       back: 'Back',
       roomsrequired: 'Rooms Required',
       roomSingle: 'Single',
@@ -428,6 +428,7 @@ export const translations = {
       retrySearch: 'Retry Search',
       hideFilters: 'Hide Filters',
       showFilters: 'Show Filters',
+      filters: 'Filters',
       tripDetails: 'Trip Details',
       destination: 'Destination',
       stayDates: 'Stay Dates',
@@ -1304,7 +1305,7 @@ export const translations = {
     // ── Add Hotel / Hotel Search Page ──
     addHotel: {
       title: 'Hotel hinzufügen',
-      offer:'Angebot',
+      offer: 'Angebot',
       back: 'Zurück',
       roomsrequired: 'Zimmer erforderlich',
       roomSingle: 'Einzelzimmer',
@@ -1340,6 +1341,7 @@ export const translations = {
       retrySearch: 'Erneut suchen',
       hideFilters: 'Filter ausblenden',
       showFilters: 'Filter anzeigen',
+      filters: 'Filter',
       tripDetails: 'Reisedetails',
       destination: 'Reiseziel',
       stayDates: 'Aufenthaltsdaten',

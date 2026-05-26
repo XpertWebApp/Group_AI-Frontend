@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -21,6 +22,7 @@ import { StarRating } from '@/components/ui/StarRating';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { HotelName } from '@/components/ui/HotelName';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
@@ -151,7 +153,7 @@ const DateInputComponent = forwardRef<HTMLInputElement, DateInputProps>(
         ref={ref}
         value={value as string}
         onClick={onClick}
-        onChange={() => {}}
+        onChange={() => { }}
         placeholder={placeholder}
         readOnly
         className="w-full px-3 py-2 rounded-[10px] border border-sett-primary bg-white font-montserrat text-[14px] text-sett-text-primary focus:outline-none focus:ring-2 focus:ring-sett-primary/30 cursor-pointer pr-10"
@@ -168,6 +170,118 @@ const DateInputComponent = forwardRef<HTMLInputElement, DateInputProps>(
   )
 );
 DateInputComponent.displayName = 'DateInputComponent';
+
+function FilterDropdown({
+  label,
+  icon: Icon,
+  children,
+  isOpen,
+  onToggle,
+  onClose,
+  active,
+  valueDisplay,
+}: {
+  label: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  active?: boolean;
+  valueDisplay?: string | React.ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({ position: 'fixed', visibility: 'hidden' });
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!containerRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isOpen, onClose]);
+
+  // Position logic
+  const updatePosition = useCallback(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const dropdownWidth = 280;
+
+    // Default: bottom-start
+    let top = rect.bottom + 8;
+    let left = rect.left;
+
+    // Boundary check (right)
+    if (left + dropdownWidth > window.innerWidth) {
+      left = window.innerWidth - dropdownWidth - 16;
+    }
+
+    setPopoverStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${dropdownWidth}px`,
+      zIndex: 100,
+      visibility: 'visible',
+    });
+  }, [isOpen]);
+
+  useEffect(() => {
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, { capture: true });
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, { capture: true });
+    };
+  }, [updatePosition]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-200 shadow-sm hover:shadow-md h-[40px]',
+          active
+            ? 'bg-sett-primary/10 border-sett-primary text-sett-primary'
+            : 'bg-white border-sett-border hover:border-sett-primary/40 text-sett-text-primary'
+        )}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="font-montserrat text-[14px] font-semibold whitespace-nowrap">{label}</span>
+        {valueDisplay && (
+          <span className="font-montserrat text-[13px] font-medium opacity-80 border-l border-current/20 pl-2 ml-1">
+            {valueDisplay}
+          </span>
+        )}
+        <ChevronDown className={cn('w-4 h-4 ml-1 transition-transform', isOpen && 'rotate-180')} />
+      </button>
+
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          style={popoverStyle}
+          className="bg-white rounded-[20px] border border-sett-border-light shadow-xl overflow-hidden animate-modal-overlay-in"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4">
+            {children}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
 
@@ -352,7 +466,7 @@ export default function AddHotelPage() {
   const [starFilters, setStarFilters] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [amenityFilters, setAmenityFilters] = useState<number[]>([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<'stars' | 'price' | 'amenities' | null>(null);
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string; sethubDetailsUrl?: string | null } | null>(null);
@@ -983,10 +1097,6 @@ export default function AddHotelPage() {
     setEditCheckinDate(isoToDate(request.checkinDate ?? ''));
     setEditCheckoutDate(isoToDate(request.checkoutDate ?? ''));
     setEditingTripDetails(true);
-    // The sidebar (which holds Trip Details) is hidden by default below xl
-    // (1280px). Force it open so the edit form is actually visible when the
-    // user clicks "Edit Trip Details" on the no-hotels-available screen.
-    setFiltersOpen(true);
     // Scroll sidebar into view with a small delay to ensure state is updated
     // and the sidebar has had time to render.
     setTimeout(() => {
@@ -1620,8 +1730,8 @@ export default function AddHotelPage() {
                         {isBetweenBatches
                           ? t.addHotel.searchingWiderTitle
                           : t.addHotel.hotelsChecked
-                              .replace('{completed}', String(searchSummary.completed))
-                              .replace('{total}', String(searchSummary.total))}
+                            .replace('{completed}', String(searchSummary.completed))
+                            .replace('{total}', String(searchSummary.total))}
                       </p>
                     )}
                   </div>
@@ -1864,25 +1974,9 @@ export default function AddHotelPage() {
         {/* Manual request card + sidebar — when no hotels found */}
         {phase === 'done' && manualRequestOnly && (
           <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
-            {/* ── Mobile/tablet sidebar toggle ── */}
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className="xl-wide:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
-            </button>
-
-            {/* ── Left Sidebar: Trip Details + Filters (always visible in manual mode) ── */}
-            <aside ref={sidebarRef} className={cn(
-              'xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden xl-wide:block'
-            )}>
-              <div
-                className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-card-rise-in"
-                style={{ animationDelay: '160ms' }}
-              >
+            {/* ── Left Sidebar: Trip Details (Information Only) ── */}
+            <aside ref={sidebarRef} className="xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto h-full hidden xl-wide:flex xl-wide:flex-col">
+              <div className="bg-white xl-wide:rounded-[14px] xl-wide:border xl-wide:border-sett-border-light p-5 animate-card-rise-in flex-1 overflow-y-auto" style={{ animationDelay: '160ms' }}>
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
                 {editingTripDetails && (
                   <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
@@ -2018,25 +2112,123 @@ export default function AddHotelPage() {
         {/* Normal results grid — show results as soon as they arrive, even while polling */}
         {completedResults.length > 0 && !manualRequestOnly && (
           <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
-            {/* ── Mobile/tablet filter toggle ── */}
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className="xl-wide:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
-              {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
-                <span className="w-2 h-2 rounded-full bg-sett-primary" />
-              )}
-            </button>
+            {/* ── Sticky Header Filter Bar ── */}
+            <div className="sticky top-[64px] z-20 py-2 -mx-4 px-4 md:-mx-6 md:px-6 bg-sett-background/80 backdrop-blur-sm transition-all duration-300">
+              <div className="flex flex-wrap items-center gap-2">
+                <FilterDropdown
+                  label={t.addHotel.starRating}
+                  icon={Star}
+                  isOpen={activeDropdown === 'stars'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'stars' ? null : 'stars')}
+                  onClose={() => setActiveDropdown(null)}
+                  active={starFilters.length > 0}
+                  valueDisplay={starFilters.length > 0 ? `${starFilters.length}` : null}
+                >
+                  <div className="flex flex-col gap-3 min-w-[180px]">
+                    {[5, 4, 3, 2, 1].map((star) => (
+                      <label
+                        key={star}
+                        className={cn(
+                          'flex items-center gap-3 cursor-pointer hover:bg-sett-background p-2 rounded-lg transition-colors',
+                          starFilters.includes(star) ? 'opacity-100' : 'opacity-40'
+                        )}
+                        onClick={() => toggleStar(star)}
+                      >
+                        <span className={cn(
+                          'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                          starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                        )}>
+                          {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
+                        </span>
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: star }).map((_, i) => (
+                            <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
+                          ))}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </FilterDropdown>
 
-            {/* ── Left Sidebar: Trip Details + Filters ── */}
-            <aside ref={sidebarRef} className={cn(
-              'xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden xl-wide:block'
-            )}>
-              <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
+                <FilterDropdown
+                  label={t.addHotel.pricePerNight}
+                  icon={MoveVertical}
+                  isOpen={activeDropdown === 'price'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'price' ? null : 'price')}
+                  onClose={() => setActiveDropdown(null)}
+                  active={maxPrice < 3000}
+                  valueDisplay={maxPrice < 3000 ? `€${maxPrice}` : null}
+                >
+                  <div className="flex flex-col gap-3 min-w-[220px]">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-semibold text-sett-text-primary">Max Price</span>
+                      <span className="text-[13px] font-bold text-sett-primary">€{maxPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="relative pt-1 pb-1">
+                      <input
+                        type="range"
+                        min={0}
+                        max={3000}
+                        step={50}
+                        value={maxPrice}
+                        onChange={(e) => setMaxPrice(Number(e.target.value))}
+                        style={{
+                          background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
+                        }}
+                        className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
+                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-sett-text-accent">€0</span>
+                      <span className="text-[11px] font-medium text-sett-text-accent">€3,000</span>
+                    </div>
+                  </div>
+                </FilterDropdown>
+
+                <FilterDropdown
+                  label={t.addHotel.amenities}
+                  icon={SlidersHorizontal}
+                  isOpen={activeDropdown === 'amenities'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'amenities' ? null : 'amenities')}
+                  onClose={() => setActiveDropdown(null)}
+                  active={amenityFilters.length > 0}
+                  valueDisplay={amenityFilters.length > 0 ? amenityFilters.length : null}
+                >
+                  <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto min-w-[220px] pr-1">
+                    {availableFacilities.map((facility) => {
+                      const AmenityIcon = getAmenityIcon(facility.name);
+                      const isSelected = amenityFilters.includes(facility.id);
+                      return (
+                        <label
+                          key={facility.id}
+                          className={cn(
+                            "flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors hover:bg-sett-background",
+                            isSelected ? "bg-sett-primary/5" : ""
+                          )}
+                          onClick={() => toggleAmenity(facility.id)}
+                        >
+                          <span className={cn(
+                            'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                            isSelected ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                          )}>
+                            {isSelected && <span className="w-2 h-2 rounded-full bg-white" />}
+                          </span>
+                          {AmenityIcon && <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />}
+                          <span className="font-montserrat text-[13px] text-sett-text-secondary truncate">
+                            {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </FilterDropdown>
+              </div>
+            </div>
+
+            {/* ── Left Sidebar: Trip Details (Information Only) ── */}
+            <aside ref={sidebarRef} className="xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto h-full hidden xl-wide:flex xl-wide:flex-col">
+              <div className="bg-white xl-wide:rounded-[14px] xl-wide:border xl-wide:border-sett-border-light p-5 flex-1 overflow-y-auto">
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
                 {editingTripDetails && (
                   <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
@@ -2152,125 +2344,7 @@ export default function AddHotelPage() {
                       </div>
                     </div>
                   )}
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Star Rating */}
-                  <div className="flex flex-col gap-3">
-                    <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                      {t.addHotel.starRating}
-                    </label>
-                    <div className="flex flex-col gap-3">
-                      {[5, 4, 3, 2, 1].map((star) => (
-                        <label
-                          key={star}
-                          className={cn(
-                            'flex items-center gap-3 cursor-pointer transition-opacity',
-                            starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
-                          )}
-                          onClick={() => toggleStar(star)}
-                        >
-                          <span className={cn(
-                            'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
-                            starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
-                          )}>
-                            {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
-                          </span>
-                          <div className="flex gap-0.5">
-                            {Array.from({ length: star }).map((_, i) => (
-                              <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
-                            ))}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Price Per Night */}
-                  <div className="flex flex-col gap-3">
-                    {/* Label row */}
-                    <div className="flex items-center justify-between">
-                      <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                        {t.addHotel.pricePerNight}
-                      </label>
-                      {/* Active value badge */}
-                      <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
-                        style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
-                        &euro;{maxPrice.toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* Slider track */}
-                    <div className="relative pt-1 pb-1">
-                      <input
-                        type="range"
-                        min={0}
-                        max={3000}
-                        step={50}
-                        value={maxPrice}
-                        onChange={(e) => setMaxPrice(Number(e.target.value))}
-                        style={{
-                          background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
-                        }}
-                        className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
-                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110
-                        [&::-moz-range-thumb]:w-[18px] [&::-moz-range-thumb]:h-[18px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-sett-primary [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Min / Max labels */}
-                    <div className="flex items-center justify-between">
-                      <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
-                      <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
-                    </div>
-                  </div>
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Amenities */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                        {t.addHotel.amenities}
-                      </label>
-                      {availableFacilities.length > 6 && (
-                        <button
-                          type="button"
-                          className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
-                          onClick={() => setShowAllAmenities((prev) => !prev)}
-                        >
-                          {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
-                        const AmenityIcon = getAmenityIcon(facility.name);
-                        return (
-                          <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
-                            <span className={cn(
-                              'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                              amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
-                            )}
-                              onClick={() => toggleAmenity(facility.id)}
-                            >
-                              {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
-                            </span>
-                            {AmenityIcon && (
-                              <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
-                            )}
-                            <span className="font-montserrat text-[14px] text-sett-text-secondary">
-                              {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
-
               </div>
             </aside>
 
