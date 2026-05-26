@@ -3148,11 +3148,7 @@ function HotelResultCard({
         {/* ── Hotel Image ── */}
         <div
           className={cn(
-            // sm:self-start prevents the image from stretching to match the
-            // height of the content column when the card has many room rows.
-            // Without it, the flex row defaults to align-items: stretch and
-            // the image's aspect-ratio gets overridden, distorting the photo.
-            'w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 sm:self-start relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light',
+            'w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light',
             onImageClick ? 'cursor-pointer group' : ''
           )}
           onClick={onImageClick}
