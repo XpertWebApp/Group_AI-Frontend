@@ -275,8 +275,11 @@ export default function BookingRequestsPage() {
       <Header title={t.requests.title} />
 
       <div className="p-4 md:p-6 space-y-6">
-        {/* Card with filters + table */}
-        <div className="bg-white rounded-[14px] border border-sett-border animate-card-rise-in">
+        {/* Card with filters + table.
+            `overflow-hidden` clips the inner list/table's corners against the
+            wrapper's 14px radius — without it the last row's bottom corners
+            poked past the rounded border and read as a faded/uneven edge. */}
+        <div className="bg-white rounded-[14px] border border-sett-border animate-card-rise-in overflow-hidden">
           {/* Toolbar: filters on the left, primary actions on the right.
               The two action buttons live in their own flex group that never
               wraps internally, so Create Request and Refresh stay on the same

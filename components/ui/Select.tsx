@@ -110,11 +110,17 @@ export function Select({
     };
 
     if (positionMode === 'absolute') {
-      // For absolute positioning (inside scrollable containers like modals)
+      // For absolute positioning (inside scrollable containers like modals
+      // or any page wrapper with overflow-y-auto, e.g. <main> in AppLayout).
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (!containerRect) return;
 
-      const relativeTop = rect.top - containerRect.top + containerRect.height;
+      // Position the dropdown just below the trigger button, relative to the
+      // Select's own container (which is `position: relative`). Previously
+      // this added `containerRect.height` instead of using the trigger's
+      // bottom — that pushed the dropdown the full container height (label +
+      // input) below the trigger, leaving a visible gap of ~label-height.
+      const relativeTop = rect.bottom - containerRect.top;
       const relativeLeft = rect.left - containerRect.left;
       const spaceBelow = containerRect.bottom - rect.bottom;
       const spaceAbove = rect.top - containerRect.top;
