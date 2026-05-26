@@ -6,6 +6,7 @@ import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { StatCardSkeleton, TableSkeleton, CardSkeleton } from '@/components/ui/Loader';
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowDown, ArrowUp, Eye, Plus } from 'lucide-react';
@@ -100,12 +101,29 @@ export default function DashboardPage() {
                 ? (raw as { vsLastMonth: number }).vsLastMonth
                 : null;
 
-              const cardDelay = index * 90;       // cascade: 0, 90, 180, 270ms
-              const badgeDelay = cardDelay + 180; // badge pops as card settles
-              const valueDelay = cardDelay + 220; // number lands after the badge
+              // Sequential per-card reveal — each card waits until the
+              // previous one has finished its main entrance (card rise +
+              // label + badge ≈ 350ms) before starting. The number count-up
+              // continues in the background after the next card has already
+              // begun, so the cascade still feels lively rather than slow.
+              //
+              // Per-card timing:
+              //   - card rise:        0
+              //   - label fade:    +160ms
+              //   - badge pop:     +200ms
+              //   - number count:  +280ms (runs 900ms internally)
+              //   - trend fade:    +480ms
+              //
+              // Stride between cards: 360ms — long enough that each card
+              // visibly lands before the next one starts; short enough that
+              // the full sequence completes in ~1.5s for 4 cards.
+              const cardDelay = index * 360;
+              const labelDelay = cardDelay + 160;
+              const badgeDelay = cardDelay + 200;
+              const valueAnimDelay = cardDelay + 280;
+              const trendDelay = cardDelay + 480;
 
               const trendPositive = trend != null && trend > 0;
-              const trendNegative = trend != null && trend < 0;
 
               return (
                 <div
@@ -122,30 +140,45 @@ export default function DashboardPage() {
                   >
                     <Image src={card.icon} alt="" width={16} height={16} />
                   </div>
-                  {/* §7.3 Label: Grey, Montserrat 400, 12–14px */}
-                  <p className="font-montserrat text-[13px] font-normal leading-normal uppercase tracking-[0.08em] text-sett-text-secondary pr-10 break-words min-h-[2.625rem]">
+                  {/* §7.3 Label — fades up shortly after the card lands. */}
+                  <p
+                    className="font-montserrat text-[13px] font-normal leading-normal uppercase tracking-[0.08em] text-sett-text-secondary pr-10 break-words min-h-[2.625rem] animate-label-fade-up"
+                    style={{ animationDelay: `${labelDelay}ms` }}
+                  >
                     {card.label}
                   </p>
-                  {/* §7.3 Big number: Navy, Montserrat 800, 28–36px */}
+                  {/* §7.3 Big number — fades in via animate-value-count-in
+                      AND counts up to the real value via AnimatedNumber.
+                      The wrapper animates opacity/translateY at valueAnimDelay,
+                      then AnimatedNumber begins the count-up internally at
+                      the same delay so the two land in sync. */}
                   <p
                     className="font-montserrat text-[32px] font-extrabold leading-tight text-sett-text-primary mt-1 animate-value-count-in tabular-nums"
-                    style={{ animationDelay: `${valueDelay}ms` }}
+                    style={{ animationDelay: `${valueAnimDelay}ms` }}
                   >
-                    {value}
+                    <AnimatedNumber value={value} delay={valueAnimDelay} duration={900} />
                   </p>
-                  {/* §7.3 Trend: Green (↑) positive, Red (↓) negative */}
+                  {/* §7.3 Trend — appears after the number has been counting
+                      up for a beat, so user's eye lands on the big value
+                      first and the supporting trend second. */}
                   {trend != null && trend !== 0 && (
                     <p
-                      className={`mt-1 inline-flex items-center gap-1 font-montserrat text-[12px] font-semibold tabular-nums ${
+                      className={`mt-1 inline-flex items-center gap-1 font-montserrat text-[12px] font-semibold tabular-nums animate-trend-fade-in ${
                         trendPositive ? 'text-sett-primary' : 'text-sett-destructive'
                       }`}
+                      style={{ animationDelay: `${trendDelay}ms` }}
                     >
                       {trendPositive ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
-                      {trendPositive ? '+' : ''}{trend}% {t.dashboard.vsLastMonth}
+                      {trendPositive ? '+' : '-'}
+                      <AnimatedNumber value={Math.abs(trend)} delay={trendDelay} duration={900} decimals={Number.isInteger(trend) ? 0 : 1} />
+                      % {t.dashboard.vsLastMonth}
                     </p>
                   )}
                   {trend === 0 && (
-                    <p className="mt-1 font-montserrat text-[12px] font-medium text-sett-text-accent">
+                    <p
+                      className="mt-1 font-montserrat text-[12px] font-medium text-sett-text-accent animate-trend-fade-in"
+                      style={{ animationDelay: `${trendDelay}ms` }}
+                    >
                       0% {t.dashboard.vsLastMonth}
                     </p>
                   )}
@@ -155,35 +188,54 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Recent Offers Section */}
+        {/* Recent Offers Section.
+            Deferred until all four stat cards have finished their cascade
+            (which completes around 2260ms — see cardDelay calc above).
+            Starts at 2400ms for a small breathing pause, then its own
+            internal cascade begins from this base. */}
         <section>
           <div
             className="bg-white rounded-[14px] shadow-[0_1px_4px_0_rgba(0,0,0,0.08)] border border-sett-border-light overflow-hidden animate-card-rise-in"
-            style={{ animationDelay: '370ms' }}
+            style={{ animationDelay: '2400ms' }}
           >
-            <div
-              className="flex flex-col gap-3 p-5 border-b border-sett-border-light sm:flex-row sm:items-center sm:justify-between animate-sidebar-fade-up"
-              style={{ animationDelay: '500ms' }}
-            >
+            {/* Header bar — texts inside cascade individually:
+                  - Title at 2580ms
+                  - Subtitle at 2680ms
+                  - Action buttons at 2760ms
+                The outer wrapper no longer animates as a block (removed
+                animate-sidebar-fade-up) so the child cascade is the only
+                motion — avoids the title sliding in twice. */}
+            <div className="flex flex-col gap-3 p-5 border-b border-sett-border-light sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
                 <div>
-                  <h2 className="font-montserrat text-[22px] font-extrabold leading-tight text-sett-text-primary">
+                  <h2
+                    className="font-montserrat text-[22px] font-extrabold leading-tight text-sett-text-primary animate-label-fade-up"
+                    style={{ animationDelay: '2580ms' }}
+                  >
                     {t.dashboard.recentOffers}
                   </h2>
-                  <p className="font-montserrat text-[14px] font-normal leading-normal text-sett-text-secondary mt-0.5">
+                  <p
+                    className="font-montserrat text-[14px] font-normal leading-normal text-sett-text-secondary mt-0.5 animate-label-fade-up"
+                    style={{ animationDelay: '2680ms' }}
+                  >
                     {t.dashboard.recentOffersSubtitle}
                   </p>
                 </div>
               </div>
+              {/* Outer cluster fades up at 2760ms, then each button
+                  jelly-pops in sequence: View All at 2820ms, Create Request
+                  at 2920ms. The 100ms stride is short enough they feel like
+                  a single playful "two-pop" gesture rather than two
+                  unrelated animations. */}
               <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Link href="/booking-requests" className="flex-1 sm:flex-none">
+                <Link href="/booking-requests" className="flex-1 sm:flex-none animate-jelly-pop" style={{ animationDelay: '2820ms' }}>
                   <Button variant="outline" size="sm" fullWidth>
                     <Eye className="w-4 h-4" />
                     {t.dashboard.viewAll}
                   </Button>
                 </Link>
-                <Link href="/booking-requests/create" className="flex-1 sm:flex-none">
+                <Link href="/booking-requests/create" className="flex-1 sm:flex-none animate-jelly-pop" style={{ animationDelay: '2920ms' }}>
                   <Button variant="primary" size="sm" fullWidth>
                     <Plus className="w-4 h-4" />
                     {t.dashboard.createRequest}
@@ -207,7 +259,7 @@ export default function DashboardPage() {
             {!loading && offers.length === 0 && (
               <div
                 className="px-4 py-8 text-center text-body text-sett-text-accent animate-sidebar-fade-up"
-                style={{ animationDelay: '600ms' }}
+                style={{ animationDelay: '2900ms' }}
               >
                 {t.dashboard.noRecentOffers}
               </div>
@@ -218,14 +270,29 @@ export default function DashboardPage() {
               <div className="hidden xl:block overflow-x-auto">
                 <table className="w-full min-w-[900px]">
                   <thead>
-                    {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
+                    {/* §5.2 Header row: Navy background, white text, Montserrat 600–700.
+                        Each column label fades up individually L→R starting
+                        at 2820ms with a 60ms stride, so the header reveals
+                        as a wave before the rows begin streaming in. */}
                     <tr className="h-[48px] bg-sett-navy">
-                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.offerId}</th>
-                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.customer}</th>
-                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.destination}</th>
-                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.checkInOut}</th>
-                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.status}</th>
-                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">{t.requests.createdOn}</th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">
+                        <span className="inline-block animate-label-fade-up" style={{ animationDelay: '2820ms' }}>{t.requests.offerId}</span>
+                      </th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">
+                        <span className="inline-block animate-label-fade-up" style={{ animationDelay: '2880ms' }}>{t.requests.customer}</span>
+                      </th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">
+                        <span className="inline-block animate-label-fade-up" style={{ animationDelay: '2940ms' }}>{t.requests.destination}</span>
+                      </th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">
+                        <span className="inline-block animate-label-fade-up" style={{ animationDelay: '3000ms' }}>{t.requests.checkInOut}</span>
+                      </th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">
+                        <span className="inline-block animate-label-fade-up" style={{ animationDelay: '3060ms' }}>{t.requests.status}</span>
+                      </th>
+                      <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-4 py-3">
+                        <span className="inline-block animate-label-fade-up" style={{ animationDelay: '3120ms' }}>{t.requests.createdOn}</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -237,7 +304,7 @@ export default function DashboardPage() {
                           // §5.2 Alternating row: #F8F9FA
                           i % 2 === 1 ? 'bg-sett-table-alt-row' : 'bg-white'
                         }`}
-                        style={{ animationDelay: `${580 + Math.min(i, 6) * 50}ms` }}
+                        style={{ animationDelay: `${3200 + Math.min(i, 6) * 60}ms` }}
                       >
                         <td className="relative px-4 py-3 text-body text-sett-text-primary font-medium">
                           {/* Left accent bar — slides in on row hover */}
@@ -285,7 +352,7 @@ export default function DashboardPage() {
                     key={row.id}
                     href={`/booking-requests/${row.requestId ?? row.id}`}
                     className="group block p-4 rounded-[14px] border border-sett-border-light hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 transition-all duration-280 ease-sett-out hover:-translate-y-0.5 hover:shadow-[0_4px_16px_0_rgba(7,28,66,0.08)] active:scale-[0.985] active:translate-y-0 active:shadow-none active:duration-100 animate-card-rise-in"
-                    style={{ animationDelay: `${580 + Math.min(i, 6) * 60}ms` }}
+                    style={{ animationDelay: `${3200 + Math.min(i, 6) * 60}ms` }}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-body font-semibold text-sett-text-primary transition-colors duration-180 ease-sett-out group-hover:text-sett-primary">

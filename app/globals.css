@@ -97,9 +97,37 @@
   0%   { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+/* Label fade — used on stat-card labels so they slide up into place after
+   the card itself has settled. Subtler than value-count-in so the big
+   number remains the focal point. */
+@keyframes label-fade-up {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+/* Trend line fade — used on the "+92% vs last month" text underneath the
+   stat-card number. Comes in after the number lands. */
+@keyframes trend-fade-in {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
 .animate-card-rise-in  { animation: card-rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-badge-pop-in  { animation: badge-pop-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-value-count-in { animation: value-count-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-label-fade-up { animation: label-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-trend-fade-in { animation: trend-fade-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Jelly pop — playful entrance for buttons / CTAs. Compresses Y, snaps to a
+   slight overshoot, then settles into a gentle squish-and-recover bounce so
+   the button lands like a soft jelly cube. Use sparingly — the squash is
+   intentionally noisy and works best on hero-tier actions. */
+@keyframes jelly-pop {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.6, 0.6); }
+  45%  { opacity: 1; transform: translateY(-2px) scale(1.08, 0.92); }
+  65%  { transform: translateY(1px) scale(0.94, 1.06); }
+  82%  { transform: translateY(0) scale(1.02, 0.98); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.animate-jelly-pop { animation: jelly-pop 720ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
 /* ── Exit animations (collapsing panels, dismissing cards) ──
    Use these to gracefully remove content. Pair with a delayed unmount so the
@@ -344,6 +372,9 @@
   .animate-card-rise-in,
   .animate-badge-pop-in,
   .animate-value-count-in,
+  .animate-label-fade-up,
+  .animate-trend-fade-in,
+  .animate-jelly-pop,
   .animate-step-in-right,
   .animate-step-in-left,
   .animate-card-shrink-out,

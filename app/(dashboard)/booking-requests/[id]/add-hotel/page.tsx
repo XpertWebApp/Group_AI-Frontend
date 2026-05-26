@@ -3148,7 +3148,11 @@ function HotelResultCard({
         {/* ── Hotel Image ── */}
         <div
           className={cn(
-            'w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light',
+            // sm:self-start prevents the image from stretching to match the
+            // height of the content column when the card has many room rows.
+            // Without it, the flex row defaults to align-items: stretch and
+            // the image's aspect-ratio gets overridden, distorting the photo.
+            'w-full sm:w-[240px] md:w-[260px] lg:w-[280px] aspect-video shrink-0 sm:self-start relative bg-[#F7F7F7] overflow-hidden rounded-[14px] border border-sett-border-light',
             onImageClick ? 'cursor-pointer group' : ''
           )}
           onClick={onImageClick}
@@ -3412,7 +3416,7 @@ function HotelResultCard({
                       <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary whitespace-nowrap align-top">
                         {rt.roomsAllocated}
                       </td>
-                      <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize whitespace-nowrap align-top">
+                      <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize align-top max-w-[180px] break-words">
                         {getMealTypeLabel(rt.mealName || rt.mealType || '', (t.addHotel.mealTypes as any))}
                       </td>
                       <td className="py-2.5 px-3 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary whitespace-nowrap align-top">

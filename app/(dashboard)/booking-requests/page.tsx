@@ -280,15 +280,16 @@ export default function BookingRequestsPage() {
             wrapper's 14px radius — without it the last row's bottom corners
             poked past the rounded border and read as a faded/uneven edge. */}
         <div className="bg-white rounded-[14px] border border-sett-border animate-card-rise-in overflow-hidden">
-          {/* Toolbar: filters on the left, primary actions on the right.
-              The two action buttons live in their own flex group that never
-              wraps internally, so Create Request and Refresh stay on the same
-              line regardless of zoom level. The whole bar only stacks
-              vertically when the screen is genuinely narrow (lg breakpoint). */}
-          <div
-            className="relative z-10 p-3 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4 animate-sidebar-fade-up"
-            style={{ animationDelay: '120ms' }}
-          >
+          {/* Toolbar — sequential reveal, one control at a time:
+                200ms  Search bar
+                480ms  All Time dropdown
+                760ms  All Status dropdown
+                1040ms Refresh button (jelly-pop)
+                1320ms Create Request button (jelly-pop)
+              280ms stride between controls is wide enough that each lands
+              visibly before the next starts — feels deliberate rather than
+              "everything at once". */}
+          <div className="relative z-10 p-3 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
             <div className="flex-1 min-w-0">
               <BookingRequestFilters
                 search={search}
@@ -297,6 +298,9 @@ export default function BookingRequestsPage() {
                 onStatusChange={setStatusFilter}
                 dateRange={dateRange}
                 onDateRangeChange={setDateRange}
+                searchAnimationDelay={200}
+                dateAnimationDelay={480}
+                statusAnimationDelay={760}
               />
             </div>
             <div className="flex items-center gap-2 shrink-0 lg:ml-auto">
@@ -304,13 +308,14 @@ export default function BookingRequestsPage() {
                 type="button"
                 onClick={handleRefresh}
                 disabled={loading || isRefreshing}
-                className="shrink-0 inline-flex items-center justify-center gap-2 h-[41px] px-3 sm:px-4 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill hover:border-sett-primary/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                className="shrink-0 inline-flex items-center justify-center gap-2 h-[41px] px-3 sm:px-4 rounded-lg border border-sett-border bg-white text-body font-medium text-sett-text-primary hover:bg-sett-fill hover:border-sett-primary/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 animate-jelly-pop"
+                style={{ animationDelay: '1040ms' }}
                 title={t.requests.refresh || 'Refresh requests'}
               >
                 <RefreshCw className={`w-4 h-4 transition-transform duration-500 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{t.requests.refresh || 'Refresh'}</span>
               </button>
-              <Link href="/booking-requests/create" className="shrink-0">
+              <Link href="/booking-requests/create" className="shrink-0 animate-jelly-pop" style={{ animationDelay: '1320ms' }}>
                 <button
                   type="button"
                   className="inline-flex items-center justify-center gap-2 h-[41px] px-4 rounded-lg bg-sett-primary text-sett-navy hover:bg-sett-green-dark hover:text-white font-montserrat text-[13px] font-bold uppercase tracking-[0.04em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] transition-all duration-200 active:scale-95 whitespace-nowrap"
@@ -338,7 +343,7 @@ export default function BookingRequestsPage() {
           {!loading && requests.length === 0 && (
             <div
               className="px-5 py-12 text-center text-body text-sett-text-secondary border-t border-sett-border animate-sidebar-fade-up"
-              style={{ animationDelay: '320ms' }}
+              style={{ animationDelay: '2100ms' }}
             >
               {t.requests.noRequests}
             </div>
@@ -349,20 +354,23 @@ export default function BookingRequestsPage() {
             <div className="hidden xl:block overflow-x-auto overflow-hidden">
               <table className="w-full min-w-[950px] 2xl:min-w-[1100px]">
                 <thead>
-                  {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
+                  {/* §5.2 Header row: Navy background, white text, Montserrat 600–700.
+                      Each column label fades up individually L→R starting at
+                      600ms with a 50ms stride — same pattern as the
+                      Dashboard's Recent Offers table. */}
                   <tr className="bg-sett-navy">
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.offerId}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.customer}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.destination}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.checkInOut}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.rooms}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.group}</th>
-                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.totalSell}</th>
-                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.margin}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.owner}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.status}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.createdOn}</th>
-                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{t.requests.lastUpdated}</th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2100ms' }}>{t.requests.offerId}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2150ms' }}>{t.requests.customer}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2200ms' }}>{t.requests.destination}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2250ms' }}>{t.requests.checkInOut}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2300ms' }}>{t.requests.rooms}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2350ms' }}>{t.requests.group}</span></th>
+                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2400ms' }}>{t.requests.totalSell}</span></th>
+                    <th className="text-right font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2450ms' }}>{t.requests.margin}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2500ms' }}>{t.requests.owner}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2550ms' }}>{t.requests.status}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2600ms' }}>{t.requests.createdOn}</span></th>
+                    <th className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3"><span className="inline-block animate-label-fade-up" style={{ animationDelay: '2650ms' }}>{t.requests.lastUpdated}</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -377,7 +385,7 @@ export default function BookingRequestsPage() {
                           // §5.2 Alternating row: #F8F9FA
                           i % 2 === 1 ? 'bg-sett-table-alt-row' : 'bg-white'
                         }`}
-                        style={{ animationDelay: `${320 + Math.min(i, 6) * 50}ms` }}
+                        style={{ animationDelay: `${2700 + Math.min(i, 6) * 60}ms` }}
                         onClick={() => router.push(`/booking-requests/${row.id}`)}
                       >
                         <td className="relative px-3 2xl:px-5 py-4 text-body font-medium text-sett-text-primary">
@@ -494,7 +502,7 @@ export default function BookingRequestsPage() {
                     key={row.id}
                     href={`/booking-requests/${row.id}`}
                     className="group relative block px-4 py-3 transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg animate-sidebar-item-in"
-                    style={{ animationDelay: `${320 + Math.min(i, 6) * 60}ms` }}
+                    style={{ animationDelay: `${2700 + Math.min(i, 6) * 60}ms` }}
                   >
                     {/* Left accent bar — slides in on hover */}
                     <span
@@ -582,7 +590,7 @@ export default function BookingRequestsPage() {
         {!loading && totalItems > 0 && (
           <div
             className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 animate-sidebar-fade-up"
-            style={{ animationDelay: '720ms' }}
+            style={{ animationDelay: '3200ms' }}
           >
             <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
               {t.requests.showing} {start + 1}-{Math.min(start + PAGE_SIZE, totalItems)} {t.requests.of}{' '}
