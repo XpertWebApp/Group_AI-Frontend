@@ -144,9 +144,9 @@ export default function DashboardPage() {
                       {trendPositive ? '+' : ''}{trend}% {t.dashboard.vsLastMonth}
                     </p>
                   )}
-                  {trendNegative === false && trend === 0 && (
+                  {trend === 0 && (
                     <p className="mt-1 font-montserrat text-[12px] font-medium text-sett-text-accent">
-                      — {t.dashboard.vsLastMonth}
+                      0% {t.dashboard.vsLastMonth}
                     </p>
                   )}
                 </div>

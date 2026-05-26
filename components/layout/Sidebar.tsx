@@ -475,13 +475,17 @@ function SidebarNavItem({
       <Link
         href={href}
         onClick={onMobileClose}
+        data-active={isActive || undefined}
+        data-collapsed={collapsed || undefined}
         className={cn(
-          'relative flex items-center rounded-lg text-sm font-medium overflow-hidden',
+          // sett-nav-item drives the layered hover effect — green sweep,
+          // icon halo, icon nudge, label slide. See globals.css.
+          'sett-nav-item relative flex items-center rounded-lg text-sm font-medium overflow-hidden',
           'transition-[background-color,color,padding] duration-280 ease-sett-out',
           collapsed ? 'justify-center px-0 py-2.5 h-10' : 'gap-3 px-3 py-2.5',
           isActive
             ? 'bg-white/[0.04] text-white'
-            : 'text-white/85 hover:bg-white/[0.06] hover:text-white'
+            : 'text-white/85 hover:text-white'
         )}
         aria-label={collapsed ? label : undefined}
       >
@@ -492,10 +496,10 @@ function SidebarNavItem({
             className="absolute left-0 top-1/2 -translate-y-1/2 h-[60%] w-[3px] rounded-r-full bg-sett-primary shadow-[0_0_8px_rgba(170,199,55,0.45)]"
           />
         )}
-        <Icon className="w-5 h-5 shrink-0" />
+        <Icon className="sett-nav-icon w-5 h-5 shrink-0" />
         <span
           className={cn(
-            'whitespace-nowrap transition-all duration-280 ease-sett-out',
+            'sett-nav-label whitespace-nowrap transition-all duration-280 ease-sett-out',
             collapsed
               ? 'w-0 opacity-0 -translate-x-1 pointer-events-none'
               : 'w-auto opacity-100 translate-x-0'

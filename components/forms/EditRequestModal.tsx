@@ -635,7 +635,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 value={destQuery}
                 onChange={(e) => handleDestinationInputChange(e.target.value)}
                 onFocus={() => { if (destResults.length > 0) setDestOpen(true); }}
-                placeholder="e.g. Barcelona, Spain"
+                placeholder={t.createForm.destinationPlaceholder}
                 autoComplete="off"
               />
               {destLoading && (
@@ -723,7 +723,12 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 check-in to a near date. */}
             <FreeCancellationDateBanner checkInDate={form.checkinDate} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Hotel Category sits on its own full-width row. The chip list
+                can grow to ~5 rows when all star tiers are picked; pairing
+                it with a short sibling (Budget Range) left a tall empty
+                column on the right. Budget Range now follows after Group
+                Type / Group Size for a cleaner vertical rhythm. */}
+            <div>
               {/* Lift wrapper z-index while open so the dropdown panel renders
                   above the sibling Group Size field below it. */}
               <div
@@ -848,24 +853,21 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 </div>
                 {fieldErrors.starRatings && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.starRatings}</p>}
               </div>
-              <div>
-                <Select
-                  label={`${t.offer.editBudgetRange} ${t.createForm.optional}`}
-                  options={budgetRangeOptions}
-                  value={form.budgetRange}
-                  onChange={(e) => setField('budgetRange', e.target.value)}
-                  placeholder={t.createForm.selectBudgetRange}
-                />
-              </div>
             </div>
 
-            {/* Always two columns — the modal is max-w-xl (576px), narrower
+            {/* Group Type + Group Size — required fields, side-by-side.
+                Always two columns: the modal is max-w-xl (576px), narrower
                 than Tailwind's md: breakpoint (768px), so a viewport-based
                 md:grid-cols-2 would never activate inside the modal. */}
             <div className="grid grid-cols-2 gap-3">
               <div>
+                {/* Render our own label with `labelCls` (12px uppercase navy)
+                    and override the Select trigger to match `inputCls` (4px
+                    radius, #D0D0D0 border, px-3 py-2, 13px). Without this the
+                    Select's built-in 14px label + 14px rounded-[14px] trigger
+                    visually mismatch the sibling Group Size input. */}
+                <label className={labelCls}>{t.offer.editGroupType}</label>
                 <Select
-                  label={t.offer.editGroupType}
                   options={groupTypeOptions}
                   value={displayedGroupType}
                   onChange={(e) => {
@@ -876,6 +878,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     }
                   }}
                   placeholder={t.createForm.selectGroupType}
+                  triggerClassName="rounded-[4px] border-[#D0D0D0] px-3 py-2 text-[13px]"
                 />
                 {fieldErrors.groupType && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.groupType}</p>}
               </div>
@@ -887,11 +890,29 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.groupSize}
                   onChange={(e) => setField('groupSize', e.target.value)}
-                  placeholder="e.g. 45"
+                  placeholder={t.createForm.groupSizePlaceholder}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
                 {fieldErrors.groupSize && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.groupSize}</p>}
               </div>
+            </div>
+
+            {/* Budget Range — optional, on its own row at the end of the
+                trip-details block. Demoted here so the tall Hotel Category
+                chip list no longer leaves a big empty column next to it.
+                Label + trigger styled to match the sibling text inputs (see
+                Group Type above for the same pattern). */}
+            <div>
+              <label className={labelCls}>
+                {t.offer.editBudgetRange} {t.createForm.optional}
+              </label>
+              <Select
+                options={budgetRangeOptions}
+                value={form.budgetRange}
+                onChange={(e) => setField('budgetRange', e.target.value)}
+                placeholder={t.createForm.selectBudgetRange}
+                triggerClassName="rounded-[4px] border-[#D0D0D0] px-3 py-2 text-[13px]"
+              />
             </div>
 
             {groupTypeRequiresAge(form.groupType) && (
@@ -1035,7 +1056,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 rows={2}
                 value={form.extraRoomsNote}
                 onChange={(e) => setField('extraRoomsNote', e.target.value)}
-                placeholder="Any extra room requirements..."
+                placeholder={t.offer.editExtraRoomsPlaceholder}
               />
             </div>
 
@@ -1049,7 +1070,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 rows={2}
                 value={form.specialRequirements}
                 onChange={(e) => setField('specialRequirements', e.target.value)}
-                placeholder="e.g. Wheelchair access, Food allergies"
+                placeholder={t.createForm.specialRequestsCustomerPlaceholder}
               />
             </div>
           </div>
@@ -1068,7 +1089,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.companyName}
                   onChange={(e) => setField('companyName', e.target.value)}
-                  placeholder="Company name"
+                  placeholder={t.createForm.companyNamePlaceholder}
                 />
                 {fieldErrors.companyName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.companyName}</p>}
               </div>
@@ -1078,7 +1099,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.firstName}
                   onChange={(e) => setField('firstName', e.target.value)}
-                  placeholder="First name"
+                  placeholder={t.createForm.firstNamePlaceholder}
                 />
                 {fieldErrors.firstName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.firstName}</p>}
               </div>
@@ -1088,7 +1109,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.lastName}
                   onChange={(e) => setField('lastName', e.target.value)}
-                  placeholder="Last name"
+                  placeholder={t.createForm.lastNamePlaceholder}
                 />
                 {fieldErrors.lastName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.lastName}</p>}
               </div>
@@ -1099,7 +1120,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.contactEmail}
                   onChange={(e) => setField('contactEmail', e.target.value)}
-                  placeholder="email@example.com"
+                  placeholder={t.createForm.emailPlaceholder}
                 />
                 {fieldErrors.contactEmail && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.contactEmail}</p>}
               </div>
@@ -1126,7 +1147,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 rows={2}
                 value={form.customerNotes}
                 onChange={(e) => setField('customerNotes', e.target.value)}
-                placeholder="Any additional notes..."
+                placeholder={t.offer.editCustomerNotesPlaceholder}
               />
             </div>
           </div>
