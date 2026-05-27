@@ -19,7 +19,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className={cn("block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5", labelClassName)}>
+          // §5.5 brand-spec label — 12px Montserrat 600 uppercase, 0.05em
+          // tracking, navy. Matches the labels used by Select and Hotel
+          // Category so siblings on the same row land at the same y-baseline.
+          // Previously this was 14px medium which left a ~2px vertical offset
+          // between an Input and an adjacent Select.
+          <label className={cn("block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5", labelClassName)}>
             {label.endsWith('*') ? (
               <>
                 {label.slice(0, -1).trimEnd()}{' '}
@@ -35,10 +40,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             type={inputType}
             className={cn(
-              'w-full p-3 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal',
-              'focus:outline-none focus:ring-2 focus:ring-sett-primary focus:border-transparent',
+              // §5.5 brand-spec input — same border (#E0E0E0) and same soft
+              // focus glow (shadow-input-focus) as the Hotel Category multi-
+              // select and the Select component, so form-context inputs share
+              // a single visual language when sitting next to each other.
+              'w-full p-3 rounded-[14px] border bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent placeholder:font-montserrat placeholder:text-[14px] placeholder:font-normal placeholder:leading-normal',
+              'focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150',
               'disabled:opacity-50 disabled:cursor-not-allowed',
-              error ? 'border-red-500' : 'border-sett-border',
+              error ? 'border-sett-destructive' : 'border-sett-border',
               isPassword && 'pr-10',
               isPassword && !showPassword && 'text-[20px] tracking-[0.2em] placeholder:text-[14px] placeholder:tracking-normal',
               className

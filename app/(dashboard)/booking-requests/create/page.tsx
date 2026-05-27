@@ -1149,7 +1149,14 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             // §5.5 input style so Budget Range matches the Check-in date input
             // and the sibling fields on this form. Without these overrides the
             // shared Select defaults to a 14px radius + lighter border.
-            triggerClassName="rounded-input border-sett-border"
+            // Height-pinned to 44px (with reduced vertical padding) so the
+            // trigger lines up exactly with the Hotel Category multi-select
+            // sibling on the same row.
+            // Border color is no longer overridden here — the shared Select
+            // now defaults to border-sett-border at rest and border-sett-primary
+            // when open. Overriding it here was pinning the border to grey
+            // even when open, defeating the focus highlight.
+            triggerClassName="rounded-input h-[44px] !py-0"
           />
         </div>
 
@@ -1171,7 +1178,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             error={errors.groupType}
             className="animate-field-fade-in"
             style={{ animationDelay: '380ms' }}
-            triggerClassName="rounded-input border-sett-border"
+            // Border color is no longer overridden here — the shared Select
+            // now defaults to border-sett-border at rest and border-sett-primary
+            // when open. Overriding it here was pinning the border to grey
+            // even when open, defeating the focus highlight.
+            triggerClassName="rounded-input h-[44px] !py-0"
           />
           <div className="animate-field-fade-in" style={{ animationDelay: '420ms' }}>
             <Input
@@ -1187,9 +1198,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
               error={errors.groupSize}
-              // §5.5 input style so Group Size matches the Check-in date input
-              // and the sibling fields on this form.
-              className="rounded-input"
+              // §5.5 input style so Group Size matches Group Type on the
+              // same row — same 44px height (with reduced vertical padding)
+              // and same brand-spec border/focus glow inherited from the
+              // shared Input component.
+              className="rounded-input h-[44px] !py-0"
             />
           </div>
         </div>
@@ -1308,7 +1321,10 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.extraRoomsPlaceholder}
             value={formData.extraRooms}
             onChange={(e) => updateField('extraRooms', e.target.value)}
-            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
+            // §5.5 focus glow — same soft green box-shadow + brand-primary
+            // border as Budget Range, Group Type, and the Hotel Category
+            // trigger. Replaces the chunky Tailwind ring used previously.
+            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150 min-h-[80px]"
           />
         </div>
 
@@ -1357,7 +1373,10 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.specialRequestsRoomPlaceholder}
             value={formData.specialRequestsRooms}
             onChange={(e) => updateField('specialRequestsRooms', e.target.value)}
-            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
+            // §5.5 focus glow — same soft green box-shadow + brand-primary
+            // border as Budget Range, Group Type, and the Hotel Category
+            // trigger.
+            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150 min-h-[80px]"
           />
         </div>
       </div>
@@ -1495,7 +1514,9 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.specialRequestsCustomerPlaceholder}
             value={formData.specialRequestsCustomer}
             onChange={(e) => updateField('specialRequestsCustomer', e.target.value)}
-            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
+            // §5.5 focus glow — same soft green box-shadow + brand-primary
+            // border as the Room & Accommodations textareas and Budget Range.
+            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150 min-h-[80px]"
           />
         </div>
       </div>

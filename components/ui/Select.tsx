@@ -246,12 +246,22 @@ export function Select({
           open
             ? isFilter
               ? 'border-sett-primary shadow-[0_0_0_3px_rgba(170,199,55,0.18)]'
-              : 'border-sett-primary ring-2 ring-sett-primary/20'
+              // Default (form-context) Selects use the §5.5 input focus glow
+              // — same soft green box-shadow as the Hotel Category multi-select
+              // and the brand-spec date/text inputs. Previously this used a
+              // Tailwind `ring-2` which rendered as a chunkier outline and
+              // looked visually heavier than its siblings.
+              : 'border-sett-primary shadow-input-focus'
             : error
               ? 'border-red-500'
               : isFilter
                 ? 'border-sett-border hover:border-sett-primary/50'
-                : 'border-sett-border-light hover:border-sett-primary/40',
+                // Default (form-context) Selects use the §5.5 input border
+                // (#E0E0E0) — same shade as the Hotel Category multi-select
+                // and brand-spec text inputs. Previously this used the lighter
+                // #E6EAF0 (border-light), which read as a different tint from
+                // its siblings on the same form row.
+                : 'border-sett-border hover:border-sett-primary/40',
           triggerClassName,
         )}
       >
