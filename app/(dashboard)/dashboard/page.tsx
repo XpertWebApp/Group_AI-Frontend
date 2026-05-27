@@ -228,15 +228,19 @@ export default function DashboardPage() {
                   at 2920ms. The 100ms stride is short enough they feel like
                   a single playful "two-pop" gesture rather than two
                   unrelated animations. */}
+              {/* whitespace-nowrap on both buttons keeps the label on one
+                  line on mobile — without it "CREATE REQUEST" wrapped to
+                  two lines while "VIEW ALL" stayed on one, producing
+                  unequal button heights side-by-side. */}
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Link href="/booking-requests" className="flex-1 sm:flex-none animate-jelly-pop" style={{ animationDelay: '2820ms' }}>
-                  <Button variant="outline" size="sm" fullWidth>
+                  <Button variant="outline" size="sm" fullWidth className="whitespace-nowrap">
                     <Eye className="w-4 h-4" />
                     {t.dashboard.viewAll}
                   </Button>
                 </Link>
                 <Link href="/booking-requests/create" className="flex-1 sm:flex-none animate-jelly-pop" style={{ animationDelay: '2920ms' }}>
-                  <Button variant="primary" size="sm" fullWidth>
+                  <Button variant="primary" size="sm" fullWidth className="whitespace-nowrap">
                     <Plus className="w-4 h-4" />
                     {t.dashboard.createRequest}
                   </Button>

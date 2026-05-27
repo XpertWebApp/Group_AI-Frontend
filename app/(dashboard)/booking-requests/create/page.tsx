@@ -953,8 +953,10 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </div>
             <FieldError message={errors.checkInDate} />
             {/* Passive hint — always visible below the field so the user is
-                warned BEFORE picking a risky near-date. */}
-            <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
+                warned BEFORE picking a risky near-date. Sized + colored as
+                proper helper text (12px navy/70) instead of the previous
+                11px italic light-grey which read as nearly invisible. */}
+            <p className="mt-1.5 font-montserrat text-[12px] font-medium leading-snug text-sett-text-primary/70">
               {t.createForm.checkInDateHint}
             </p>
           </div>
@@ -1050,7 +1052,12 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                       .map((opt) => (
                         <span
                           key={opt.value}
-                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-none"
+                          // Hover micro-interaction: the chip lifts 1px,
+                          // border deepens to full brand-primary, and a soft
+                          // green shadow appears underneath — signals
+                          // interactivity (and that the X is hit-able)
+                          // without competing with the chip's selected state.
+                          className="group/chip inline-flex items-center gap-1.5 px-2 py-1 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-tight cursor-default transition-all duration-200 ease-sett-out hover:-translate-y-0.5 hover:border-sett-primary hover:shadow-[0_4px_12px_-2px_rgba(170,199,55,0.35)] hover:bg-sett-light-green-bg/80"
                         >
                           {opt.node}
                           <button
@@ -1059,7 +1066,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                               e.stopPropagation();
                               toggleHotelCategory(opt.value);
                             }}
-                            className="ml-0.5 hover:text-sett-green-dark transition-colors"
+                            // X button: pops slightly larger on chip hover so
+                            // staff visually find it; rotates 90° + tints
+                            // destructive red when hovered directly so the
+                            // "this removes the selection" intent is obvious.
+                            className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ease-sett-out group-hover/chip:scale-110 hover:bg-sett-destructive/10 hover:text-sett-destructive hover:rotate-90"
                             aria-label={`Remove ${opt.label}`}
                           >
                             <XIcon className="w-3 h-3" />
@@ -1131,7 +1142,9 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 </div>
               )}
             </div>
-            <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
+            {/* Same helper-text treatment as the Check-in date hint — readable
+                12px navy/70 instead of the previous faint italic. */}
+            <p className="mt-1.5 font-montserrat text-[12px] font-medium leading-snug text-sett-text-primary/70">
               {t.createForm.hotelCategoryHint}
             </p>
             {errors.hotelCategories && (

@@ -771,7 +771,10 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                           .map((opt) => (
                             <span
                               key={opt.value}
-                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-none"
+                              // Hover micro-interaction matches the Create
+                              // form: chip lifts 1px, border deepens, soft
+                              // green shadow underneath.
+                              className="group/chip inline-flex items-center gap-1.5 px-2 py-1 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-tight cursor-default transition-all duration-200 ease-sett-out hover:-translate-y-0.5 hover:border-sett-primary hover:shadow-[0_4px_12px_-2px_rgba(170,199,55,0.35)] hover:bg-sett-light-green-bg/80"
                             >
                               {opt.node}
                               <button
@@ -780,7 +783,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                                   e.stopPropagation();
                                   toggleHotelCategory(opt.value);
                                 }}
-                                className="ml-0.5 hover:text-sett-green-dark transition-colors"
+                                className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ease-sett-out group-hover/chip:scale-110 hover:bg-sett-destructive/10 hover:text-sett-destructive hover:rotate-90"
                                 aria-label={`Remove ${opt.label}`}
                               >
                                 <X className="w-3 h-3" />
