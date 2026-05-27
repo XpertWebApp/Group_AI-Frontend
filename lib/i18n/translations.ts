@@ -563,6 +563,22 @@ export const translations = {
       hotelsAddedToOffer: '{count} hotel(s) added to your offer',
       freeCancellation: 'Free Cancellation',
       limitedCapacity: 'Limited Capacity',
+      // ── Capacity status badges (mirror BE codes) ──
+      capacityConfirmed: 'Available',
+      capacityLimited: 'Limited Capacity',
+      capacityInsufficient: 'Not enough rooms',
+      // ── Backend warning banners (hotel.note) ──
+      // Templated strings: {placeholders} get filled in by the FE localizer
+      // which pattern-matches the English BE string and pulls the
+      // dynamic values out.
+      noteInventoryOverlapDetected: 'Inventory overlap detected — supplier claims ({totalSupplierClaim}) exceed verified hotel capacity ({dbTotalRooms}). Effective capacity capped to {effectiveCapacity}.',
+      noteMultipleSuppliers: 'Multiple suppliers found ({uniqueSuppliersCount}) — allocation reduced by {percent}% to account for potential inventory overlap across channels. Verify total capacity with hotel directly.',
+      noteTotalRoomCountUnverified: 'Total room count unverified — confirm with hotel directly.',
+      noteSuppliersRemoved: '{removedCount} supplier(s) removed during option detail validation — {remainingCount} remain.',
+      noteSupplierCapsLimit: 'Supplier caps limit allocation to {validatedRoomsAllocated} of {requestedRooms} requested rooms — verify additional supply with the hotel.',
+      noteRoomAvailabilityEqualsRequested: 'Room availability equals requested amount — capacity should be verified with the hotel.',
+      noteInventoryOverlapCapped: 'Inventory overlap detected — capped at 60% of hotel physical capacity ({hotelTotalRooms} rooms).',
+      noteRoomInventoryUnverified: 'Room inventory unverified — confirm directly with hotel.',
       roomType: 'Room Type',
       rooms: 'Rooms',
       perNight: 'Per Night',
@@ -1474,6 +1490,19 @@ export const translations = {
       added: 'Hinzugefügt',
       freeCancellation: 'Kostenlose Stornierung',
       limitedCapacity: 'Begrenzte Kapazität',
+      // ── Kapazitätsstatus-Badges (entsprechen BE-Codes) ──
+      capacityConfirmed: 'Verfügbar',
+      capacityLimited: 'Begrenzte Kapazität',
+      capacityInsufficient: 'Nicht genügend Zimmer',
+      // ── Backend-Warnbanner (hotel.note) ──
+      noteInventoryOverlapDetected: 'Bestandsüberschneidung festgestellt — Lieferantenangaben ({totalSupplierClaim}) übersteigen die verifizierte Hotelkapazität ({dbTotalRooms}). Effektive Kapazität auf {effectiveCapacity} begrenzt.',
+      noteMultipleSuppliers: 'Mehrere Lieferanten gefunden ({uniqueSuppliersCount}) — Zuteilung um {percent}% reduziert, um mögliche Bestandsüberschneidungen zwischen Kanälen zu berücksichtigen. Gesamtkapazität bitte direkt beim Hotel prüfen.',
+      noteTotalRoomCountUnverified: 'Gesamtzimmeranzahl nicht verifiziert — bitte direkt mit dem Hotel bestätigen.',
+      noteSuppliersRemoved: '{removedCount} Lieferant(en) während der Optionsprüfung entfernt — {remainingCount} verbleibend.',
+      noteSupplierCapsLimit: 'Lieferantenlimits begrenzen die Zuteilung auf {validatedRoomsAllocated} von {requestedRooms} angefragten Zimmern — bitte zusätzliche Verfügbarkeit beim Hotel prüfen.',
+      noteRoomAvailabilityEqualsRequested: 'Zimmerverfügbarkeit entspricht der angefragten Anzahl — Kapazität sollte mit dem Hotel verifiziert werden.',
+      noteInventoryOverlapCapped: 'Bestandsüberschneidung festgestellt — auf 60 % der physischen Hotelkapazität begrenzt ({hotelTotalRooms} Zimmer).',
+      noteRoomInventoryUnverified: 'Zimmerbestand nicht verifiziert — bitte direkt mit dem Hotel bestätigen.',
       roomType: 'Zimmertyp',
       rooms: 'Zimmer',
       perNight: 'Pro Nacht',

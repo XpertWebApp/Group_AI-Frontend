@@ -129,6 +129,43 @@
 }
 .animate-jelly-pop { animation: jelly-pop 720ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
+/* ── 3D Success Pop ──
+   Confirmation entrance for "Added to Offer" success state. The pill flies
+   in with a perspective tilt that flattens to the page plane, lifts slightly,
+   then settles. Pairs with `check-draw` on the inner check icon and
+   `success-ripple` on the background halo for a layered confirmation moment. */
+@keyframes success-pop-3d {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.85); }
+  55%  { opacity: 1; transform: translateY(-1px) scale(1.04); }
+  80%  { transform: translateY(0.5px) scale(0.99); }
+  100% { transform: translateY(0) scale(1); }
+}
+/* Check-mark draw — SVG stroke length animation. Pairs with stroke-dasharray
+   inline on the path so the check is "drawn" in after the pill lands. */
+@keyframes check-draw {
+  0%   { stroke-dashoffset: 24; opacity: 0; }
+  20%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+/* Soft green ripple radiating out from the check — once-off "yes it landed" cue. */
+@keyframes success-ripple {
+  0%   { opacity: 0.55; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+.animate-success-pop-3d {
+  animation: success-pop-3d 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+}
+.animate-check-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: check-draw 460ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
+}
+.animate-success-ripple {
+  animation: success-ripple 900ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+}
+
 /* ── Exit animations (collapsing panels, dismissing cards) ──
    Use these to gracefully remove content. Pair with a delayed unmount so the
    animation has time to play. */
@@ -375,6 +412,9 @@
   .animate-label-fade-up,
   .animate-trend-fade-in,
   .animate-jelly-pop,
+  .animate-success-pop-3d,
+  .animate-check-draw,
+  .animate-success-ripple,
   .animate-step-in-right,
   .animate-step-in-left,
   .animate-card-shrink-out,

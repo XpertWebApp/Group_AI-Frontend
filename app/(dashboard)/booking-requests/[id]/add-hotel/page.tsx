@@ -7,7 +7,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus, Search,
+  ArrowLeft, ArrowRight, MapPin, Star, Check, BadgeCheck, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus, Search,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
@@ -38,6 +38,7 @@ import type {
   HotelSearchInitResponse,
 } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { localizeHotelNote, localizeCapacityStatus } from '@/lib/i18n/localizeHotelNote';
 
 type SearchPhase = 'idle' | 'searching' | 'polling' | 'done' | 'error';
 
@@ -3093,6 +3094,11 @@ function HotelResultCard({
   const sellPrice = hotel.sellingPricePerRoomPerNight;
   const hasCancellation = !!hotel.cxlDeadline;
   const isLimited = hotel.capacityStatus === 'LIMITED';
+  const isInsufficient = hotel.capacityStatus === 'INSUFFICIENT';
+  // Only show a badge for non-CONFIRMED states — CONFIRMED is the default
+  // happy path and doesn't need a callout (the green "Add to Offer" CTA
+  // already signals availability).
+  const showCapacityBadge = isLimited || isInsufficient;
   // Pick the description for the active locale from the multi-language payload.
   // Fallback order: descriptions[locale] → descriptions[other lang] → legacy single
   // `description` field (for older cached results before backend started shipping
@@ -3213,10 +3219,10 @@ function HotelResultCard({
                 style={{ animationDelay: '120ms' }}
               >
                 <StarRating rating={Number(hotel.starRating)} size={18} />
-                {isLimited && (
+                {showCapacityBadge && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0">
                     <AlertTriangle className="w-3 h-3" />
-                    {t.addHotel.limitedCapacity}
+                    {localizeCapacityStatus(hotel.capacityStatus, t.addHotel)}
                   </span>
                 )}
                 {showYouthFriendlyBadge && hotel.youthFriendly && (
@@ -3284,9 +3290,48 @@ function HotelResultCard({
               style={{ animationDelay: '80ms' }}
             >
               {isAdded ? (
-                <span className="flex items-center gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
-                  <Check className="w-4 h-4" strokeWidth={2.5} /> {t.addHotel.added}
-                </span>
+                // ── 3D "Added to Offer" success pill ──
+                // Layered design for tactile depth:
+                //   • outer wrapper provides 3D entrance + drop shadow
+                //   • inner pill has a gradient (light→dark green) for bevel
+                //   • inset top highlight + bottom shadow imply a curved surface
+                //   • ripple radiates once on mount as a confirmation cue
+                //   • check icon is drawn via SVG stroke-dashoffset animation
+                <div className="relative inline-flex items-center animate-success-pop-3d origin-bottom">
+                  {/* Soft green ripple — fires once when pill mounts */}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 rounded-full bg-sett-primary/30 animate-success-ripple"
+                  />
+
+                  {/* The pill itself — clean modern with a soft glow.
+                      Sized down (12px text, px-3 py-1.5) so the success
+                      confirmation feels lighter than the persistent Free
+                      Cancellation card below it, and so it baseline-aligns
+                      with the hotel title to the left rather than floating
+                      above it. */}
+                  <span
+                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-montserrat text-[12px] font-bold uppercase tracking-[0.06em] text-sett-navy transition-transform duration-200 ease-sett-out hover:-translate-y-0.5 hover:scale-[1.02]"
+                    style={{
+                      background: '#AAC737',
+                      boxShadow:
+                        'inset 0 1px 0 rgba(255,255,255,0.22), ' +   // very faint top highlight
+                        '0 3px 8px -2px rgba(170,199,55,0.35)',       // soft green glow under
+                    }}
+                  >
+                    {/* BadgeCheck — Lucide's "verified/confirmed" icon.
+                        Reads instantly as a status indicator (vs. a plain
+                        Check which can be misread as a generic OK glyph).
+                        Navy stroke matches the pill's text color for a
+                        cohesive monochrome treatment on the green pill. */}
+                    <BadgeCheck
+                      className="w-4 h-4 shrink-0"
+                      strokeWidth={2.4}
+                      aria-hidden
+                    />
+                    {t.addHotel.added}
+                  </span>
+                </div>
               ) : (
                 <Button
                   variant="primary"
@@ -3466,14 +3511,16 @@ function HotelResultCard({
             ))}
           </div>
 
-          {/* Notes */}
+          {/* Notes — backend warning banner. Pattern-matched + localized
+              against the i18n dictionary; falls back to the BE string if
+              no pattern matches so untranslated notes still surface. */}
           {hotel.note && (
             <div
               className="mt-3 animate-sidebar-fade-up"
               style={{ animationDelay: '380ms' }}
             >
-              <p className="font-montserrat text-[12px] text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                {hotel.note}
+              <p className="font-montserrat text-[12px] text-amber-600 bg-amber-50 px-2 py-1 rounded whitespace-pre-line">
+                {localizeHotelNote(hotel.note, t.addHotel)}
               </p>
             </div>
           )}

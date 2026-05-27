@@ -279,7 +279,7 @@ export interface HotelSearchResult {
   sellingPricePerRoomPerNight: number;
   highestMidRangePrice: number;
   roomsAllocated: number;
-  capacityStatus?: 'CONFIRMED' | 'LIMITED';
+  capacityStatus?: 'CONFIRMED' | 'LIMITED' | 'INSUFFICIENT';
   cxlDeadline?: string | null;
   latitude?: number | null;
   longitude?: number | null;
