@@ -1278,7 +1278,7 @@ export default function RequestDetailPage() {
                     size="sm"
                     onClick={handleAddHotelsClick}
                     isLoading={actionLoading}
-                    disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
+                    disabled={[ 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
                   >
                     {t.offer.addHotel}
                   </Button>
