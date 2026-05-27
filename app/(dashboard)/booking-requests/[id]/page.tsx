@@ -24,6 +24,9 @@ import {
   Download,
   AlertTriangle,
   Check,
+  History,
+  Inbox,
+  Sparkles,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -1426,44 +1429,93 @@ export default function RequestDetailPage() {
             {/* Right sidebar — only show when proposal exists with hotels */}
             {proposal && hotels.length > 0 && (
               <div className="w-full lg:w-72 shrink-0 space-y-4">
-                {/* Offer History */}
+                {/* ─── Offer History ───
+                    Brand-aligned redesign per SETT-Hub-Brand-Guidelines-v2:
+                      §5.3 Panels — 8px radius, 1px #E0E0E0 border, soft
+                        shadow, 3px green left accent on the card.
+                      §2 Color discipline — no blue/orange/purple. Initial
+                        offer uses navy chip; revisions use neutral white
+                        chip with grey border; final offer uses brand-green
+                        chip. The latest entry gets a subtle green-tinted
+                        background to draw the eye.
+                      §3 Typography — section title is H4-style: Montserrat
+                        700, navy, 13px uppercase, 0.05em tracking.
+                      §5.1 Buttons — Download CTA uses the brand secondary
+                        button shape (transparent + 2px green border + green
+                        text, uppercase, navy hover-fill). */}
                 <div
-                  className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden animate-card-rise-in"
-                  style={{ animationDelay: '480ms' }}
+                  className="relative bg-white rounded-[8px] border border-sett-border overflow-hidden animate-card-rise-in"
+                  style={{
+                    animationDelay: '480ms',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  }}
                 >
-                  <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-sett-border-light">
-                    <div className="w-1 h-5 bg-sett-primary rounded-full" />
-                    <h4 className="font-montserrat text-[15px] font-semibold text-sett-text-primary">
-                      {t.offer.offerHistory}
-                    </h4>
+                  {/* §5.3 emphasis accent — 3px green stripe identifying
+                      the panel as a key brand element on the sidebar. */}
+                  <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px] bg-sett-primary" />
+
+                  {/* Section header — icon + brand-spec H4 + count badge */}
+                  <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-sett-border">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30">
+                        <History className="w-3.5 h-3.5 text-sett-primary" strokeWidth={2.25} />
+                      </span>
+                      <h4 className="font-montserrat text-[13px] font-bold uppercase tracking-[0.05em] text-sett-navy">
+                        {t.offer.offerHistory}
+                      </h4>
+                    </div>
+                    {offerHistory.length > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-sett-navy text-white font-montserrat text-[11px] font-bold tabular-nums">
+                        {offerHistory.length}
+                      </span>
+                    )}
                   </div>
 
+                  {/* Loading skeleton — tighter pulse cards */}
                   {offerHistoryLoading && (
-                    <div className="p-4 space-y-3 animate-pulse">
+                    <div className="p-4 space-y-3">
                       {[1, 2].map((n) => (
-                        <div key={n} className="rounded-[10px] border border-sett-border-light p-3 space-y-2">
-                          <div className="h-4 w-24 rounded bg-sett-border" />
-                          <div className="h-3 w-full rounded bg-sett-border" />
-                          <div className="h-3 w-3/4 rounded bg-sett-border" />
+                        <div key={n} className="rounded-[8px] border border-sett-border p-3 space-y-2 animate-pulse">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="h-5 w-24 rounded-full bg-sett-border-light" />
+                            <div className="h-3 w-16 rounded bg-sett-border-light" />
+                          </div>
+                          <div className="h-3 w-full rounded bg-sett-border-light" />
+                          <div className="h-3 w-2/3 rounded bg-sett-border-light" />
                         </div>
                       ))}
                     </div>
                   )}
 
+                  {/* Empty state — navy-tinted illustration + brand copy */}
                   {!offerHistoryLoading && offerHistory.length === 0 && (
-                    <p className="px-5 py-4 font-montserrat text-[13px] text-sett-text-accent">
-                      {t.offer.noOffersSent}
-                    </p>
+                    <div className="px-5 py-8 flex flex-col items-center text-center">
+                      <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-sett-fill border border-sett-border-light mb-3">
+                        <Inbox className="w-5 h-5 text-sett-text-accent" strokeWidth={2} />
+                      </span>
+                      <p className="font-montserrat text-[13px] font-semibold text-sett-navy">
+                        {t.offer.noOffersSent}
+                      </p>
+                    </div>
                   )}
 
+                  {/* Timeline — vertical rail down the left edge of each
+                      entry block. Most recent entry sits at the top and is
+                      visually emphasized; older entries de-emphasize. */}
                   {!offerHistoryLoading && offerHistory.length > 0 && (
-                    <div className="divide-y divide-sett-border-light">
-                      {offerHistory.map((entry) => {
-                        const badgeClass = entry.type === 'initial'
-                          ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                    <div className="relative">
+                      {offerHistory.map((entry, idx) => {
+                        const isLatest = idx === 0;
+                        // §2 brand-only color palette for the chip:
+                        //  - initial   → navy chip
+                        //  - revision  → light grey neutral chip
+                        //  - final     → brand-green chip (signals "this
+                        //    is the customer-facing winning offer")
+                        const chipClass = entry.type === 'initial'
+                          ? 'bg-sett-navy text-white border-sett-navy'
                           : entry.type === 'final'
-                            ? 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00]'
-                            : 'bg-orange-50 border border-orange-200 text-orange-700';
+                            ? 'bg-sett-primary text-sett-navy border-sett-primary'
+                            : 'bg-sett-fill text-sett-navy border-sett-border';
 
                         const typeLabel = entry.type === 'initial'
                           ? t.offer.initialOffer
@@ -1478,51 +1530,144 @@ export default function RequestDetailPage() {
                           ? t.offer.servicesCount.replace('{n}', '1')
                           : t.offer.servicesPluralCount.replace('{n}', String(entry.serviceCount));
 
+                        // Recipients: show first email + "+N" overflow chip
+                        // for the long-list case (full list available on
+                        // hover via title attribute).
+                        const recipients = entry.sentToEmails;
+                        const recipientsLabel = recipients.length === 0
+                          ? '—'
+                          : recipients.length === 1
+                            ? recipients[0]
+                            : `${recipients[0]} +${recipients.length - 1}`;
+                        const recipientsTooltip = recipients.join(', ');
+
+                        // Hotel/service count as just the number — the
+                        // singular/plural translation strings (e.g. "2
+                        // hotels") wrapped to two lines in the narrow
+                        // sidebar column. Pulling the count out as a tabular
+                        // number + a short word keeps everything on one
+                        // baseline.
+                        const numberOnly = (label: string) => {
+                          const m = label.match(/\d+/);
+                          return m ? m[0] : label;
+                        };
+                        const hotelN = numberOnly(hotelsLabel);
+                        const serviceN = numberOnly(servicesLabel);
+                        // Short word — strip the leading number + space so
+                        // we render "2 hotels" as "2  hotels" with our own
+                        // spacing/alignment instead of relying on the
+                        // i18n string's spaces which produced inconsistent
+                        // wrapping.
+                        const hotelWord = hotelsLabel.replace(/^\d+\s*/, '').toLowerCase();
+                        const serviceWord = servicesLabel.replace(/^\d+\s*/, '').toLowerCase();
+
                         return (
-                          <div key={entry.id} className="p-4 space-y-2">
-                            {/* Badge + date */}
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-badge font-montserrat text-[11px] font-semibold uppercase tracking-wide ${badgeClass}`}>
-                                #{entry.offerNumber} {typeLabel}
-                              </span>
-                              <span className="font-montserrat text-[12px] text-sett-text-accent whitespace-nowrap">
-                                {formatDate(entry.sentAt)}
-                              </span>
-                            </div>
-
-                            {/* Recipients */}
-                            <p className="font-montserrat text-[12px] text-sett-text-secondary truncate">
-                              {t.offer.sentTo}: {entry.sentToEmails.join(', ')}
-                            </p>
-
-                            {/* Item counts + total */}
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-montserrat text-[12px] text-sett-text-accent">
-                                {hotelsLabel}, {servicesLabel}
-                              </span>
-                              {entry.totalPrice != null && (
-                                <span className="font-montserrat text-[12px] font-semibold text-sett-text-primary whitespace-nowrap">
-                                  {formatCurrencyEU(entry.totalPrice, entry.currency)}
+                          <div
+                            key={entry.id}
+                            className={cn(
+                              'relative transition-colors duration-200',
+                              isLatest
+                                ? 'bg-sett-light-green-bg/40'
+                                : 'hover:bg-sett-fill/60',
+                              idx < offerHistory.length - 1 && 'border-b border-sett-border-light',
+                            )}
+                          >
+                            {/* Comfortable per-entry padding so rows breathe. */}
+                            <div className="px-5 py-4 space-y-3">
+                              {/* ── Row 1 — Type chip + offer # · date ──
+                                  Chip carries the offer-type semantic; the
+                                  small "#1" and date sit right-aligned at the
+                                  same y for a clean masthead. */}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={cn(
+                                  'inline-flex items-center px-2.5 py-1 rounded-full border font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] leading-none whitespace-nowrap',
+                                  chipClass,
+                                )}>
+                                  {typeLabel}
                                 </span>
+                                <div className="flex items-center gap-1.5 font-montserrat text-[11px] font-medium text-sett-text-secondary whitespace-nowrap tabular-nums">
+                                  <span className="text-sett-text-accent">#{entry.offerNumber}</span>
+                                  <span className="text-sett-border" aria-hidden>•</span>
+                                  <span>{formatDate(entry.sentAt)}</span>
+                                </div>
+                              </div>
+
+                              {/* ── Row 2 — Recipients ──
+                                  Tiny uppercase label above the value gives
+                                  the data a key/value affordance instead of
+                                  "Sent to: x@y.com" running together. */}
+                              <div className="space-y-0.5">
+                                <p className="font-montserrat text-[10px] font-bold uppercase tracking-[0.06em] text-sett-text-accent">
+                                  {t.offer.sentTo}
+                                </p>
+                                <p
+                                  className="font-montserrat text-[13px] font-medium text-sett-navy truncate"
+                                  title={recipientsTooltip}
+                                >
+                                  {recipientsLabel}
+                                </p>
+                              </div>
+
+                              {/* ── Row 3 — Summary band ──
+                                  Two stacked sub-rows inside one card:
+                                    • counts (hotels · services) — smaller
+                                    • price — full-width, dominant
+                                  Splitting onto two lines fixed the price
+                                  getting truncated when both items shared
+                                  the same horizontal row at narrow sidebar
+                                  widths. The price is the value staff care
+                                  about most — it now gets its own row and
+                                  the visual weight (16px extrabold) to
+                                  match. */}
+                              <div className="rounded-[6px] bg-white border border-sett-border-light overflow-hidden">
+                                {/* Counts sub-row */}
+                                <div className="flex items-center gap-3 px-3 py-2 font-montserrat text-[12px] text-sett-navy border-b border-sett-border-light">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
+                                    <span className="font-bold tabular-nums">{hotelN}</span>
+                                    <span className="text-sett-text-secondary">{hotelWord}</span>
+                                  </span>
+                                  <span className="w-px h-3 bg-sett-border" aria-hidden />
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-sett-text-accent" />
+                                    <span className="font-bold tabular-nums">{serviceN}</span>
+                                    <span className="text-sett-text-secondary">{serviceWord}</span>
+                                  </span>
+                                </div>
+                                {/* Price sub-row — full-width, label + value */}
+                                {entry.totalPrice != null && (
+                                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-sett-fill/60">
+                                    <span className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-sett-text-accent">
+                                      {t.offer.total}
+                                    </span>
+                                    <span className="font-montserrat text-[16px] font-extrabold text-sett-navy whitespace-nowrap tabular-nums leading-none">
+                                      {formatCurrencyEU(entry.totalPrice, entry.currency)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* ── Row 4 — Download CTA ──
+                                  Compact secondary-style: green text on
+                                  light-green tint, full-width, doesn't try
+                                  to compete with the chip above. */}
+                              {entry.pdfUrl ? (
+                                <a
+                                  href={entry.pdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-light-green-bg/70 border border-sett-primary/30 font-montserrat text-[12px] font-bold uppercase tracking-[0.06em] text-sett-green-dark hover:bg-sett-primary hover:text-sett-navy hover:border-sett-primary transition-colors duration-200 active:scale-[0.98]"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  {t.modals.downloadPdf}
+                                </a>
+                              ) : (
+                                <div className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-fill border border-sett-border-light font-montserrat text-[11px] font-medium text-sett-text-accent">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  {t.offer.pdfUnavailable}
+                                </div>
                               )}
                             </div>
-
-                            {/* Download */}
-                            {entry.pdfUrl ? (
-                              <a
-                                href={entry.pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-sett-border font-montserrat text-[12px] font-medium text-sett-text-primary hover:border-sett-primary hover:text-sett-primary transition-colors"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                {t.modals.downloadPdf}
-                              </a>
-                            ) : (
-                              <span className="font-montserrat text-[12px] text-sett-text-accent italic">
-                                {t.offer.pdfUnavailable}
-                              </span>
-                            )}
                           </div>
                         );
                       })}
