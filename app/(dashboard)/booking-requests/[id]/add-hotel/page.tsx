@@ -2729,7 +2729,7 @@ export default function AddHotelPage() {
                       <div className="relative flex items-center gap-4 py-5 my-2">
                         <div className="flex-1 h-px bg-gradient-to-r from-sett-border-light via-sett-border-light to-transparent" />
                         <span className="text-sett-text-secondary font-montserrat text-[12px] font-medium uppercase whitespace-nowrap tracking-wider">
-                          More options
+                          {t.addHotel.moreOptions}
                         </span>
                         <div className="flex-1 h-px bg-gradient-to-l from-sett-border-light via-sett-border-light to-transparent" />
                       </div>
@@ -2760,15 +2760,18 @@ export default function AddHotelPage() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                   </svg>
-                                  Loading
+                                  {t.addHotel.alternativesLoading}
                                 </span>
                               ) : (
-                                `${filteredAltResults.length} option${filteredAltResults.length !== 1 ? 's' : ''}`
+                                (filteredAltResults.length === 1
+                                  ? t.addHotel.optionsCount
+                                  : t.addHotel.optionsPluralCount
+                                ).replace('{n}', String(filteredAltResults.length))
                               )}
                             </span>
                           </div>
                           <p className="font-montserrat text-[13px] text-sett-text-secondary leading-relaxed">
-                            Hotels with different locations, amenities, or layouts that match your trip dates and budget
+                            {t.addHotel.alternativesSubline}
                           </p>
                         </div>
 

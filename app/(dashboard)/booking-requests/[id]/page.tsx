@@ -157,37 +157,13 @@ export default function RequestDetailPage() {
   const [offerHistoryLoading, setOfferHistoryLoading] = useState(false);
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
-  // While true, the collapsible body keeps rendering with an exit animation
-  // (so the user actually sees it close). Cleared once the animation duration elapses.
-  const [summaryClosing, setSummaryClosing] = useState(false);
-  const summaryCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // The collapsible body now uses a CSS `grid-template-rows` 1fr↔0fr
+  // transition (see .sett-collapsible in globals.css), so the content
+  // stays mounted always and the wrapper smoothly contracts its height.
+  // No timer machinery needed — toggling state is enough.
   const toggleSummary = useCallback(() => {
-    // Cancel any in-flight close so rapid clicks stay in sync with state.
-    if (summaryCloseTimerRef.current) {
-      clearTimeout(summaryCloseTimerRef.current);
-      summaryCloseTimerRef.current = null;
-    }
-    if (summaryCollapsed) {
-      // Expand — content will mount and re-trigger the cascade-in animations
-      setSummaryClosing(false);
-      setSummaryCollapsed(false);
-      return;
-    }
-    // Collapse — keep content mounted, play exit, then unmount
-    setSummaryClosing(true);
-    summaryCloseTimerRef.current = setTimeout(() => {
-      setSummaryCollapsed(true);
-      setSummaryClosing(false);
-      summaryCloseTimerRef.current = null;
-    }, 260); // matches .animate-card-shrink-out duration
-  }, [summaryCollapsed]);
-
-  // Clear the timer on unmount
-  useEffect(() => {
-    return () => {
-      if (summaryCloseTimerRef.current) clearTimeout(summaryCloseTimerRef.current);
-    };
+    setSummaryCollapsed((v) => !v);
   }, []);
 
   // Modal states
@@ -994,11 +970,19 @@ export default function RequestDetailPage() {
             </div>
 
             {/* ── Collapsible: the rest of the request summary ──
-                Stays mounted during the close animation (summaryClosing) so the user
-                actually sees the exit motion before the content unmounts. */}
-            {(!summaryCollapsed || summaryClosing) && (
-              <div className={summaryClosing ? 'animate-card-shrink-out' : undefined}>
-                <hr className="border-sett-border-light mb-6" />
+                Uses .sett-collapsible (grid-template-rows 1fr↔0fr) so the
+                panel smoothly contracts/expands its intrinsic height across
+                ~420ms — no DOM measurement, no timer machinery. Content
+                stays mounted always so internal animations re-trigger on
+                expand. The inner aria-hidden tracks the visible state for
+                screen readers. */}
+            <div
+              className="sett-collapsible"
+              data-collapsed={summaryCollapsed || undefined}
+              aria-hidden={summaryCollapsed}
+            >
+              <div className="sett-collapsible-inner">
+                <hr className="border-sett-border-light mb-6 mt-2" />
 
                 {/* ── Room & Accommodations ── */}
                 <div className="flex flex-col gap-5 mb-6">
@@ -1241,26 +1225,46 @@ export default function RequestDetailPage() {
                   )}
                 </div>
               </div>
-            )}
-            {/* Collapse/Expand toggle — sits on the card's bottom edge, half-overlapping.
-                Single icon that rotates 180° to smoothly transition between expanded/collapsed
-                states (instead of icon-swap pop). */}
+            </div>
+            {/* ── Collapse / Expand toggle ──
+                Brand-aligned §5.1 button: 14px Montserrat 700, UPPERCASE,
+                0.08em tracking, 4px radius. State-driven styling:
+                  • Collapsed: PRIMARY (filled #AAC737, navy text) — invites
+                    the user to "Show More" with brand confidence.
+                  • Expanded: SECONDARY (transparent, 2px green border,
+                    green text) — quieter because the content's already
+                    on screen, the action just dismisses it.
+                Sits centered on the bottom edge of the card, lifted by a
+                subtle drop shadow so it reads as a control attached to the
+                panel rather than a generic widget. */}
             <button
               type="button"
               onClick={toggleSummary}
-              disabled={summaryClosing}
-              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-sett-fill border border-sett-border-light shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white hover:scale-105 active:scale-95 transition-all duration-280 ease-sett-spring z-10 disabled:cursor-default"
-              aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
-              aria-expanded={!summaryCollapsed && !summaryClosing}
+              className={cn(
+                'absolute left-1/2 -bottom-5 -translate-x-1/2 z-10',
+                'inline-flex items-center gap-2 px-5 h-10 rounded-[4px]',
+                'font-montserrat text-[13px] font-bold uppercase tracking-[0.08em] leading-none',
+                'transition-[background-color,color,border-color,transform,box-shadow] duration-200 ease-out',
+                'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2',
+                summaryCollapsed
+                  // §5.1 PRIMARY — filled green, navy text
+                  ? 'bg-sett-primary text-sett-navy border-2 border-sett-primary hover:bg-sett-green-dark hover:border-sett-green-dark hover:text-white shadow-[0_4px_14px_-2px_rgba(170,199,55,0.55)]'
+                  // §5.1 SECONDARY — transparent, green border + text
+                  : 'bg-white text-sett-primary border-2 border-sett-primary hover:bg-sett-primary hover:text-sett-navy shadow-[0_4px_12px_-2px_rgba(7,28,66,0.12)]',
+              )}
+              aria-label={summaryCollapsed ? t.offer.showMoreDetails : t.offer.showLessDetails}
+              aria-expanded={!summaryCollapsed}
             >
+              <span>{summaryCollapsed ? t.offer.showMoreDetails : t.offer.showLessDetails}</span>
+              {/* Chevron rotates in lockstep with the panel's ~420ms slide. */}
               <ChevronUp
                 className={cn(
-                  'w-4 h-4 transition-transform duration-320 ease-sett-spring',
-                  // Pre-rotate during the closing animation so the chevron flips
-                  // in sync with the content exiting (instead of waiting until
-                  // the unmount completes).
-                  (summaryCollapsed || summaryClosing) ? 'rotate-180' : 'rotate-0'
+                  'w-4 h-4 shrink-0 transition-transform duration-[420ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+                  summaryCollapsed ? 'rotate-180' : 'rotate-0',
                 )}
+                strokeWidth={2.5}
+                aria-hidden
               />
             </button>
           </div>

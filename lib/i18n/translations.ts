@@ -9,6 +9,9 @@ export const translations = {
       createRequest: 'Create Request',
       settings: 'Settings',
       searchAnything: 'Search anything',
+      // Sidebar collapse-toggle tooltips
+      expandSidebar: 'Expand sidebar',
+      collapseSidebar: 'Collapse sidebar',
       comingSoon: 'Coming Soon',
       settingsComingSoon: 'Settings and account management features are currently under development.',
     },
@@ -239,6 +242,9 @@ export const translations = {
     offer: {
       offer: 'Offer',
       requestSummary: 'Request Summary',
+      // Request-summary collapse/expand toggle labels (§5.1 brand button).
+      showMoreDetails: 'Show More',
+      showLessDetails: 'Show Less',
       emailInvalid: 'Please enter a valid email address',
       bookingDetails: 'Booking details for this offer',
       addHotels: 'Add Hotels',
@@ -535,6 +541,10 @@ export const translations = {
       showAlternatives: 'Show Alternatives',
       searchingAlternatives: 'Searching for alternatives…',
       similarAlternatives: 'Similar alternatives',
+      moreOptions: 'More options',
+      optionsCount: '{n} option',
+      optionsPluralCount: '{n} options',
+      alternativesSubline: 'Hotels with different locations, amenities, or layouts that match your trip dates and budget',
       noAlternativesFound: 'No alternative hotels found',
       alternativesLoading: 'Loading…',
       // Search More — fetches the next ~200 hotels at the same destination/star
@@ -944,6 +954,9 @@ export const translations = {
       createRequest: 'Anfrage erstellen',
       settings: 'Einstellungen',
       searchAnything: 'Suche',
+      // Sidebar-Toggle-Tooltips
+      expandSidebar: 'Seitenleiste ausklappen',
+      collapseSidebar: 'Seitenleiste einklappen',
       comingSoon: 'Demnächst verfügbar',
       settingsComingSoon: 'Einstellungen und Kontoverwaltung befinden sich derzeit in Entwicklung.',
     },
@@ -1168,6 +1181,8 @@ export const translations = {
     offer: {
       offer: 'Angebot',
       requestSummary: 'Anfragezusammenfassung',
+      showMoreDetails: 'Mehr anzeigen',
+      showLessDetails: 'Weniger anzeigen',
       emailInvalid: "Bitte geben Sie eine gültige E-Mail-Adresse ein",
       bookingDetails: 'Buchungsdetails für dieses Angebot',
       addHotels: 'Hotels hinzufügen',
@@ -1462,6 +1477,10 @@ export const translations = {
       showAlternatives: 'Alternativen anzeigen',
       searchingAlternatives: 'Alternativen werden gesucht…',
       similarAlternatives: 'Ähnliche Alternativen',
+      moreOptions: 'Weitere Optionen',
+      optionsCount: '{n} Option',
+      optionsPluralCount: '{n} Optionen',
+      alternativesSubline: 'Hotels mit anderen Standorten, Ausstattungen oder Aufteilungen, die zu Ihren Reisedaten und Ihrem Budget passen',
       noAlternativesFound: 'Keine alternativen Hotels gefunden',
       alternativesLoading: 'Laden…',
       // Search More

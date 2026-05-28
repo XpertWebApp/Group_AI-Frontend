@@ -245,6 +245,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             <SidebarCollapseToggle
               collapsed={sidebarCollapsed}
               onToggle={toggleSidebar}
+              expandLabel={t.nav.expandSidebar}
+              collapseLabel={t.nav.collapseSidebar}
             />
           )}
         </div>
@@ -255,6 +257,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             <SidebarCollapseToggle
               collapsed={sidebarCollapsed}
               onToggle={toggleSidebar}
+              expandLabel={t.nav.expandSidebar}
+              collapseLabel={t.nav.collapseSidebar}
             />
           </div>
         )}
@@ -690,11 +694,18 @@ function SidebarIconButton({ label, onClick, icon: Icon }: SidebarIconButtonProp
 function SidebarCollapseToggle({
   collapsed,
   onToggle,
+  expandLabel,
+  collapseLabel,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  /** Localized "Expand sidebar" tooltip — passed in so this component
+   *  doesn't need its own useLanguage() hook. */
+  expandLabel: string;
+  /** Localized "Collapse sidebar" tooltip. */
+  collapseLabel: string;
 }) {
-  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  const label = collapsed ? expandLabel : collapseLabel;
   return (
     <div className="relative group hidden lg:block">
       <button

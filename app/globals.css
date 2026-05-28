@@ -177,6 +177,34 @@
   animation: card-shrink-out 260ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+/* ── Collapsible panel — smooth height + opacity transition ──
+   Uses the modern grid-template-rows 1fr ↔ 0fr technique so intrinsic
+   height animates without measuring the DOM. The inner child collapses
+   to 0px (min-height: 0 + overflow: hidden) and the outer wrapper smoothly
+   contracts the grid row.
+
+   Opening:  ease-out so the panel decelerates as it lands open.
+   Closing:  ease-in so the panel accelerates as it tucks away.
+   420ms is intentionally slow enough that the user perceives the motion
+   as a panel sliding rather than a snap. */
+.sett-collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 420ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+}
+.sett-collapsible[data-collapsed='true'] {
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 380ms cubic-bezier(0.4, 0, 1, 1),
+              opacity 260ms cubic-bezier(0.4, 0, 1, 1);
+  opacity: 0;
+}
+.sett-collapsible > .sett-collapsible-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* ── GreenWaves (auth pages) — draw-in + perpetual shimmer ── */
 @keyframes sett-wave-draw {
   0%   { stroke-dashoffset: 900; }
@@ -418,6 +446,7 @@
   .animate-step-in-right,
   .animate-step-in-left,
   .animate-card-shrink-out,
+  .sett-collapsible,
   .animate-modal-overlay-in,
   .animate-modal-pop-in,
   .animate-modal-image-fade,
@@ -429,6 +458,10 @@
   .animate-curtain-fade-out,
   .sett-wave-draw,
   .sett-wave-shimmer { animation: none !important; }
+  /* Collapsible panel: snap instead of slide when reduced-motion is on. */
+  .sett-collapsible {
+    transition: none !important;
+  }
   /* Collapse the sidebar nav-item hover transitions when reduced-motion is on.
      The hover effect still works (background tint + color change) but with no
      transition — instant on/off — and no transform-based shifts. */
