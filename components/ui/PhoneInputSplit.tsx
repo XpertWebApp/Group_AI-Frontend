@@ -115,25 +115,32 @@ export function PhoneInputSplit({
   return (
     <div className="flex flex-col">
       {label && (
-        <label className="block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5">
+        // §5.5 brand-spec label — matches Input / Select labels so siblings
+        // on the same row land at the same baseline.
+        <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
           {label}
-          {required && <span className="font-montserrat text-[14px] font-medium leading-normal uppercase text-[#FB2C36] ml-0.5">*</span>}
+          {required && <span className="text-sett-destructive ml-0.5">*</span>}
         </label>
       )}
 
       <div className="relative" ref={wrapperRef}>
-        {/* Input row */}
+        {/* Input row — §5.5 brand-spec chrome:
+              - rounded-input (4px) instead of 14px to match Budget Range,
+                Group Size, Hotel Category, etc.
+              - border-sett-border (#E0E0E0) at rest.
+              - Soft green box-shadow focus glow (shadow-input-focus) instead
+                of the chunky Tailwind ring-2. */}
         <div
           className={cn(
-            'flex items-center rounded-[14px] border bg-white transition-all duration-150 focus-within:ring-2 focus-within:ring-sett-primary focus-within:border-sett-primary',
-            error ? 'border-red-500' : 'border-sett-border-light'
+            'flex items-center rounded-input border bg-white transition-[border-color,box-shadow] duration-150 focus-within:border-sett-primary focus-within:shadow-input-focus',
+            error ? 'border-sett-destructive' : 'border-sett-border'
           )}
         >
           {/* Country code selector button */}
           <button
             type="button"
             onClick={() => { setOpen((o) => !o); setSearch(''); }}
-            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-3 font-montserrat text-[14px] font-normal text-sett-text-primary hover:bg-[#F7F7F7] rounded-l-[14px] transition-colors"
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-3 font-montserrat text-[14px] font-normal text-sett-text-primary hover:bg-[#F7F7F7] rounded-l-input transition-colors"
           >
             {selectedCountry ? (
               <FlagImage iso2={selectedCountry.iso2} size="20px" />
@@ -161,7 +168,7 @@ export function PhoneInputSplit({
               onNumberChange(digits.slice(0, maxLocal));
             }}
             placeholder="201234567"
-            className="flex-1 py-3 px-3 bg-transparent focus:outline-none font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent rounded-r-[14px]"
+            className="flex-1 py-3 px-3 bg-transparent focus:outline-none font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent rounded-r-input"
           />
         </div>
 
@@ -208,7 +215,7 @@ export function PhoneInputSplit({
       </div>
 
       {error && (
-        <p className="font-montserrat text-[12px] text-red-500 leading-none mt-2">{error}</p>
+        <p className="font-montserrat text-[12px] text-sett-destructive leading-none mt-2">{error}</p>
       )}
     </div>
   );

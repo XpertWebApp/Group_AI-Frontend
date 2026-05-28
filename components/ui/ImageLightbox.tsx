@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, X, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -47,11 +48,20 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
   // so the user never lands on a broken image. If every index fails, fall back
   // to the placeholder.
   const [failed, setFailed] = useState<Set<number>>(new Set());
+  // Mirror set of indices whose thumbnail has finished loading. Drives the
+  // "X of Y images loaded" progress strip + the thumbnail-strip skeletons
+  // so the user can see at a glance how much of the gallery is ready.
+  const [loadedThumbs, setLoadedThumbs] = useState<Set<number>>(new Set());
   const [idx, setIdx] = useState(() => Math.min(Math.max(initialIndex, 0), Math.max(chain.length - 1, 0)));
   const thumbScrollerRef = useRef<HTMLDivElement>(null);
 
   const total = chain.length;
   const showCarousel = total > 1;
+  // Progress for the loading affordance — count loaded + failed thumbs as
+  // "settled" so the bar reaches 100% even when some images fail.
+  const settledThumbs = loadedThumbs.size + failed.size;
+  const loadProgress = total > 0 ? settledThumbs / total : 0;
+  const isStillLoading = settledThumbs < total;
 
   // Find the next non-failed index in a given direction.
   const advance = useCallback(
@@ -111,29 +121,48 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
   const allFailed = total > 0 && failed.size >= total;
   const resolvedSrc = total === 0 || allFailed ? PLACEHOLDER : chain[idx];
 
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
-      className="fixed inset-0 z-[60] bg-black/95 flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] bg-black/95 flex flex-col p-4 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Hotel image gallery"
     >
-      {/* Top bar — counter + close.
+      {/* Top bar — counter (left) + hotel name (centre) + close (right).
           Use solid-dark backings (not translucent white) so the controls stay
-          legible against bright photos (white-walled hotels, pale skies, etc.). */}
-      <div className="flex items-center justify-between px-2 sm:px-4 pb-3 z-10">
+          legible against bright photos (white-walled hotels, pale skies, etc.).
+          The hotel name takes the centre `flex-1` so it can absorb the rest of
+          the row's width; it truncates with ellipsis on long names and hides
+          entirely on very narrow viewports so the counter + close stay usable. */}
+      <div className="flex items-center gap-3 px-2 sm:px-4 pb-3 z-10">
         {showCarousel ? (
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[13px] font-semibold text-white tabular-nums shadow-lg">
+          <span className="shrink-0 inline-flex items-center px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[13px] font-semibold text-white tabular-nums shadow-lg">
             {idx + 1} <span className="text-white/55 mx-1.5">/</span> {total}
           </span>
         ) : (
-          <span />
+          // Spacer with the same width as the counter would have, so the close
+          // button stays anchored to the right edge when there's only one image.
+          <span className="shrink-0 w-12" aria-hidden />
         )}
+
+        {/* Hotel name — centred, truncates on overflow. `alt` is the hotel
+            name (call sites pass hotel.hotelName). Hidden on `xs` so the
+            counter + close still have room to breathe on narrow screens. */}
+        {alt && (
+          <h2
+            className="hidden sm:flex flex-1 items-center justify-center min-w-0 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 font-montserrat text-[14px] font-semibold text-white shadow-lg"
+            title={alt}
+          >
+            <span className="truncate">{alt}</span>
+          </h2>
+        )}
+
         <button
           type="button"
           onClick={onClose}
-          className="p-2.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 hover:bg-black/85 hover:ring-white/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary shadow-lg"
+          className="shrink-0 ml-auto sm:ml-0 p-2.5 rounded-full bg-black/70 backdrop-blur-md ring-1 ring-white/15 hover:bg-black/85 hover:ring-white/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary shadow-lg"
           aria-label="Close"
         >
           <X className="w-5 h-5 text-white" />
@@ -194,6 +223,41 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
           className="shrink-0 mt-3 pt-3 border-t border-white/10"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Loading status row — tells the user "X of Y images loaded"
+              with a thin progress bar. Without this, users on slow
+              connections see only the first 1–2 thumbnails populate and
+              assume that's the whole gallery (the dark shimmer skeletons
+              of unloaded thumbs blend into the black backdrop). */}
+          <div className="flex items-center justify-between gap-3 px-1 pb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {isStillLoading ? (
+                <>
+                  <span
+                    className="inline-block w-3 h-3 border-2 border-sett-primary border-t-transparent rounded-full animate-spin"
+                    aria-hidden
+                  />
+                  <span className="font-montserrat text-[12px] font-medium text-white/85 tabular-nums truncate">
+                    Loading images{' '}
+                    <span className="text-white/55">
+                      ({settledThumbs} / {total})
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <span className="font-montserrat text-[12px] font-medium text-white/55 tabular-nums">
+                  All {total} images loaded
+                </span>
+              )}
+            </div>
+            {/* Thin progress bar — visual reinforcement of the count */}
+            <div className="w-32 sm:w-40 h-1 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full bg-sett-primary transition-[width] duration-300 ease-out"
+                style={{ width: `${Math.round(loadProgress * 100)}%` }}
+                aria-hidden
+              />
+            </div>
+          </div>
           <div
             ref={thumbScrollerRef}
             className="flex gap-2 overflow-x-auto pb-1"
@@ -207,6 +271,14 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
                 isActive={i === idx}
                 isFailed={failed.has(i)}
                 onSelect={() => setIdx(i)}
+                onLoad={() =>
+                  setLoadedThumbs((prev) => {
+                    if (prev.has(i)) return prev;
+                    const next = new Set(prev);
+                    next.add(i);
+                    return next;
+                  })
+                }
                 onFail={() =>
                   setFailed((prev) => {
                     if (prev.has(i)) return prev;
@@ -220,7 +292,8 @@ export function ImageLightbox({ src, srcs, initialIndex = 0, alt, onClose }: Ima
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -265,7 +338,10 @@ function HeroImage({
 }
 
 /* ─────────────────────────────────────────────────────────
- * Thumbnail — shimmer skeleton until the small image loads
+ * Thumbnail — shimmer skeleton until the small image loads.
+ * The skeleton needs to be clearly visible against the near-black
+ * lightbox backdrop so the user perceives "more slots exist, they're
+ * just still loading" — otherwise unloaded thumbs look like background.
  * ───────────────────────────────────────────────────────── */
 function Thumbnail({
   url,
@@ -273,6 +349,7 @@ function Thumbnail({
   isActive,
   isFailed,
   onSelect,
+  onLoad,
   onFail,
 }: {
   url: string;
@@ -280,6 +357,7 @@ function Thumbnail({
   isActive: boolean;
   isFailed: boolean;
   onSelect: () => void;
+  onLoad: () => void;
   onFail: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
@@ -292,26 +370,42 @@ function Thumbnail({
       className={cn(
         'relative shrink-0 w-20 h-14 sm:w-24 sm:h-16 rounded-[8px] overflow-hidden border-2 transition-all duration-200',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary',
-        isActive
-          ? 'border-sett-primary opacity-100 scale-105 shadow-[0_0_0_2px_rgba(170,199,55,0.25)]'
-          : 'border-transparent opacity-60 hover:opacity-100 hover:border-white/40',
+        // Unloaded slots use a brighter neutral border + brighter base fill
+        // so the slot is visible on the black backdrop. Once the image
+        // loads, the border collapses back to the active/idle treatment.
+        !loaded && !isFailed && 'bg-white/[0.10] border-white/15',
+        loaded && (
+          isActive
+            ? 'border-sett-primary opacity-100 scale-105 shadow-[0_0_0_2px_rgba(170,199,55,0.25)]'
+            : 'border-transparent opacity-60 hover:opacity-100 hover:border-white/40'
+        ),
         isFailed && 'opacity-25 grayscale cursor-not-allowed pointer-events-none',
       )}
       aria-label={`Show image ${index + 1}`}
       aria-current={isActive ? 'true' : undefined}
     >
-      {/* Shimmer placeholder until the thumb loads */}
-      {!loaded && !isFailed && <ImageShimmer />}
+      {/* Loading skeleton — shimmer + small image icon so the slot is
+          unmistakably "an image is coming here" rather than dead space. */}
+      {!loaded && !isFailed && (
+        <span className="absolute inset-0 flex items-center justify-center" aria-hidden>
+          <ImageShimmer />
+          <ImageIcon className="relative w-4 h-4 text-white/40" />
+        </span>
+      )}
       <img
         src={url}
         alt=""
         decoding="async"
+        loading="lazy"
         className={cn(
           'relative w-full h-full object-cover',
           'transition-opacity duration-300',
           loaded ? 'opacity-100' : 'opacity-0',
         )}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => {
+          setLoaded(true);
+          onLoad();
+        }}
         onError={() => {
           setLoaded(true); // collapse the shimmer; parent marks this slot as failed
           onFail();

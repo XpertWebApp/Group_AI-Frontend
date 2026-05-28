@@ -6,6 +6,7 @@ import { Modal } from './Modal';
 import { useNotifications } from '@/lib/notifications/NotificationsContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateTimeEU } from '@/lib/dateFormatter';
+import { formatNotification } from '@/lib/notifications/formatNotification';
 import type { Notification } from '@/types';
 import {
   Bell,
@@ -113,16 +114,19 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
               const kind = pickIconKind(n.type);
               const { Icon, bg, fg } = ICON_MAP[kind];
               const clickable = pickHref(n) !== null;
+              // Localized title/body — falls back to the BE-provided strings
+              // for any notification type we don't have a template for.
+              const { title: localTitle, body: localBody } = formatNotification(n, t.notifications);
               return (
                 <li key={n.id}>
                   <button
                     type="button"
                     onClick={() => handleItemClick(n)}
                     disabled={!clickable && n.read}
-                    className={`group w-full text-left px-3 py-3 rounded-[12px] border transition-all flex items-start gap-3 ${
+                    className={`group w-full text-left px-3 py-3 rounded-[8px] border transition-all flex items-start gap-3 ${
                       n.read
-                        ? 'border-sett-border-light bg-white hover:bg-sett-fill/40'
-                        : 'border-sett-primary/30 bg-sett-primary/[0.04] hover:bg-sett-primary/[0.08]'
+                        ? 'border-[#E0E0E0] bg-white hover:bg-[#F8F9FA]'
+                        : 'border-sett-primary/30 bg-[#F5F9E8] hover:bg-[#EEF6D2]'
                     } ${clickable ? 'cursor-pointer' : 'cursor-default'} disabled:cursor-default`}
                   >
                     <div
@@ -134,7 +138,7 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start gap-2">
                         <p className={`flex-1 font-montserrat text-[13px] leading-snug ${n.read ? 'font-medium text-sett-text-primary' : 'font-semibold text-sett-text-primary'}`}>
-                          {n.title}
+                          {localTitle}
                         </p>
                         {!n.read && (
                           <span
@@ -143,9 +147,9 @@ export function NotificationsModal({ open, onClose }: NotificationsModalProps) {
                           />
                         )}
                       </div>
-                      {n.body && (
+                      {localBody && (
                         <p className="font-montserrat text-[12px] text-sett-text-secondary mt-0.5 leading-relaxed line-clamp-2">
-                          {n.body}
+                          {localBody}
                         </p>
                       )}
                       <p className="font-montserrat text-[11px] text-sett-text-accent mt-1.5">

@@ -30,6 +30,9 @@ export interface AddProposalHotelPayload {
   address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;
+  /** Deep-link into SETTHub for this hotel. Captured from the search-result
+   *  payload at add-time so it can be re-used on the request summary page. */
+  sethubDetailsUrl?: string | null;
 }
 
 export interface AdjustHotelPricingPayload {

@@ -6,6 +6,29 @@
   100% { transform: translateX(200%); }
 }
 
+/* Button-text gradient sweep: animates background-position across a
+   tri-stop gradient so a soft "highlight" travels left→right over the
+   text. Pairs with `bg-clip-text` + `text-transparent` on the element. */
+@keyframes button-text-shine {
+  0%   { background-position: -200% 50%; }
+  60%  { background-position: 200% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.animate-button-text-shine {
+  background-size: 200% 100%;
+  animation: button-text-shine 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Soft "breathing" glow halo behind the button — slow pulsing shadow that
+   feels alive without distracting. */
+@keyframes button-glow-pulse {
+  0%, 100% { box-shadow: 0 2px 8px 0 rgba(170,199,55,0.30), 0 0 0 0 rgba(170,199,55,0.0); }
+  50%      { box-shadow: 0 4px 14px 0 rgba(170,199,55,0.45), 0 0 0 6px rgba(170,199,55,0.10); }
+}
+.animate-button-glow-pulse {
+  animation: button-glow-pulse 3s ease-in-out infinite;
+}
+
 @keyframes toast-in {
   0%   { opacity: 0; transform: translateX(24px) scale(0.96); }
   60%  { opacity: 1; transform: translateX(-2px) scale(1.005); }
@@ -74,9 +97,74 @@
   0%   { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+/* Label fade — used on stat-card labels so they slide up into place after
+   the card itself has settled. Subtler than value-count-in so the big
+   number remains the focal point. */
+@keyframes label-fade-up {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+/* Trend line fade — used on the "+92% vs last month" text underneath the
+   stat-card number. Comes in after the number lands. */
+@keyframes trend-fade-in {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
 .animate-card-rise-in  { animation: card-rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-badge-pop-in  { animation: badge-pop-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-value-count-in { animation: value-count-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-label-fade-up { animation: label-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-trend-fade-in { animation: trend-fade-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Jelly pop — playful entrance for buttons / CTAs. Compresses Y, snaps to a
+   slight overshoot, then settles into a gentle squish-and-recover bounce so
+   the button lands like a soft jelly cube. Use sparingly — the squash is
+   intentionally noisy and works best on hero-tier actions. */
+@keyframes jelly-pop {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.6, 0.6); }
+  45%  { opacity: 1; transform: translateY(-2px) scale(1.08, 0.92); }
+  65%  { transform: translateY(1px) scale(0.94, 1.06); }
+  82%  { transform: translateY(0) scale(1.02, 0.98); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.animate-jelly-pop { animation: jelly-pop 720ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ── 3D Success Pop ──
+   Confirmation entrance for "Added to Offer" success state. The pill flies
+   in with a perspective tilt that flattens to the page plane, lifts slightly,
+   then settles. Pairs with `check-draw` on the inner check icon and
+   `success-ripple` on the background halo for a layered confirmation moment. */
+@keyframes success-pop-3d {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.85); }
+  55%  { opacity: 1; transform: translateY(-1px) scale(1.04); }
+  80%  { transform: translateY(0.5px) scale(0.99); }
+  100% { transform: translateY(0) scale(1); }
+}
+/* Check-mark draw — SVG stroke length animation. Pairs with stroke-dasharray
+   inline on the path so the check is "drawn" in after the pill lands. */
+@keyframes check-draw {
+  0%   { stroke-dashoffset: 24; opacity: 0; }
+  20%  { opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+/* Soft green ripple radiating out from the check — once-off "yes it landed" cue. */
+@keyframes success-ripple {
+  0%   { opacity: 0.55; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+.animate-success-pop-3d {
+  animation: success-pop-3d 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+}
+.animate-check-draw {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: check-draw 460ms cubic-bezier(0.22, 1, 0.36, 1) 240ms both;
+}
+.animate-success-ripple {
+  animation: success-ripple 900ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+}
 
 /* ── Exit animations (collapsing panels, dismissing cards) ──
    Use these to gracefully remove content. Pair with a delayed unmount so the
@@ -87,6 +175,34 @@
 }
 .animate-card-shrink-out {
   animation: card-shrink-out 260ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* ── Collapsible panel — smooth height + opacity transition ──
+   Uses the modern grid-template-rows 1fr ↔ 0fr technique so intrinsic
+   height animates without measuring the DOM. The inner child collapses
+   to 0px (min-height: 0 + overflow: hidden) and the outer wrapper smoothly
+   contracts the grid row.
+
+   Opening:  ease-out so the panel decelerates as it lands open.
+   Closing:  ease-in so the panel accelerates as it tucks away.
+   420ms is intentionally slow enough that the user perceives the motion
+   as a panel sliding rather than a snap. */
+.sett-collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 420ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+}
+.sett-collapsible[data-collapsed='true'] {
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 380ms cubic-bezier(0.4, 0, 1, 1),
+              opacity 260ms cubic-bezier(0.4, 0, 1, 1);
+  opacity: 0;
+}
+.sett-collapsible > .sett-collapsible-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ── GreenWaves (auth pages) — draw-in + perpetual shimmer ── */
@@ -209,6 +325,103 @@
   100% { opacity: 0; }
 }
 .animate-curtain-slide-in { animation: curtain-slide-in 400ms cubic-bezier(0.65, 0, 0.35, 1) both; }
+
+/* ── Sidebar nav-item hover effect ──
+   `sett-nav-item` is the root of each sidebar nav link. The hover treatment
+   layers three subtle effects so the navy sidebar feels alive without
+   competing with the active-item green left-border.
+   1. ::before  — green-tinted gradient that sweeps in from the left
+                  (transform-based, GPU-accelerated, no layout thrash).
+   2. ::after   — soft circular halo behind the icon that fades in on hover,
+                  giving the icon a "glow on focus" affordance.
+   3. icon + label translate slightly forward on hover for tactile feedback.
+   The active-item bg utility wins over the hover gradient by sitting on the
+   element itself (z-index 10) while the gradient is z-index 0. */
+.sett-nav-item {
+  position: relative;
+  isolation: isolate;
+}
+.sett-nav-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    rgba(170, 199, 55, 0.18) 0%,
+    rgba(170, 199, 55, 0.08) 60%,
+    rgba(170, 199, 55, 0) 100%);
+  opacity: 0;
+  transform: translateX(-100%);
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 220ms ease-out;
+  z-index: -1;
+  pointer-events: none;
+}
+.sett-nav-item:hover::before,
+.sett-nav-item:focus-visible::before {
+  opacity: 1;
+  transform: translateX(0);
+}
+.sett-nav-item::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(170, 199, 55, 0.22) 0%, rgba(170, 199, 55, 0) 70%);
+  opacity: 0;
+  transform: translateY(-50%) scale(0.6);
+  transition: opacity 240ms ease-out, transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: -1;
+  pointer-events: none;
+}
+.sett-nav-item:hover::after,
+.sett-nav-item:focus-visible::after {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+/* When collapsed (icon-only), center the halo. */
+.sett-nav-item[data-collapsed='true']::after {
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+}
+.sett-nav-item[data-collapsed='true']:hover::after,
+.sett-nav-item[data-collapsed='true']:focus-visible::after {
+  transform: translate(-50%, -50%) scale(1);
+}
+/* Icon micro-interaction — nudge forward on hover. */
+.sett-nav-item .sett-nav-icon {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+              color 220ms ease-out;
+}
+.sett-nav-item:hover .sett-nav-icon,
+.sett-nav-item:focus-visible .sett-nav-icon {
+  transform: translateX(2px) scale(1.08);
+  color: #AAC737;
+}
+.sett-nav-item[data-collapsed='true']:hover .sett-nav-icon,
+.sett-nav-item[data-collapsed='true']:focus-visible .sett-nav-icon {
+  transform: scale(1.12);
+}
+/* Label nudge — keeps the cursor's pull alive on the right edge. */
+.sett-nav-item .sett-nav-label {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sett-nav-item:hover .sett-nav-label,
+.sett-nav-item:focus-visible .sett-nav-label {
+  transform: translateX(3px);
+}
+/* Active item — drop the hover effects so the green left-border stays the
+   single dominant signal for "where you are". */
+.sett-nav-item[data-active='true']::before,
+.sett-nav-item[data-active='true']::after {
+  display: none;
+}
+.sett-nav-item[data-active='true'] .sett-nav-icon {
+  color: #AAC737;
+}
 .animate-welcome-rise     { animation: welcome-rise 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-curtain-fade-out { animation: curtain-fade-out 300ms ease-out both; }
 
@@ -224,9 +437,16 @@
   .animate-card-rise-in,
   .animate-badge-pop-in,
   .animate-value-count-in,
+  .animate-label-fade-up,
+  .animate-trend-fade-in,
+  .animate-jelly-pop,
+  .animate-success-pop-3d,
+  .animate-check-draw,
+  .animate-success-ripple,
   .animate-step-in-right,
   .animate-step-in-left,
   .animate-card-shrink-out,
+  .sett-collapsible,
   .animate-modal-overlay-in,
   .animate-modal-pop-in,
   .animate-modal-image-fade,
@@ -238,6 +458,28 @@
   .animate-curtain-fade-out,
   .sett-wave-draw,
   .sett-wave-shimmer { animation: none !important; }
+  /* Collapsible panel: snap instead of slide when reduced-motion is on. */
+  .sett-collapsible {
+    transition: none !important;
+  }
+  /* Collapse the sidebar nav-item hover transitions when reduced-motion is on.
+     The hover effect still works (background tint + color change) but with no
+     transition — instant on/off — and no transform-based shifts. */
+  .sett-nav-item::before,
+  .sett-nav-item::after,
+  .sett-nav-item .sett-nav-icon,
+  .sett-nav-item .sett-nav-label {
+    transition: none !important;
+  }
+  .sett-nav-item:hover .sett-nav-icon,
+  .sett-nav-item:focus-visible .sett-nav-icon,
+  .sett-nav-item:hover .sett-nav-label,
+  .sett-nav-item:focus-visible .sett-nav-label {
+    transform: none !important;
+  }
+  .sett-nav-item::before {
+    transform: translateX(0) !important;
+  }
   /* When reduced-motion is on, hide the shimmer overlay entirely (otherwise its
      "frozen mid-stroke" state would be visible). The base wave paths still show
      because their stroke-dashoffset would freeze at the initial value (hidden);
@@ -562,6 +804,66 @@ input[type="date"]:invalid::-webkit-datetime-edit {
 
 .sett-datepicker-popper .react-datepicker__triangle {
   display: none;
+}
+
+/* ── RichTextEditor — restore list markers + basic block styling ──
+   Tailwind's preflight strips default `<ul>`/`<ol>` markers and margins.
+   Inside the contenteditable surface we want the browser defaults back so
+   document.execCommand('insertOrderedList' | 'insertUnorderedList') actually
+   shows bullets/numbers, and so existing seeded list HTML continues to look
+   correct. Scoped via .sett-rich-editor so we don't affect anything else. */
+.sett-rich-editor ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.25em 0;
+}
+.sett-rich-editor ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 0.25em 0;
+}
+.sett-rich-editor li {
+  margin: 0.15em 0;
+}
+/* Nested lists get tighter spacing + alternating markers. */
+.sett-rich-editor ul ul,
+.sett-rich-editor ol ul {
+  list-style-type: circle;
+  margin: 0;
+}
+.sett-rich-editor ul ol,
+.sett-rich-editor ol ol {
+  list-style-type: lower-alpha;
+  margin: 0;
+}
+
+/* In-modal variant — applied when the calendar lives inside a modal whose
+   body has limited vertical room (e.g. Edit Request modal). A slightly more
+   compact rhythm gives the popper a better chance of fitting fully below the
+   field, even at high browser zoom, before popper's collision logic flips it
+   above. Visual language identical to the default — only proportions change. */
+.sett-datepicker-popper--in-modal .react-datepicker__header {
+  padding: 10px 0 6px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__current-month {
+  font-size: 13px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__day-name {
+  font-size: 11px;
+  width: 1.75rem;
+  line-height: 1.75rem;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__day {
+  width: 1.75rem;
+  line-height: 1.75rem;
+  font-size: 12px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__today-button {
+  font-size: 12px;
+  padding: 7px;
+}
+.sett-datepicker-popper--in-modal .react-datepicker__navigation {
+  top: 8px;
 }
 
 /* Contract preview HTML content (terms & cancellation conditions) */

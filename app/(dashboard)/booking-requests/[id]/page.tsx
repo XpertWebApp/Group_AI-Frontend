@@ -24,14 +24,19 @@ import {
   Download,
   AlertTriangle,
   Check,
+  History,
+  Inbox,
+  Sparkles,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
+import { HotelName } from '@/components/ui/HotelName';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { EditRequestModal } from '@/components/forms/EditRequestModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
@@ -42,6 +47,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU, formatDateTimeEU } from '@/lib/dateFormatter';
 import { formatPriceEU, formatCurrencyEU, formatPercentageEU, formatNumberEU } from '@/lib/numberFormatter';
 import { cn } from '@/lib/utils/cn';
+import { selectedStars } from '@/lib/utils/starRatings';
 import { getGroupTypeLabel, groupTypeRequiresAge } from '@/lib/utils/groupType';
 import toast from 'react-hot-toast';
 
@@ -49,7 +55,37 @@ function formatDate(dateStr: string | null | undefined): string {
   return formatDateEU(dateStr);
 }
 
-function formatRoomType(type: string): string {
+/**
+ * Map an API-shaped room-type code (e.g. "StandardDoubleBeds", "twin_beds",
+ * "single") to the user's current locale. `tAddHotel` is the addHotel slice
+ * of the i18n bundle — passed in so this stays a pure function (not a hook).
+ *
+ * Falls back to a generated CamelCase split when the code isn't known, so a
+ * new server-side room type still renders sanely.
+ */
+function formatRoomType(
+  type: string,
+  tAddHotel?: {
+    roomSingle: string; roomDouble: string; roomTriple: string;
+    roomQuadruple: string; roomSuite: string; roomSuites: string;
+    standardDoubleBed: string; twinBed: string;
+  },
+): string {
+  if (tAddHotel) {
+    const normalized = type.toLowerCase().replace(/[_\s]/g, '');
+    const map: Record<string, string> = {
+      twinbeds: tAddHotel.twinBed,
+      twin: tAddHotel.twinBed,
+      standarddoublebeds: tAddHotel.standardDoubleBed,
+      single: tAddHotel.roomSingle,
+      double: tAddHotel.roomDouble,
+      triple: tAddHotel.roomTriple,
+      quadruple: tAddHotel.roomQuadruple,
+      suite: tAddHotel.roomSuite,
+      suites: tAddHotel.roomSuites,
+    };
+    if (map[normalized]) return map[normalized];
+  }
   return type
     .replace(/_+/g, ' ')
     .replace(/([A-Z])/g, ' $1')
@@ -60,13 +96,17 @@ function formatRoomType(type: string): string {
     .join(' ');
 }
 
-function getRoomLabel(type: string, detail: any): string {
+function getRoomLabel(
+  type: string,
+  detail: any,
+  tAddHotel?: Parameters<typeof formatRoomType>[1],
+): string {
   // If actual descriptions are available from the hotel, use those
   if (detail.actualDescriptions && detail.actualDescriptions.length > 0) {
     return detail.actualDescriptions[0];
   }
-  // Otherwise, use the requested room type
-  return formatRoomType(type);
+  // Otherwise, use the requested room type (localized when t is provided)
+  return formatRoomType(type, tAddHotel);
 }
 
 function formatPhone(code: string | null | undefined, num: string | null | undefined): string {
@@ -117,37 +157,13 @@ export default function RequestDetailPage() {
   const [offerHistoryLoading, setOfferHistoryLoading] = useState(false);
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
-  // While true, the collapsible body keeps rendering with an exit animation
-  // (so the user actually sees it close). Cleared once the animation duration elapses.
-  const [summaryClosing, setSummaryClosing] = useState(false);
-  const summaryCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // The collapsible body now uses a CSS `grid-template-rows` 1fr↔0fr
+  // transition (see .sett-collapsible in globals.css), so the content
+  // stays mounted always and the wrapper smoothly contracts its height.
+  // No timer machinery needed — toggling state is enough.
   const toggleSummary = useCallback(() => {
-    // Cancel any in-flight close so rapid clicks stay in sync with state.
-    if (summaryCloseTimerRef.current) {
-      clearTimeout(summaryCloseTimerRef.current);
-      summaryCloseTimerRef.current = null;
-    }
-    if (summaryCollapsed) {
-      // Expand — content will mount and re-trigger the cascade-in animations
-      setSummaryClosing(false);
-      setSummaryCollapsed(false);
-      return;
-    }
-    // Collapse — keep content mounted, play exit, then unmount
-    setSummaryClosing(true);
-    summaryCloseTimerRef.current = setTimeout(() => {
-      setSummaryCollapsed(true);
-      setSummaryClosing(false);
-      summaryCloseTimerRef.current = null;
-    }, 260); // matches .animate-card-shrink-out duration
-  }, [summaryCollapsed]);
-
-  // Clear the timer on unmount
-  useEffect(() => {
-    return () => {
-      if (summaryCloseTimerRef.current) clearTimeout(summaryCloseTimerRef.current);
-    };
+    setSummaryCollapsed((v) => !v);
   }, []);
 
   // Modal states
@@ -743,16 +759,15 @@ export default function RequestDetailPage() {
               <div className="flex items-start gap-3">
                 <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
-                      {t.offer.requestSummary}
-                    </h2>
-                    {!['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase()) && (
-                      <button type="button" onClick={() => setEditRequestOpen(true)} className="p-0.5 rounded hover:opacity-70 transition-opacity">
-                        <SquarePen className="w-4 h-4 text-sett-primary" />
-                      </button>
-                    )}
-                  </div>
+                  {/* Edit-icon dedup: the button next to the Trip Details
+                      subsection (a few lines below) is the canonical entry
+                      point — it sits beside the data the user actually
+                      edits. The previously-rendered duplicate next to the
+                      Request Summary title was removed to avoid two
+                      identically-behaving controls in the same eyeline. */}
+                  <h2 className="font-montserrat text-[18px] font-semibold text-sett-text-primary">
+                    {t.offer.requestSummary}
+                  </h2>
                   <p className="font-montserrat text-[14px] font-normal leading-none text-sett-text-secondary mt-0.5">
                     {t.offer.bookingDetails}
                   </p>
@@ -790,14 +805,38 @@ export default function RequestDetailPage() {
                       {t.offer.tripDetails}
                     </h3>
                     {!['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase()) && (
-                      <button
-                        type="button"
-                        onClick={() => setEditRequestOpen(true)}
-                        className="p-0.5 rounded hover:opacity-70 transition-opacity"
-                        aria-label={t.common.edit}
-                      >
-                        <SquarePen className="w-4 h-4 text-sett-primary" />
-                      </button>
+                      <span className="relative group/edit inline-flex">
+                        <button
+                          type="button"
+                          onClick={() => setEditRequestOpen(true)}
+                          // Two layered hover effects:
+                          //  - background pill tints green so the hit target is
+                          //    visually obvious before the click.
+                          //  - icon scales up + rotates a touch and the button
+                          //    nudges right so the action feels responsive.
+                          // Active state presses down for tactile feedback.
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-[8px] text-sett-primary hover:bg-sett-light-green-bg hover:text-sett-green-dark hover:translate-x-0.5 active:scale-95 transition-[background-color,color,transform] duration-200 ease-sett-out focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-1"
+                          aria-label={t.offer.editRequestTitle}
+                          title={t.offer.editRequestTitle}
+                        >
+                          <SquarePen className="w-4 h-4 transition-transform duration-200 ease-sett-out group-hover/edit:scale-110 group-hover/edit:rotate-[-4deg]" />
+                        </button>
+                        {/* Custom tooltip — visible on hover/focus, hidden by
+                            default. Uses the brand navy panel so it reads
+                            against any backdrop. Native title= above provides
+                            the same text for accessibility tools / mobile
+                            long-press / users who land via keyboard nav. */}
+                        <span
+                          role="tooltip"
+                          className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 whitespace-nowrap rounded-md bg-sett-navy text-white text-[11px] font-medium font-montserrat px-2 py-1 shadow-lg ring-1 ring-white/10 opacity-0 translate-y-[-2px] transition-all duration-180 ease-sett-out group-hover/edit:opacity-100 group-hover/edit:translate-y-0 group-focus-within/edit:opacity-100 group-focus-within/edit:translate-y-0"
+                        >
+                          {t.offer.editRequestTitle}
+                          <span
+                            aria-hidden
+                            className="absolute left-1/2 -translate-x-1/2 bottom-full border-4 border-transparent border-b-sett-navy"
+                          />
+                        </span>
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-[10px] flex-wrap">
@@ -830,13 +869,40 @@ export default function RequestDetailPage() {
                         <p className="font-montserrat text-[12px] font-medium leading-none tracking-normal uppercase text-sett-text-secondary">
                           {t.offer.hotelCategory}
                         </p>
-                        {/* value row */}
-                        <div className="flex items-center gap-2 flex-nowrap">
-                          <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary whitespace-nowrap">
-                            ({request.starRating}-Star)
-                          </span>
-                          {request.starRating && <StarRating rating={request.starRating} />}
-                        </div>
+                        {/* value row — multi-select aware. If multiple categories
+                            are saved, render them as comma-separated `3★, 4★`. */}
+                        {(() => {
+                          const stars = selectedStars(request);
+                          if (stars.length === 0) {
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-accent">—</span>
+                              </div>
+                            );
+                          }
+                          if (stars.length === 1) {
+                            return (
+                              <div className="flex items-center gap-2 flex-nowrap">
+                                <span className="font-montserrat text-[14px] font-normal leading-none text-sett-text-primary whitespace-nowrap">
+                                  ({stars[0]}-Star)
+                                </span>
+                                <StarRating rating={stars[0]} />
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center flex-wrap gap-1.5">
+                              {stars.map((s) => (
+                                <span
+                                  key={s}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-none"
+                                >
+                                  {s}★
+                                </span>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                       {/* Vertical divider */}
                       <div className="hidden xl:block w-px h-[46px] bg-sett-border-light shrink-0" />
@@ -904,11 +970,19 @@ export default function RequestDetailPage() {
             </div>
 
             {/* ── Collapsible: the rest of the request summary ──
-                Stays mounted during the close animation (summaryClosing) so the user
-                actually sees the exit motion before the content unmounts. */}
-            {(!summaryCollapsed || summaryClosing) && (
-              <div className={summaryClosing ? 'animate-card-shrink-out' : undefined}>
-                <hr className="border-sett-border-light mb-6" />
+                Uses .sett-collapsible (grid-template-rows 1fr↔0fr) so the
+                panel smoothly contracts/expands its intrinsic height across
+                ~420ms — no DOM measurement, no timer machinery. Content
+                stays mounted always so internal animations re-trigger on
+                expand. The inner aria-hidden tracks the visible state for
+                screen readers. */}
+            <div
+              className="sett-collapsible"
+              data-collapsed={summaryCollapsed || undefined}
+              aria-hidden={summaryCollapsed}
+            >
+              <div className="sett-collapsible-inner">
+                <hr className="border-sett-border-light mb-6 mt-2" />
 
                 {/* ── Room & Accommodations ── */}
                 <div className="flex flex-col gap-5 mb-6">
@@ -1124,8 +1198,11 @@ export default function RequestDetailPage() {
                       <p className="text-label text-sett-text-accent uppercase tracking-wide mb-2">
                         {t.offer.termsConditions}
                       </p>
+                      {/* `sett-rich-editor` restores ul/ol markers that Tailwind
+                          preflight strips — same hook used by the RichTextEditor
+                          so what the user typed renders identically here. */}
                       <div
-                        className="font-montserrat text-[14px] font-semibold text-sett-text-primary"
+                        className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
                         dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
                       />
@@ -1140,7 +1217,7 @@ export default function RequestDetailPage() {
                         {t.offer.cancellationConditions}
                       </p>
                       <div
-                        className="font-montserrat text-[14px] font-semibold text-sett-text-primary"
+                        className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
                         dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
                       />
@@ -1148,26 +1225,46 @@ export default function RequestDetailPage() {
                   )}
                 </div>
               </div>
-            )}
-            {/* Collapse/Expand toggle — sits on the card's bottom edge, half-overlapping.
-                Single icon that rotates 180° to smoothly transition between expanded/collapsed
-                states (instead of icon-swap pop). */}
+            </div>
+            {/* ── Collapse / Expand toggle ──
+                Brand-aligned §5.1 button: 14px Montserrat 700, UPPERCASE,
+                0.08em tracking, 4px radius. State-driven styling:
+                  • Collapsed: PRIMARY (filled #AAC737, navy text) — invites
+                    the user to "Show More" with brand confidence.
+                  • Expanded: SECONDARY (transparent, 2px green border,
+                    green text) — quieter because the content's already
+                    on screen, the action just dismisses it.
+                Sits centered on the bottom edge of the card, lifted by a
+                subtle drop shadow so it reads as a control attached to the
+                panel rather than a generic widget. */}
             <button
               type="button"
               onClick={toggleSummary}
-              disabled={summaryClosing}
-              className="absolute left-1/2 -bottom-5 -translate-x-1/2 w-10 h-10 rounded-[10px] bg-sett-fill border border-sett-border-light shadow-[0_8px_20px_0_rgba(0,0,0,0.13)] flex items-center justify-center text-sett-text-accent hover:text-sett-text-primary hover:bg-white hover:scale-105 active:scale-95 transition-all duration-280 ease-sett-spring z-10 disabled:cursor-default"
-              aria-label={summaryCollapsed ? 'Expand request summary' : 'Collapse request summary'}
-              aria-expanded={!summaryCollapsed && !summaryClosing}
+              className={cn(
+                'absolute left-1/2 -bottom-5 -translate-x-1/2 z-10',
+                'inline-flex items-center gap-2 px-5 h-10 rounded-[4px]',
+                'font-montserrat text-[13px] font-bold uppercase tracking-[0.08em] leading-none',
+                'transition-[background-color,color,border-color,transform,box-shadow] duration-200 ease-out',
+                'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-sett-primary focus-visible:ring-offset-2',
+                summaryCollapsed
+                  // §5.1 PRIMARY — filled green, navy text
+                  ? 'bg-sett-primary text-sett-navy border-2 border-sett-primary hover:bg-sett-green-dark hover:border-sett-green-dark hover:text-white shadow-[0_4px_14px_-2px_rgba(170,199,55,0.55)]'
+                  // §5.1 SECONDARY — transparent, green border + text
+                  : 'bg-white text-sett-primary border-2 border-sett-primary hover:bg-sett-primary hover:text-sett-navy shadow-[0_4px_12px_-2px_rgba(7,28,66,0.12)]',
+              )}
+              aria-label={summaryCollapsed ? t.offer.showMoreDetails : t.offer.showLessDetails}
+              aria-expanded={!summaryCollapsed}
             >
+              <span>{summaryCollapsed ? t.offer.showMoreDetails : t.offer.showLessDetails}</span>
+              {/* Chevron rotates in lockstep with the panel's ~420ms slide. */}
               <ChevronUp
                 className={cn(
-                  'w-4 h-4 transition-transform duration-320 ease-sett-spring',
-                  // Pre-rotate during the closing animation so the chevron flips
-                  // in sync with the content exiting (instead of waiting until
-                  // the unmount completes).
-                  (summaryCollapsed || summaryClosing) ? 'rotate-180' : 'rotate-0'
+                  'w-4 h-4 shrink-0 transition-transform duration-[420ms] ease-[cubic-bezier(0.4,0,0.2,1)]',
+                  summaryCollapsed ? 'rotate-180' : 'rotate-0',
                 )}
+                strokeWidth={2.5}
+                aria-hidden
               />
             </button>
           </div>
@@ -1188,7 +1285,7 @@ export default function RequestDetailPage() {
                     size="sm"
                     onClick={handleAddHotelsClick}
                     isLoading={actionLoading}
-                    disabled={['sent', 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
+                    disabled={[ 'approved', 'accepted', 'declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase())}
                   >
                     {t.offer.addHotel}
                   </Button>
@@ -1295,6 +1392,23 @@ export default function RequestDetailPage() {
                               proposalStatus={proposal!.status}
                             />
                           ))}
+                          {/* Subtotal row — visual parity with the hotel
+                              breakdown. Sums only the services included in
+                              the proposal total (excluded ones are dimmed
+                              in the row above and skipped here). */}
+                          <tr className="bg-sett-fill">
+                            <td colSpan={7} className="px-4 py-3 text-right text-label text-sett-text-accent uppercase tracking-wide font-semibold">
+                              {t.contract.subtotal}
+                            </td>
+                            <td className="px-4 py-3 text-right text-body font-bold text-sett-text-primary">
+                              {formatPriceEU(
+                                services
+                                  .filter((s) => s.includedInTotal !== false)
+                                  .reduce((sum, s) => sum + Number(s.sellPrice ?? 0) * (s.quantity ?? 1), 0)
+                              )}
+                            </td>
+                            <td />
+                          </tr>
                         </tbody>
                       </table>
                     </div>
@@ -1319,44 +1433,93 @@ export default function RequestDetailPage() {
             {/* Right sidebar — only show when proposal exists with hotels */}
             {proposal && hotels.length > 0 && (
               <div className="w-full lg:w-72 shrink-0 space-y-4">
-                {/* Offer History */}
+                {/* ─── Offer History ───
+                    Brand-aligned redesign per SETT-Hub-Brand-Guidelines-v2:
+                      §5.3 Panels — 8px radius, 1px #E0E0E0 border, soft
+                        shadow, 3px green left accent on the card.
+                      §2 Color discipline — no blue/orange/purple. Initial
+                        offer uses navy chip; revisions use neutral white
+                        chip with grey border; final offer uses brand-green
+                        chip. The latest entry gets a subtle green-tinted
+                        background to draw the eye.
+                      §3 Typography — section title is H4-style: Montserrat
+                        700, navy, 13px uppercase, 0.05em tracking.
+                      §5.1 Buttons — Download CTA uses the brand secondary
+                        button shape (transparent + 2px green border + green
+                        text, uppercase, navy hover-fill). */}
                 <div
-                  className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden animate-card-rise-in"
-                  style={{ animationDelay: '480ms' }}
+                  className="relative bg-white rounded-[8px] border border-sett-border overflow-hidden animate-card-rise-in"
+                  style={{
+                    animationDelay: '480ms',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  }}
                 >
-                  <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-sett-border-light">
-                    <div className="w-1 h-5 bg-sett-primary rounded-full" />
-                    <h4 className="font-montserrat text-[15px] font-semibold text-sett-text-primary">
-                      {t.offer.offerHistory}
-                    </h4>
+                  {/* §5.3 emphasis accent — 3px green stripe identifying
+                      the panel as a key brand element on the sidebar. */}
+                  <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px] bg-sett-primary" />
+
+                  {/* Section header — icon + brand-spec H4 + count badge */}
+                  <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 border-b border-sett-border">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30">
+                        <History className="w-3.5 h-3.5 text-sett-primary" strokeWidth={2.25} />
+                      </span>
+                      <h4 className="font-montserrat text-[13px] font-bold uppercase tracking-[0.05em] text-sett-navy">
+                        {t.offer.offerHistory}
+                      </h4>
+                    </div>
+                    {offerHistory.length > 0 && (
+                      <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-sett-navy text-white font-montserrat text-[11px] font-bold tabular-nums">
+                        {offerHistory.length}
+                      </span>
+                    )}
                   </div>
 
+                  {/* Loading skeleton — tighter pulse cards */}
                   {offerHistoryLoading && (
-                    <div className="p-4 space-y-3 animate-pulse">
+                    <div className="p-4 space-y-3">
                       {[1, 2].map((n) => (
-                        <div key={n} className="rounded-[10px] border border-sett-border-light p-3 space-y-2">
-                          <div className="h-4 w-24 rounded bg-sett-border" />
-                          <div className="h-3 w-full rounded bg-sett-border" />
-                          <div className="h-3 w-3/4 rounded bg-sett-border" />
+                        <div key={n} className="rounded-[8px] border border-sett-border p-3 space-y-2 animate-pulse">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="h-5 w-24 rounded-full bg-sett-border-light" />
+                            <div className="h-3 w-16 rounded bg-sett-border-light" />
+                          </div>
+                          <div className="h-3 w-full rounded bg-sett-border-light" />
+                          <div className="h-3 w-2/3 rounded bg-sett-border-light" />
                         </div>
                       ))}
                     </div>
                   )}
 
+                  {/* Empty state — navy-tinted illustration + brand copy */}
                   {!offerHistoryLoading && offerHistory.length === 0 && (
-                    <p className="px-5 py-4 font-montserrat text-[13px] text-sett-text-accent">
-                      {t.offer.noOffersSent}
-                    </p>
+                    <div className="px-5 py-8 flex flex-col items-center text-center">
+                      <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-sett-fill border border-sett-border-light mb-3">
+                        <Inbox className="w-5 h-5 text-sett-text-accent" strokeWidth={2} />
+                      </span>
+                      <p className="font-montserrat text-[13px] font-semibold text-sett-navy">
+                        {t.offer.noOffersSent}
+                      </p>
+                    </div>
                   )}
 
+                  {/* Timeline — vertical rail down the left edge of each
+                      entry block. Most recent entry sits at the top and is
+                      visually emphasized; older entries de-emphasize. */}
                   {!offerHistoryLoading && offerHistory.length > 0 && (
-                    <div className="divide-y divide-sett-border-light">
-                      {offerHistory.map((entry) => {
-                        const badgeClass = entry.type === 'initial'
-                          ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                    <div className="relative">
+                      {offerHistory.map((entry, idx) => {
+                        const isLatest = idx === 0;
+                        // §2 brand-only color palette for the chip:
+                        //  - initial   → navy chip
+                        //  - revision  → light grey neutral chip
+                        //  - final     → brand-green chip (signals "this
+                        //    is the customer-facing winning offer")
+                        const chipClass = entry.type === 'initial'
+                          ? 'bg-sett-navy text-white border-sett-navy'
                           : entry.type === 'final'
-                            ? 'bg-sett-light-green-bg border border-sett-primary/40 text-[#667f00]'
-                            : 'bg-orange-50 border border-orange-200 text-orange-700';
+                            ? 'bg-sett-primary text-sett-navy border-sett-primary'
+                            : 'bg-sett-fill text-sett-navy border-sett-border';
 
                         const typeLabel = entry.type === 'initial'
                           ? t.offer.initialOffer
@@ -1371,51 +1534,144 @@ export default function RequestDetailPage() {
                           ? t.offer.servicesCount.replace('{n}', '1')
                           : t.offer.servicesPluralCount.replace('{n}', String(entry.serviceCount));
 
+                        // Recipients: show first email + "+N" overflow chip
+                        // for the long-list case (full list available on
+                        // hover via title attribute).
+                        const recipients = entry.sentToEmails;
+                        const recipientsLabel = recipients.length === 0
+                          ? '—'
+                          : recipients.length === 1
+                            ? recipients[0]
+                            : `${recipients[0]} +${recipients.length - 1}`;
+                        const recipientsTooltip = recipients.join(', ');
+
+                        // Hotel/service count as just the number — the
+                        // singular/plural translation strings (e.g. "2
+                        // hotels") wrapped to two lines in the narrow
+                        // sidebar column. Pulling the count out as a tabular
+                        // number + a short word keeps everything on one
+                        // baseline.
+                        const numberOnly = (label: string) => {
+                          const m = label.match(/\d+/);
+                          return m ? m[0] : label;
+                        };
+                        const hotelN = numberOnly(hotelsLabel);
+                        const serviceN = numberOnly(servicesLabel);
+                        // Short word — strip the leading number + space so
+                        // we render "2 hotels" as "2  hotels" with our own
+                        // spacing/alignment instead of relying on the
+                        // i18n string's spaces which produced inconsistent
+                        // wrapping.
+                        const hotelWord = hotelsLabel.replace(/^\d+\s*/, '').toLowerCase();
+                        const serviceWord = servicesLabel.replace(/^\d+\s*/, '').toLowerCase();
+
                         return (
-                          <div key={entry.id} className="p-4 space-y-2">
-                            {/* Badge + date */}
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-badge font-montserrat text-[11px] font-semibold uppercase tracking-wide ${badgeClass}`}>
-                                #{entry.offerNumber} {typeLabel}
-                              </span>
-                              <span className="font-montserrat text-[12px] text-sett-text-accent whitespace-nowrap">
-                                {formatDate(entry.sentAt)}
-                              </span>
-                            </div>
-
-                            {/* Recipients */}
-                            <p className="font-montserrat text-[12px] text-sett-text-secondary truncate">
-                              {t.offer.sentTo}: {entry.sentToEmails.join(', ')}
-                            </p>
-
-                            {/* Item counts + total */}
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-montserrat text-[12px] text-sett-text-accent">
-                                {hotelsLabel}, {servicesLabel}
-                              </span>
-                              {entry.totalPrice != null && (
-                                <span className="font-montserrat text-[12px] font-semibold text-sett-text-primary whitespace-nowrap">
-                                  {formatCurrencyEU(entry.totalPrice, entry.currency)}
+                          <div
+                            key={entry.id}
+                            className={cn(
+                              'relative transition-colors duration-200',
+                              isLatest
+                                ? 'bg-sett-light-green-bg/40'
+                                : 'hover:bg-sett-fill/60',
+                              idx < offerHistory.length - 1 && 'border-b border-sett-border-light',
+                            )}
+                          >
+                            {/* Comfortable per-entry padding so rows breathe. */}
+                            <div className="px-5 py-4 space-y-3">
+                              {/* ── Row 1 — Type chip + offer # · date ──
+                                  Chip carries the offer-type semantic; the
+                                  small "#1" and date sit right-aligned at the
+                                  same y for a clean masthead. */}
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={cn(
+                                  'inline-flex items-center px-2.5 py-1 rounded-full border font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] leading-none whitespace-nowrap',
+                                  chipClass,
+                                )}>
+                                  {typeLabel}
                                 </span>
+                                <div className="flex items-center gap-1.5 font-montserrat text-[11px] font-medium text-sett-text-secondary whitespace-nowrap tabular-nums">
+                                  <span className="text-sett-text-accent">#{entry.offerNumber}</span>
+                                  <span className="text-sett-border" aria-hidden>•</span>
+                                  <span>{formatDate(entry.sentAt)}</span>
+                                </div>
+                              </div>
+
+                              {/* ── Row 2 — Recipients ──
+                                  Tiny uppercase label above the value gives
+                                  the data a key/value affordance instead of
+                                  "Sent to: x@y.com" running together. */}
+                              <div className="space-y-0.5">
+                                <p className="font-montserrat text-[10px] font-bold uppercase tracking-[0.06em] text-sett-text-accent">
+                                  {t.offer.sentTo}
+                                </p>
+                                <p
+                                  className="font-montserrat text-[13px] font-medium text-sett-navy truncate"
+                                  title={recipientsTooltip}
+                                >
+                                  {recipientsLabel}
+                                </p>
+                              </div>
+
+                              {/* ── Row 3 — Summary band ──
+                                  Two stacked sub-rows inside one card:
+                                    • counts (hotels · services) — smaller
+                                    • price — full-width, dominant
+                                  Splitting onto two lines fixed the price
+                                  getting truncated when both items shared
+                                  the same horizontal row at narrow sidebar
+                                  widths. The price is the value staff care
+                                  about most — it now gets its own row and
+                                  the visual weight (16px extrabold) to
+                                  match. */}
+                              <div className="rounded-[6px] bg-white border border-sett-border-light overflow-hidden">
+                                {/* Counts sub-row */}
+                                <div className="flex items-center gap-3 px-3 py-2 font-montserrat text-[12px] text-sett-navy border-b border-sett-border-light">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Building2 className="w-3.5 h-3.5 text-sett-text-accent" />
+                                    <span className="font-bold tabular-nums">{hotelN}</span>
+                                    <span className="text-sett-text-secondary">{hotelWord}</span>
+                                  </span>
+                                  <span className="w-px h-3 bg-sett-border" aria-hidden />
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-sett-text-accent" />
+                                    <span className="font-bold tabular-nums">{serviceN}</span>
+                                    <span className="text-sett-text-secondary">{serviceWord}</span>
+                                  </span>
+                                </div>
+                                {/* Price sub-row — full-width, label + value */}
+                                {entry.totalPrice != null && (
+                                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-sett-fill/60">
+                                    <span className="font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-sett-text-accent">
+                                      {t.offer.total}
+                                    </span>
+                                    <span className="font-montserrat text-[16px] font-extrabold text-sett-navy whitespace-nowrap tabular-nums leading-none">
+                                      {formatCurrencyEU(entry.totalPrice, entry.currency)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* ── Row 4 — Download CTA ──
+                                  Compact secondary-style: green text on
+                                  light-green tint, full-width, doesn't try
+                                  to compete with the chip above. */}
+                              {entry.pdfUrl ? (
+                                <a
+                                  href={entry.pdfUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-light-green-bg/70 border border-sett-primary/30 font-montserrat text-[12px] font-bold uppercase tracking-[0.06em] text-sett-green-dark hover:bg-sett-primary hover:text-sett-navy hover:border-sett-primary transition-colors duration-200 active:scale-[0.98]"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  {t.modals.downloadPdf}
+                                </a>
+                              ) : (
+                                <div className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-fill border border-sett-border-light font-montserrat text-[11px] font-medium text-sett-text-accent">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  {t.offer.pdfUnavailable}
+                                </div>
                               )}
                             </div>
-
-                            {/* Download */}
-                            {entry.pdfUrl ? (
-                              <a
-                                href={entry.pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-sett-border font-montserrat text-[12px] font-medium text-sett-text-primary hover:border-sett-primary hover:text-sett-primary transition-colors"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                                {t.modals.downloadPdf}
-                              </a>
-                            ) : (
-                              <span className="font-montserrat text-[12px] text-sett-text-accent italic">
-                                {t.offer.pdfUnavailable}
-                              </span>
-                            )}
                           </div>
                         );
                       })}
@@ -1449,19 +1705,19 @@ export default function RequestDetailPage() {
                                 {breakdown.hotelName}
                               </h5>
                               <div className="flex items-center justify-between">
-                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Purchase</span>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">{t.offer.purchase}</span>
                                 <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#071C42' }}>
                                   €{formatPriceEU(breakdown.buy)}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Sell</span>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">{t.offer.sell}</span>
                                 <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#071C42' }}>
                                   €{formatPriceEU(breakdown.sell)}
                                 </span>
                               </div>
                               <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid #D1D5DB' }}>
-                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">Margin</span>
+                                <span className="font-montserrat text-[12px] font-medium text-[#686868]">{t.requests.margin}</span>
                                 <span className="font-montserrat font-semibold text-[14px]" style={{ color: '#667F00' }}>
                                   €{formatPriceEU(breakdown.margin)}
                                 </span>
@@ -1581,58 +1837,70 @@ export default function RequestDetailPage() {
           />
 
           {/* Approve & Send Modal */}
-          {sendOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white rounded-[14px] border border-sett-border-light w-full max-w-md mx-4 p-6">
+          <ModalOverlay
+            open={sendOpen}
+            onClose={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
+          >
+              <div
+                className="bg-white w-full max-w-md mx-4 flex flex-col overflow-hidden"
+                style={{
+                  borderRadius: 8, // §5.3 panel
+                  border: '1px solid #E0E0E0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                }}
+              >
+                {/* §5.3 accent strip */}
+                <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
+                <div className="px-5 py-5">
                 <div className="flex items-start justify-between mb-5">
-                  <div className="flex flex-col gap-1">
-                    <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary leading-none">
+                  <div className="flex flex-col gap-1.5">
+                    <h3 className="font-montserrat text-[18px] font-bold text-sett-navy leading-tight">
                       {offerHistory.length === 0
                         ? t.offer.sendInitialOffer
                         : offerHistory.length === 1
                           ? t.offer.sendFinalOffer
                           : t.offer.sendRevision}
                     </h3>
-                    <p className="font-montserrat text-[14px] text-sett-text-secondary">
+                    <p className="font-montserrat text-[13px] text-sett-grey leading-snug">
                       {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
-                    className="p-1.5 rounded-lg hover:bg-[#F7F7F7] text-[#686868] transition-colors -mt-1"
+                    className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors -mt-1"
                     aria-label="Close"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
 
                 {sendError && (
-                  <div className="flex flex-col gap-2 mb-4 p-3 rounded-[10px] bg-red-50 border border-red-200">
+                  <div className="flex flex-col gap-2 mb-4 p-3 rounded-[4px]" style={{ background: '#FCEBEB', border: '1px solid #CC3333' }}>
                     <div className="flex items-start gap-2">
-                      <XCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
-                      <p className="font-montserrat text-[13px] text-red-700">{sendError}</p>
+                      <XCircle className="w-4 h-4 text-[#CC3333] mt-0.5 shrink-0" />
+                      <p className="font-montserrat text-[13px] text-[#CC3333]">{sendError}</p>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
-                      {t.offer.emailsLabel} <span className="text-red-500">*</span>
+                    <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-navy mb-1.5">
+                      {t.offer.emailsLabel} <span className="text-[#CC3333]">*</span>
                     </label>
-                    {/* Multi-email chip input */}
+                    {/* Multi-email chip input — §5.5 input */}
                     <div
-                      className={`min-h-[42px] w-full px-2 py-1.5 rounded-[10px] border flex flex-wrap gap-1.5 cursor-text ${sendEmailError
-                        ? 'border-red-500 focus-within:border-red-500 focus-within:ring-2 focus-within:ring-red-200'
-                        : 'border-sett-border-light focus-within:border-sett-primary focus-within:ring-2 focus-within:ring-sett-primary/10'
+                      className={`min-h-[41px] w-full px-2 py-1.5 rounded-[4px] border flex flex-wrap gap-1.5 cursor-text transition-[border-color,box-shadow] duration-150 ${sendEmailError
+                        ? 'border-[#CC3333] focus-within:shadow-[0_0_0_3px_rgba(204,51,51,0.15)]'
+                        : 'border-[#D0D0D0] focus-within:border-sett-primary focus-within:shadow-[0_0_0_3px_rgba(170,199,55,0.15)]'
                         }`}
                       onClick={() => emailInputRef.current?.focus()}
                     >
                       {sendEmails.map((email, idx) => (
                         <span
                           key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-sett-primary/10 text-sett-primary rounded-[6px] font-montserrat text-[13px] max-w-full"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#F5F9E8] border border-sett-primary text-sett-navy rounded-[4px] font-montserrat text-[13px] font-semibold max-w-full"
                         >
                           <span className="truncate max-w-[200px]">{email}</span>
                           <button
@@ -1642,7 +1910,7 @@ export default function RequestDetailPage() {
                               setSendEmails((prev) => prev.filter((_, i) => i !== idx));
                               if (sendEmailError) setSendEmailError('');
                             }}
-                            className="shrink-0 text-sett-primary hover:text-red-500 ml-0.5 focus:outline-none"
+                            className="shrink-0 text-sett-navy hover:text-sett-green-dark ml-0.5 focus:outline-none"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                           </button>
@@ -1657,34 +1925,34 @@ export default function RequestDetailPage() {
                           onKeyDown={handleEmailInputKeyDown}
                           onBlur={handleEmailInputBlur}
                           placeholder={sendEmails.length === 0 ? t.offer.addEmailPlaceholder : ''}
-                          className="flex-1 min-w-[180px] px-1 py-0.5 font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none bg-transparent"
+                          className="flex-1 min-w-[180px] px-1 py-0.5 font-montserrat text-[14px] text-sett-navy placeholder:text-sett-grey focus:outline-none bg-transparent"
                         />
                       )}
                     </div>
                     {sendEmailError && (
-                      <p className="mt-1 font-montserrat text-[12px] text-red-500">{sendEmailError}</p>
+                      <p className="mt-1 font-montserrat text-[12px] text-[#CC3333]">{sendEmailError}</p>
                     )}
-                    <p className="mt-1 font-montserrat text-[12px] text-sett-text-accent">{t.offer.emailsMaxLimit}</p>
+                    <p className="mt-1 font-montserrat text-[12px] text-sett-grey">{t.offer.emailsMaxLimit}</p>
                   </div>
                   <div>
-                    <label className="block font-montserrat text-[13px] font-semibold text-sett-text-primary mb-1.5">
-                      {t.offer.adminNotes} <span className="font-normal text-sett-text-accent">{t.offer.adminNotesOptional}</span>
+                    <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-navy mb-1.5">
+                      {t.offer.adminNotes} <span className="font-normal text-sett-grey normal-case tracking-normal">{t.offer.adminNotesOptional}</span>
                     </label>
                     <textarea
                       value={sendNotes}
                       onChange={(e) => setSendNotes(e.target.value)}
                       placeholder={t.offer.notesPlaceholder}
                       rows={3}
-                      className="w-full px-3 py-2.5 rounded-[10px] border border-sett-border-light font-montserrat text-[14px] text-sett-text-primary placeholder-sett-text-accent focus:outline-none focus:border-sett-primary resize-none"
+                      className="w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] font-montserrat text-[14px] text-sett-navy placeholder:text-sett-grey focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] resize-none transition-[border-color,box-shadow] duration-150"
                     />
                   </div>
                 </div>
-
-                <div className="flex gap-4 mt-6">
+                </div>
+                <div className="h-px bg-[#E0E0E0] mx-5" />
+                <div className="flex gap-3 px-5 py-4 justify-end">
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="flex-1"
                     onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
                     disabled={actionLoading}
                   >
@@ -1693,11 +1961,10 @@ export default function RequestDetailPage() {
                   <Button
                     variant="primary"
                     size="sm"
-                    className="flex-1"
                     onClick={handleApproveAndSend}
                     isLoading={actionLoading}
                   >
-                    <Send className="w-5 h-5" />
+                    <Send className="w-4 h-4" />
                     {offerHistory.length === 0
                       ? t.offer.sendInitialOffer
                       : offerHistory.length === 1
@@ -1706,8 +1973,7 @@ export default function RequestDetailPage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          )}
+          </ModalOverlay>
 
           <ConfirmModal
             open={declineOpen}
@@ -2080,11 +2346,23 @@ function HotelCard({
     <div className={`bg-sett-card rounded-[16px] border transition-opacity overflow-hidden ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
       {/* Unified navy header: identity (left) + controls (right) */}
       <div className="bg-[#1B2B44] rounded-t-[16px] px-3 sm:px-4 py-3 flex items-center gap-3 flex-wrap">
-        {/* Identity: hotel name + stars */}
+        {/* Identity: hotel name + stars.
+            If the persisted hotel has a SETTHub deep link, render the name as
+            a HotelName link (matches the Add Hotel card behavior); otherwise
+            fall back to a plain heading. `HotelName` uses brand-green by
+            default — overridden here with white text + subtle hover bg so it
+            reads on the navy header surface. */}
         <div className="flex items-center gap-2 min-w-0 flex-1 min-h-[28px]">
-          <h4 className="text-body font-bold text-white truncate">
-            {hotel.hotelName || hotel.hotelCode}
-          </h4>
+          {hotel.sethubDetailsUrl ? (
+            <HotelName
+              hotel={{ hotelName: hotel.hotelName || hotel.hotelCode, sethubDetailsUrl: hotel.sethubDetailsUrl }}
+              className="!text-white hover:!text-white active:!text-white hover:!bg-white/10 active:!bg-white/15 !text-body !font-bold min-w-0"
+            />
+          ) : (
+            <h4 className="text-body font-bold text-white truncate">
+              {hotel.hotelName || hotel.hotelCode}
+            </h4>
+          )}
           <div
             className="flex gap-0.5 shrink-0"
             aria-label={`${hotel.starRating ?? 0} of 5 stars`}
@@ -2228,7 +2506,7 @@ function HotelCard({
                   const total = sell * qty * nights;
                   return (
                     <tr key={type} className="border-b border-sett-border last:border-0">
-                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{getRoomLabel(type, detail)}</td>
+                      <td className="px-4 py-2.5 text-body text-sett-text-primary">{getRoomLabel(type, detail, t.addHotel)}</td>
                       <td className="px-4 py-2.5 text-body text-sett-text-primary text-right">
                         {formatPriceEU(net)}
                       </td>
@@ -2272,7 +2550,7 @@ function HotelCard({
               const total = sell * qty * nights;
               return (
                 <div key={type} className="p-3 space-y-2">
-                  <p className="text-body font-medium text-sett-text-primary">{getRoomLabel(type, detail)}</p>
+                  <p className="text-body font-medium text-sett-text-primary">{getRoomLabel(type, detail, t.addHotel)}</p>
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>
@@ -2341,7 +2619,7 @@ function HotelCard({
       {/* Hotel Breakdown — Total Sell */}
       <div className="px-4 py-3 border-t border-sett-border/50 bg-[#F9FAFB]">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-sett-text-accent font-medium">Total Sell</span>
+          <span className="text-sett-text-accent font-medium">{t.offer.totalSell}</span>
           <span className="text-sett-text-primary font-semibold">€{formatPriceEU(
             Object.values(hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {}).reduce(
               (sum, detail) => sum + Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1),
@@ -2492,23 +2770,23 @@ function ServiceCard({
           </div>
         )}
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Net</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.net}</span>
           <p className="text-sett-text-primary mt-0.5">{formatPriceEU(buy)}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Markup</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.markup}</span>
           <p className="text-sett-text-primary mt-0.5">{formatPercentageEU(markup, 0)}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Sell</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.sell}</span>
           <p className="text-sett-text-primary mt-0.5">{formatPriceEU(sell)}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Qty</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.qty}</span>
           <p className="text-sett-text-primary mt-0.5">{qty}</p>
         </div>
         <div>
-          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">Total</span>
+          <span className="text-sett-text-accent uppercase tracking-wide text-[11px] font-semibold">{t.offer.total}</span>
           <p className="text-sett-primary font-semibold mt-0.5">{formatPriceEU(total)}</p>
         </div>
       </div>

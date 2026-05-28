@@ -94,25 +94,29 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
     <header className="sticky top-0 z-30 bg-sett-navy">
       <div className="flex items-center justify-between h-[64px] px-4 sm:px-5">
         {/* ─── Left: Mobile menu + Logo (mobile-only) + Title ─── */}
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-1 sm:gap-4 min-w-0">
           {/* Mobile-only: hamburger to open the sidebar */}
           <button
             type="button"
             onClick={openMobileSidebar}
             className="lg:hidden p-2 -ml-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-            aria-label="Open menu"
+            aria-label={t.common.openMenu}
           >
             <Menu className="w-6 h-6" />
           </button>
 
-          {/* Logo: shown on screens where the sidebar is hidden (< lg) */}
+          {/* Logo: shown on screens where the sidebar is hidden (< lg).
+              Height-scaled to ~24px (h-6) so it sits next to the 18–20px
+              page title at a balanced visual weight. Previously h-9 (36px)
+              made the wordmark dominate the title 2:1, which read as
+              poor hierarchy. */}
           <div className="lg:hidden shrink-0">
             <Image
               src="/icons/sett_logo.svg"
               alt="SETT Hub"
-              width={36}
-              height={36}
-              className="h-9 w-auto"
+              width={84}
+              height={24}
+              className="h-6 w-auto"
               priority
             />
           </div>
@@ -131,12 +135,17 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
           </div>
         </div>
 
-        {/* ─── Right: Actions ─── */}
-        <div className="flex items-center gap-1 sm:gap-1.5">
+        {/* ─── Right: Actions ───
+            Hidden on phones/tablets — chrome controls (language, mute,
+            notifications, user menu) move into the sidebar drawer so the
+            mobile header has room to breathe and the page title is fully
+            visible. On lg+ the sidebar is always inline so the header is
+            the natural home for these controls. */}
+        <div className="hidden lg:flex items-center gap-1 sm:gap-1.5">
           {/* Language toggle — prominent per §7.4 */}
           <div className="relative group">
             <LanguageToggle />
-            <Tooltip>Switch Language</Tooltip>
+            <Tooltip>{t.common.switchLanguage}</Tooltip>
           </div>
 
           {/* Vertical divider */}
@@ -147,7 +156,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
               type="button"
               onClick={onRefresh}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              aria-label="Refresh"
+              aria-label={t.common.refresh}
             />
           )}
 
@@ -171,7 +180,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
               type="button"
               onClick={() => setNotificationsOpen(true)}
               className="relative p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+              aria-label={unreadCount > 0 ? `${t.common.notifications} (${unreadCount})` : t.common.notifications}
             >
               <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'animate-bell-shake' : ''}`} />
               {unreadCount > 0 && (
@@ -183,7 +192,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
                 </>
               )}
             </button>
-            <Tooltip>Notifications</Tooltip>
+            <Tooltip>{t.common.notifications}</Tooltip>
           </div>
 
           {/* Divider before user */}
@@ -251,7 +260,7 @@ export function Header({ title, subtitle, actions, onRefresh }: HeaderProps) {
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 font-montserrat text-[13px] font-medium text-sett-text-primary hover:bg-sett-background transition-colors text-left"
                     >
                       <LogOut className="w-4 h-4 text-sett-text-accent" />
-                      Logout
+                      {t.common.logout}
                     </button>
                   )}
                 </div>

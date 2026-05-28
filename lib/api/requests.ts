@@ -18,6 +18,13 @@ export interface ListRequestsParams {
   limit?: number;
   search?: string;
   status?: string;
+  /** Filter window on the request's `createdAt` column. Use these for the
+   *  toolbar "This Month / Quarter / Year" filter. Backend must apply the
+   *  window to created_at (NOT checkinDate). */
+  createdFrom?: string;
+  createdTo?: string;
+  /** @deprecated Ambiguous — backend treated this as a check-in filter.
+   *  Kept temporarily as a legacy alias; prefer `createdFrom`/`createdTo`. */
   dateFrom?: string;
   dateTo?: string;
   sortBy?: string;
@@ -35,10 +42,16 @@ export interface ListRequestsResult {
 }
 
 export const requestsApi = {
-  async list(params?: ListRequestsParams): Promise<ListRequestsResult> {
+  /** Pass `opts.silent = true` to opt out of the global error toast — useful
+   *  for background polls / auto-refresh-on-notification, where a transient
+   *  5xx should not pop a banner at the user. */
+  async list(
+    params?: ListRequestsParams,
+    opts: { silent?: boolean } = {},
+  ): Promise<ListRequestsResult> {
     const { data } = await apiClient.get<ApiResponse<PaginatedResponse<BookingRequest> | BookingRequest[]>>(
       '/requests',
-      { params }
+      { params, _suppressToast: opts.silent }
     );
     if (!data.success || !data.data) {
       return { requests: [] };

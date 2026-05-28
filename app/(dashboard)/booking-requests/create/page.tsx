@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { ChevronDown, X as XIcon } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils/cn';
 import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { translations } from '@/lib/i18n/translations';
 import {
   AGE_REQUIRED_GROUP_TYPES,
   AVERAGE_AGE_MAX,
@@ -25,6 +27,7 @@ import {
   buildGroupTypeOptions,
   groupTypeRequiresAge,
 } from '@/lib/utils/groupType';
+import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
 
 interface FormData {
   // Step 1: Trip Details
@@ -32,7 +35,8 @@ interface FormData {
   destination: string;
   checkInDate: string;
   checkOutDate: string;
-  hotelCategory: string;
+  /** Multi-select hotel category codes ("1".."5"). Empty = none ticked yet. */
+  hotelCategories: string[];
   budgetRange: string;
   groupType: string;
   groupSize: string;
@@ -67,7 +71,7 @@ const defaultFormData: FormData = {
   destination: '',
   checkInDate: '',
   checkOutDate: '',
-  hotelCategory: '',
+  hotelCategories: [],
   budgetRange: '',
   groupType: '',
   groupSize: '',
@@ -90,10 +94,11 @@ const defaultFormData: FormData = {
   phoneCountryCode: '+44',
   phone: '',
   specialRequestsCustomer: '',
-  termsAndConditions:
-    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>All prices are per room per night unless otherwise stated</li><li>Prices are subject to availability at time of booking</li><li>Full payment required 30 days before arrival</li><li>Cancellation policy applies as per individual hotel terms</li><li>Group rates are valid for minimum 10 participants</li><li>Final room list required 14 days before arrival</li></ol>',
-  cancellationConditions:
-    '<ol style="list-style-type: decimal; padding-left: 1.5rem;"><li>Cancellations made 14 days or more in advance of the event date will receive a 100% refund.</li><li>Cancellations made within 7 days will incur a 50% fee.</li></ol>',
+  // Defaults for the policy editors are seeded at mount-time from the current
+  // locale via an effect inside the page component (see below). Left blank
+  // here so the i18n layer is the single source of truth for the boilerplate.
+  termsAndConditions: '',
+  cancellationConditions: '',
 };
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
@@ -164,7 +169,7 @@ function getStepProgress(step: number, data: FormData): number {
       data.checkOutDate <= maxDate &&
       (!data.checkInDate || data.checkOutDate > data.checkInDate)
     );
-    checks.push(!!data.hotelCategory);
+    checks.push(data.hotelCategories.length > 0);
     checks.push(!!data.groupType);
     checks.push(!!data.groupSize.trim() && Number(data.groupSize) > 0);
     if (groupTypeRequiresAge(data.groupType)) {
@@ -238,7 +243,9 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     if (data.checkInDate && data.checkOutDate && data.checkOutDate <= data.checkInDate) {
       errors.checkOutDate = t.createForm.checkOutAfterCheckIn;
     }
-    if (!data.hotelCategory) errors.hotelCategory = t.createForm.hotelCategoryRequired;
+    if (data.hotelCategories.length === 0) {
+      errors.hotelCategories = t.createForm.hotelCategoryRequired;
+    }
     if (!data.groupType) errors.groupType = t.createForm.groupTypeRequired;
     if (!data.groupSize.trim()) {
       errors.groupSize = t.createForm.groupSizeRequired;
@@ -304,7 +311,12 @@ const SESSION_KEY = 'createFormSession';
 function CreateBookingRequestPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  // Both translations bundles, so we can detect "field still contains the
+  // OTHER locale's default" and re-seed on language switch without
+  // overwriting any edits the user has typed.
+  const enTranslations = translations.en.createForm;
+  const deTranslations = translations.de.createForm;
   const [currentStep, setCurrentStep] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const params = new URLSearchParams(window.location.search);
@@ -332,8 +344,22 @@ function CreateBookingRequestPageInner() {
     try {
       const saved = sessionStorage.getItem(SESSION_KEY);
       if (saved) {
-        const { formData: savedForm } = JSON.parse(saved) as { formData: FormData };
-        return { ...defaultFormData, ...savedForm, nameListFile: null };
+        // Older drafts stored a single-value `hotelCategory: string`. Migrate
+        // that into the new `hotelCategories: string[]` so the dropdown
+        // pre-ticks correctly without throwing away the user's prior pick.
+        const parsed = JSON.parse(saved) as { formData: Partial<FormData> & { hotelCategory?: string } };
+        const savedForm = parsed.formData ?? {};
+        const migratedCategories: string[] = Array.isArray(savedForm.hotelCategories)
+          ? savedForm.hotelCategories
+          : savedForm.hotelCategory
+            ? [savedForm.hotelCategory]
+            : [];
+        return {
+          ...defaultFormData,
+          ...savedForm,
+          hotelCategories: migratedCategories,
+          nameListFile: null,
+        };
       }
     } catch {}
     return defaultFormData;
@@ -361,8 +387,19 @@ function CreateBookingRequestPageInner() {
     try {
       const saved = sessionStorage.getItem(`createFormDraft_${draft}`);
       if (saved) {
-        const parsed = JSON.parse(saved) as FormData;
-        setFormData({ ...defaultFormData, ...parsed, nameListFile: null });
+        // Same legacy-field migration as the SESSION_KEY restore path above.
+        const parsed = JSON.parse(saved) as Partial<FormData> & { hotelCategory?: string };
+        const migratedCategories: string[] = Array.isArray(parsed.hotelCategories)
+          ? parsed.hotelCategories
+          : parsed.hotelCategory
+            ? [parsed.hotelCategory]
+            : [];
+        setFormData({
+          ...defaultFormData,
+          ...parsed,
+          hotelCategories: migratedCategories,
+          nameListFile: null,
+        });
         setDraftRequestId(draft);
       }
     } catch {
@@ -380,6 +417,35 @@ function CreateBookingRequestPageInner() {
       // storage full — not critical
     }
   }, [currentStep, formData, draftRequestId]);
+
+  // Seed (and re-seed on language toggle) the boilerplate text in the policy
+  // editors. We only overwrite the field if it's empty OR currently holds the
+  // OTHER locale's default — that way any edit the user has typed is
+  // preserved across language switches.
+  useEffect(() => {
+    setFormData((prev) => {
+      const enTerms = enTranslations.defaultTermsHtml;
+      const deTerms = deTranslations.defaultTermsHtml;
+      const enCancel = enTranslations.defaultCancellationHtml;
+      const deCancel = deTranslations.defaultCancellationHtml;
+      const wantedTerms = locale === 'de' ? deTerms : enTerms;
+      const wantedCancel = locale === 'de' ? deCancel : enCancel;
+
+      const termsIsDefault = !prev.termsAndConditions
+        || prev.termsAndConditions === enTerms
+        || prev.termsAndConditions === deTerms;
+      const cancelIsDefault = !prev.cancellationConditions
+        || prev.cancellationConditions === enCancel
+        || prev.cancellationConditions === deCancel;
+
+      if (!termsIsDefault && !cancelIsDefault) return prev;
+      return {
+        ...prev,
+        termsAndConditions: termsIsDefault ? wantedTerms : prev.termsAndConditions,
+        cancellationConditions: cancelIsDefault ? wantedCancel : prev.cancellationConditions,
+      };
+    });
+  }, [locale, enTranslations, deTranslations]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => {
@@ -441,7 +507,14 @@ function CreateBookingRequestPageInner() {
         destinationName: formData.destination,
         checkinDate: formData.checkInDate,
         checkoutDate: formData.checkOutDate || undefined,
-        starRating: formData.hotelCategory ? Number(formData.hotelCategory) : undefined,
+        // Send both fields during the migration window. Backend prefers `starRatings`
+        // when both are present; legacy single field stays for Wix-webhook compat.
+        starRatings: formData.hotelCategories.length > 0
+          ? formData.hotelCategories.map(Number).sort((a, b) => a - b)
+          : undefined,
+        starRating: formData.hotelCategories.length > 0
+          ? Number(formData.hotelCategories[0])
+          : undefined,
         budgetRange: formData.budgetRange || undefined,
         groupType: formData.groupType || undefined,
         groupSize: formData.groupSize ? Number(formData.groupSize) : undefined,
@@ -698,6 +771,28 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
   const justSelectedRef = useRef(false);
   const userTypingRef = useRef(false);
 
+  // Hotel-category multi-select dropdown state. Same UX pattern as AddServiceModal —
+  // chips inside the trigger, checkbox dropdown below.
+  const [hotelCatDropdownOpen, setHotelCatDropdownOpen] = useState(false);
+  const hotelCatWrapperRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hotelCatDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (hotelCatWrapperRef.current && !hotelCatWrapperRef.current.contains(e.target as Node)) {
+        setHotelCatDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [hotelCatDropdownOpen]);
+
+  const toggleHotelCategory = (value: string) => {
+    const next = formData.hotelCategories.includes(value)
+      ? formData.hotelCategories.filter((v) => v !== value)
+      : [...formData.hotelCategories, value].sort();
+    updateField('hotelCategories', next);
+  };
+
   // Sync destQuery when formData.destination is restored from sessionStorage draft
   useEffect(() => {
     if (formData.destination && !userTypingRef.current) {
@@ -851,12 +946,19 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 popperPlacement="bottom-end"
                 portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
-                todayButton="Today"
+                todayButton={t.addHotel.today}
                 showPopperArrow={false}
                 customInput={<DateInput hasError={!!errors.checkInDate} />}
               />
             </div>
             <FieldError message={errors.checkInDate} />
+            {/* Passive hint — always visible below the field so the user is
+                warned BEFORE picking a risky near-date. Sized + colored as
+                proper helper text (12px navy/70) instead of the previous
+                11px italic light-grey which read as nearly invisible. */}
+            <p className="mt-1.5 font-montserrat text-[12px] font-medium leading-snug text-sett-text-primary/70">
+              {t.createForm.checkInDateHint}
+            </p>
           </div>
           <div className="animate-field-fade-in" style={{ animationDelay: '220ms' }}>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
@@ -874,7 +976,7 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
                 popperPlacement="bottom-end"
                 portalId="sett-datepicker-portal"
                 wrapperClassName="w-full"
-                todayButton="Today"
+                todayButton={t.addHotel.today}
                 showPopperArrow={false}
                 customInput={<DateInput hasError={!!errors.checkOutDate} />}
               />
@@ -883,18 +985,172 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
           </div>
         </div>
 
-        {/* Hotel Category / Budget */}
+        {/* Free-cancellation contextual banner — appears only when the user has
+            picked a check-in date within the next 14 days. The backend filters
+            search results to free-cancellation rates only, so near-date requests
+            return fewer hotels. We surface this to the user so they understand
+            why their result set may be small (and can choose a later date if
+            their group allows it). */}
+        <FreeCancellationDateBanner checkInDate={formData.checkInDate} />
+
+        {/* Hotel Category (multi-select dropdown) / Budget.
+            Same UX pattern as the AddServiceModal: chips inside the trigger,
+            checkbox dropdown below. Backend's ±1 relaxation widens further
+            automatically — the helper text below the field explains this. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label={`${t.createForm.hotelCategory} *`}
-            options={hotelCategoryOptions}
-            value={formData.hotelCategory}
-            onChange={(e) => updateField('hotelCategory', e.target.value)}
-            placeholder={t.createForm.selectHotelCategory}
-            error={errors.hotelCategory}
-            className="animate-field-fade-in"
+          {/* When the dropdown is open, lift the wrapper's z-index so the
+              panel renders above sibling form fields below (Group Type, etc.).
+              Same pattern as the shared Select component — without this, the
+              panel is painted behind later siblings on the page. */}
+          <div
+            className={cn(
+              'animate-field-fade-in',
+              hotelCatDropdownOpen && 'relative z-[9999]',
+            )}
             style={{ animationDelay: '280ms' }}
-          />
+            ref={hotelCatWrapperRef}
+          >
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+              {t.createForm.hotelCategory} <span className="text-sett-destructive">*</span>
+            </label>
+            <div className="relative">
+              {/* Trigger — shows selected categories as chips, or the placeholder */}
+              <div
+                role="combobox"
+                aria-haspopup="listbox"
+                aria-expanded={hotelCatDropdownOpen}
+                aria-controls="hotel-category-listbox"
+                tabIndex={0}
+                onClick={() => setHotelCatDropdownOpen((v) => !v)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setHotelCatDropdownOpen((v) => !v);
+                  }
+                }}
+                className={cn(
+                  // §5.5 brand-spec input: 4px radius + #E0E0E0 border, so
+                  // Hotel Category visually matches the Check-in date input
+                  // and the adjacent Budget Range / Group Type / Group Size
+                  // fields on this form.
+                  'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-input border bg-white cursor-pointer transition-all duration-150',
+                  errors.hotelCategories
+                    ? 'border-sett-destructive'
+                    : hotelCatDropdownOpen
+                      ? 'border-sett-primary shadow-input-focus'
+                      : 'border-sett-border hover:border-sett-primary/40',
+                )}
+              >
+                {formData.hotelCategories.length === 0 ? (
+                  <span className="font-montserrat text-[14px] font-normal text-sett-text-accent flex-1">
+                    {t.createForm.selectHotelCategory}
+                  </span>
+                ) : (
+                  <>
+                    {hotelCategoryOptions
+                      .filter((o) => formData.hotelCategories.includes(o.value))
+                      .map((opt) => (
+                        <span
+                          key={opt.value}
+                          // Hover micro-interaction: the chip lifts 1px,
+                          // border deepens to full brand-primary, and a soft
+                          // green shadow appears underneath — signals
+                          // interactivity (and that the X is hit-able)
+                          // without competing with the chip's selected state.
+                          className="group/chip inline-flex items-center gap-1.5 px-2 py-1 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-tight cursor-default transition-all duration-200 ease-sett-out hover:-translate-y-0.5 hover:border-sett-primary hover:shadow-[0_4px_12px_-2px_rgba(170,199,55,0.35)] hover:bg-sett-light-green-bg/80"
+                        >
+                          {opt.node}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleHotelCategory(opt.value);
+                            }}
+                            // X button: pops slightly larger on chip hover so
+                            // staff visually find it; rotates 90° + tints
+                            // destructive red when hovered directly so the
+                            // "this removes the selection" intent is obvious.
+                            className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ease-sett-out group-hover/chip:scale-110 hover:bg-sett-destructive/10 hover:text-sett-destructive hover:rotate-90"
+                            aria-label={`Remove ${opt.label}`}
+                          >
+                            <XIcon className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                  </>
+                )}
+                <ChevronDown
+                  className={cn(
+                    'shrink-0 w-4 h-4 ml-auto text-sett-text-muted transition-transform duration-200',
+                    hotelCatDropdownOpen && 'rotate-180',
+                  )}
+                />
+              </div>
+
+              {/* Dropdown panel */}
+              {hotelCatDropdownOpen && (
+                <div
+                  id="hotel-category-listbox"
+                  role="listbox"
+                  aria-multiselectable="true"
+                  className="absolute z-20 w-full mt-1.5 bg-white border border-sett-border-light rounded-[14px] shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden animate-sidebar-fade-up"
+                >
+                  <div className="px-3.5 py-2.5 border-b border-sett-border-light">
+                    <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent">
+                      {t.createForm.hotelCategory}
+                    </p>
+                  </div>
+                  <div
+                    className="max-h-[240px] overflow-y-auto py-1.5"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
+                  >
+                    {hotelCategoryOptions.map((opt) => {
+                      const isSelected = formData.hotelCategories.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => toggleHotelCategory(opt.value)}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                            isSelected
+                              ? 'bg-sett-light-green-bg text-sett-primary font-medium'
+                              : 'text-sett-text-primary hover:bg-sett-fill',
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              'w-4 h-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-colors',
+                              isSelected
+                                ? 'bg-sett-primary border-sett-primary'
+                                : 'bg-white border-sett-border',
+                            )}
+                          >
+                            {isSelected && (
+                              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </span>
+                          {opt.node}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Same helper-text treatment as the Check-in date hint — readable
+                12px navy/70 instead of the previous faint italic. */}
+            <p className="mt-1.5 font-montserrat text-[12px] font-medium leading-snug text-sett-text-primary/70">
+              {t.createForm.hotelCategoryHint}
+            </p>
+            {errors.hotelCategories && (
+              <p className="mt-1 text-caption text-sett-destructive">{errors.hotelCategories}</p>
+            )}
+          </div>
           <Select
             label={`${t.createForm.budgetRange} ${t.createForm.optional}`}
             options={budgetRangeOptions}
@@ -903,6 +1159,17 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.selectBudgetRange}
             className="animate-field-fade-in"
             style={{ animationDelay: '320ms' }}
+            // §5.5 input style so Budget Range matches the Check-in date input
+            // and the sibling fields on this form. Without these overrides the
+            // shared Select defaults to a 14px radius + lighter border.
+            // Height-pinned to 44px (with reduced vertical padding) so the
+            // trigger lines up exactly with the Hotel Category multi-select
+            // sibling on the same row.
+            // Border color is no longer overridden here — the shared Select
+            // now defaults to border-sett-border at rest and border-sett-primary
+            // when open. Overriding it here was pinning the border to grey
+            // even when open, defeating the focus highlight.
+            triggerClassName="rounded-input h-[44px] !py-0"
           />
         </div>
 
@@ -924,6 +1191,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             error={errors.groupType}
             className="animate-field-fade-in"
             style={{ animationDelay: '380ms' }}
+            // Border color is no longer overridden here — the shared Select
+            // now defaults to border-sett-border at rest and border-sett-primary
+            // when open. Overriding it here was pinning the border to grey
+            // even when open, defeating the focus highlight.
+            triggerClassName="rounded-input h-[44px] !py-0"
           />
           <div className="animate-field-fade-in" style={{ animationDelay: '420ms' }}>
             <Input
@@ -939,6 +1211,11 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
               onKeyDown={(e) => { if (e.key === '-' || e.key === 'e' || e.key === '.') e.preventDefault(); }}
               onWheel={(e) => (e.target as HTMLInputElement).blur()}
               error={errors.groupSize}
+              // §5.5 input style so Group Size matches Group Type on the
+              // same row — same 44px height (with reduced vertical padding)
+              // and same brand-spec border/focus glow inherited from the
+              // shared Input component.
+              className="rounded-input h-[44px] !py-0"
             />
           </div>
         </div>
@@ -1027,7 +1304,7 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
       {formData.doubleRooms > 0 && (
         <div className="mt-4 rounded-[14px] border border-sett-border-light bg-sett-fill p-5">
           <h3 className="font-montserrat text-[16px] font-semibold leading-normal text-sett-text-primary mb-4">
-            Select Bed Configuration for Double Room
+            {t.addHotel.selectBedConfiguration}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RoomCounter
@@ -1057,7 +1334,10 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.extraRoomsPlaceholder}
             value={formData.extraRooms}
             onChange={(e) => updateField('extraRooms', e.target.value)}
-            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
+            // §5.5 focus glow — same soft green box-shadow + brand-primary
+            // border as Budget Range, Group Type, and the Hotel Category
+            // trigger. Replaces the chunky Tailwind ring used previously.
+            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150 min-h-[80px]"
           />
         </div>
 
@@ -1106,7 +1386,10 @@ function RoomAccommodationsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.specialRequestsRoomPlaceholder}
             value={formData.specialRequestsRooms}
             onChange={(e) => updateField('specialRequestsRooms', e.target.value)}
-            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
+            // §5.5 focus glow — same soft green box-shadow + brand-primary
+            // border as Budget Range, Group Type, and the Hotel Category
+            // trigger.
+            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150 min-h-[80px]"
           />
         </div>
       </div>
@@ -1244,7 +1527,9 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             placeholder={t.createForm.specialRequestsCustomerPlaceholder}
             value={formData.specialRequestsCustomer}
             onChange={(e) => updateField('specialRequestsCustomer', e.target.value)}
-            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary min-h-[80px]"
+            // §5.5 focus glow — same soft green box-shadow + brand-primary
+            // border as the Room & Accommodations textareas and Budget Range.
+            className="w-full px-3 py-2.5 rounded-input border border-sett-border bg-white text-body text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150 min-h-[80px]"
           />
         </div>
       </div>

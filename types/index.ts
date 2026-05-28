@@ -66,7 +66,12 @@ export interface BookingRequest {
   checkinDate: string;
   checkoutDate?: string | null;
   nights: number;
+  // Legacy single-select star rating (kept for back-compat with older rows and Wix webhook).
+  // Always equals starRatings[0] when starRatings is present.
   starRating?: number | null;
+  // Multi-select hotel category — new canonical field. Use `selectedStars(req)` from
+  // lib/utils/starRatings to read with automatic legacy fallback.
+  starRatings?: number[] | null;
   budgetRange?: string | null;
   budget?: number | null;
   groupType?: string | null;
@@ -176,6 +181,11 @@ export interface ProposalHotel {
   address?: string | null;
   addressCity?: string | null;
   addressCountry?: string | null;
+  /** Deep-link to the hotel in SETTHub. Persisted at add-time from the
+   *  search-result payload so the request summary page can make the hotel
+   *  name clickable (opens in a new tab). May be null for hotels added
+   *  before this field was tracked. */
+  sethubDetailsUrl?: string | null;
   createdAt: string;
   includedInTotal?: boolean;
 }
@@ -269,7 +279,7 @@ export interface HotelSearchResult {
   sellingPricePerRoomPerNight: number;
   highestMidRangePrice: number;
   roomsAllocated: number;
-  capacityStatus?: 'CONFIRMED' | 'LIMITED';
+  capacityStatus?: 'CONFIRMED' | 'LIMITED' | 'INSUFFICIENT';
   cxlDeadline?: string | null;
   latitude?: number | null;
   longitude?: number | null;

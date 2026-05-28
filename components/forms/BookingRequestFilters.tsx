@@ -1,9 +1,7 @@
 'use client';
 
 import { Select } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
-import { Search, Plus } from 'lucide-react';
-import Link from 'next/link';
+import { Search } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface BookingRequestFiltersProps {
@@ -13,6 +11,13 @@ interface BookingRequestFiltersProps {
   onStatusChange: (v: string) => void;
   dateRange: string;
   onDateRangeChange: (v: string) => void;
+  /** Optional per-control entrance-animation delays. When provided, each
+   *  control wraps in animate-label-fade-up with its own delay so the page
+   *  can choreograph a sequential reveal (search → date → status). Omit any
+   *  field to skip its animation entirely. */
+  searchAnimationDelay?: number;
+  dateAnimationDelay?: number;
+  statusAnimationDelay?: number;
 }
 
 export function BookingRequestFilters({
@@ -22,6 +27,9 @@ export function BookingRequestFilters({
   onStatusChange,
   dateRange,
   onDateRangeChange,
+  searchAnimationDelay,
+  dateAnimationDelay,
+  statusAnimationDelay,
 }: BookingRequestFiltersProps) {
   const { t } = useLanguage();
 
@@ -46,9 +54,13 @@ export function BookingRequestFilters({
   ];
 
   return (
-    <div className="flex items-center gap-[14px] flex-wrap">
-      {/* Search bar */}
-      <div className="relative w-full flex-1 min-w-[200px] max-w-full md:max-w-[600px]">
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Search bar — grows to fill remaining row width, with a sensible cap
+          so it doesn't dominate when there's lots of horizontal space. */}
+      <div
+        className={`relative flex-1 min-w-[200px] max-w-[480px]${searchAnimationDelay != null ? ' animate-label-fade-up' : ''}`}
+        style={searchAnimationDelay != null ? { animationDelay: `${searchAnimationDelay}ms` } : undefined}
+      >
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-secondary" />
         <input
           type="search"
@@ -59,31 +71,27 @@ export function BookingRequestFilters({
         />
       </div>
 
-      {/* Date range */}
+      {/* Date range — wider (152px) so the chevron + active label have
+          breathing room and "Last 30 days" type values don't truncate. */}
       <Select
         variant="filter"
         options={dateOptions}
         value={dateRange}
         onChange={(e) => onDateRangeChange(e.target.value)}
-        className="w-[144px]"
+        className={`w-[152px] shrink-0${dateAnimationDelay != null ? ' animate-label-fade-up' : ''}`}
+        style={dateAnimationDelay != null ? { animationDelay: `${dateAnimationDelay}ms` } : undefined}
       />
 
-      {/* Status */}
+      {/* Status — slightly wider (160px) than Date because some status
+          labels ("AI Generated", "Processing") are longer. */}
       <Select
         variant="filter"
         options={statusOptions}
         value={status}
         onChange={(e) => onStatusChange(e.target.value)}
-        className="w-[144px]"
+        className={`w-[160px] shrink-0${statusAnimationDelay != null ? ' animate-label-fade-up' : ''}`}
+        style={statusAnimationDelay != null ? { animationDelay: `${statusAnimationDelay}ms` } : undefined}
       />
-
-      {/* Create button */}
-      <Link href="/booking-requests/create" className="ml-auto">
-        <Button variant="primary" size="md" className="text-white whitespace-nowrap">
-          <Plus className="w-4 h-4 mr-1" />
-          {t.nav.createRequest}
-        </Button>
-      </Link>
     </div>
   );
 }

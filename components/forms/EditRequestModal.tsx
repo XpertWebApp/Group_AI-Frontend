@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { requestsApi } from '@/lib/api/requests';
@@ -21,6 +22,8 @@ import {
   groupTypeRequiresAge,
   toCanonicalGroupType,
 } from '@/lib/utils/groupType';
+import { selectedStars } from '@/lib/utils/starRatings';
+import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
 import { Spinner } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils/cn';
 import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
@@ -40,7 +43,8 @@ interface FormState {
   destinationName: string;
   checkinDate: string;
   checkoutDate: string;
-  starRating: string;
+  /** Multi-select star category codes ("1".."5"). Empty = none ticked. */
+  starRatings: string[];
   budgetRange: string;
   groupType: string;
   groupSize: string;
@@ -64,17 +68,18 @@ interface FormState {
   customerNotes: string;
 }
 
-/* ── Shared label style matching create form ── */
+/* ── Shared label style — §5.5 form labels: Montserrat 600, 12px, uppercase,
+   letter-spacing 0.05em, navy. */
 const labelCls =
-  'block font-montserrat text-[14px] font-medium leading-normal text-sett-text-primary uppercase mb-1.5';
+  'block font-montserrat text-[12px] font-semibold leading-tight text-sett-navy uppercase tracking-[0.05em] mb-1';
 
-/* ── Shared input style matching create form ── */
+/* ── Shared input style ── */
 const inputCls =
-  'w-full p-3 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:ring-2 focus:ring-sett-primary transition-colors';
+  'w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] bg-white font-montserrat text-[13px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] transition-colors';
 
-/* ── Shared textarea style matching create form ── */
+/* ── Shared textarea style ── */
 const textareaCls =
-  'w-full px-3 py-2.5 rounded-[14px] border border-sett-border-light bg-white font-montserrat text-[14px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:ring-2 focus:ring-sett-primary transition-colors resize-none min-h-[80px]';
+  'w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] bg-white font-montserrat text-[13px] font-normal leading-normal text-sett-text-primary placeholder:text-sett-text-muted focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] transition-colors resize-none min-h-[64px]';
 
 /* ── Section header matching create form ── */
 function StarDisplay({ rating, label }: { rating: number; label: string }) {
@@ -105,12 +110,12 @@ function StarDisplay({ rating, label }: { rating: number; label: string }) {
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <div className="flex items-start gap-3 mb-5">
-      <div className="w-1 h-10 bg-sett-primary rounded-full mt-0.5 shrink-0" />
+    <div className="flex items-start gap-2.5 mb-3">
+      <div className="w-1 h-8 bg-sett-primary rounded-full mt-0.5 shrink-0" />
       <div>
-        <h3 className="font-montserrat text-[16px] font-bold text-sett-text-primary leading-tight">{title}</h3>
+        <h3 className="font-montserrat text-[14px] font-bold text-sett-text-primary leading-tight">{title}</h3>
         {subtitle && (
-          <p className="font-montserrat text-[13px] text-sett-text-accent mt-0.5">{subtitle}</p>
+          <p className="font-montserrat text-[12px] text-sett-text-accent mt-0.5 leading-snug">{subtitle}</p>
         )}
       </div>
     </div>
@@ -132,10 +137,10 @@ function RadioOption({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex items-center gap-2 p-3 rounded-[14px] border font-montserrat text-[14px] font-normal leading-normal transition-colors flex-1',
+        'flex items-center gap-2 px-3 py-2 rounded-[4px] border font-montserrat text-[13px] font-normal leading-normal transition-colors flex-1',
         selected
-          ? 'border-sett-primary/40 bg-sett-light-green-bg text-sett-text-primary'
-          : 'border-sett-border-light bg-white text-sett-text-primary hover:border-sett-primary/40'
+          ? 'border-sett-primary bg-[#F5F9E8] text-sett-navy'
+          : 'border-[#D0D0D0] bg-white text-sett-navy hover:border-sett-primary/60'
       )}
     >
       {selected ? (
@@ -188,7 +193,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     destinationName: '',
     checkinDate: '',
     checkoutDate: '',
-    starRating: '',
+    starRatings: [],
     budgetRange: '',
     groupType: '',
     groupSize: '',
@@ -222,6 +227,54 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
   const justSelectedRef = useRef(false);
   const destDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Hotel-category multi-select dropdown state. Mirrors the AddServiceModal UX.
+  const [hotelCatDropdownOpen, setHotelCatDropdownOpen] = useState(false);
+  const hotelCatWrapperRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hotelCatDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (hotelCatWrapperRef.current && !hotelCatWrapperRef.current.contains(e.target as Node)) {
+        setHotelCatDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [hotelCatDropdownOpen]);
+  const toggleHotelCategory = (value: string) => {
+    setForm((prev) => ({
+      ...prev,
+      starRatings: prev.starRatings.includes(value)
+        ? prev.starRatings.filter((v) => v !== value)
+        : [...prev.starRatings, value].sort(),
+    }));
+  };
+
+  // Anchors used to scroll the modal body so the date input is positioned with
+  // enough room for the calendar popper to fit fully below it.
+  const checkinAnchorRef = useRef<HTMLInputElement>(null);
+  const checkoutAnchorRef = useRef<HTMLInputElement>(null);
+
+  // When the user opens a calendar, gently scroll the modal so the input sits
+  // near the top — guarantees enough vertical room below for the calendar
+  // popper, even at 150% zoom where the calendar's footprint is taller than
+  // half the modal.
+  const ensureDatePickerVisible = useCallback((which: 'checkin' | 'checkout') => {
+    const container = scrollContainerRef.current;
+    const anchor = which === 'checkin' ? checkinAnchorRef.current : checkoutAnchorRef.current;
+    if (!container || !anchor) return;
+    // Defer to next frame so the popper has a chance to mount and measure.
+    requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      // Target: keep the input ~24px below the top of the scroll area.
+      const desiredOffsetFromTop = 24;
+      const delta = anchorRect.top - containerRect.top - desiredOffsetFromTop;
+      if (Math.abs(delta) > 4) {
+        container.scrollBy({ top: delta, behavior: 'smooth' });
+      }
+    });
+  }, []);
+
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -239,7 +292,10 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         destinationName: request.destinationName ?? '',
         checkinDate: request.checkinDate?.slice(0, 10) ?? '',
         checkoutDate: request.checkoutDate?.slice(0, 10) ?? '',
-        starRating: request.starRating?.toString() ?? '',
+        // Pre-tick selected categories. Reads new `starRatings` first, then falls
+        // back to wrapping the legacy single `starRating` so old saved requests
+        // open with the correct boxes already checked.
+        starRatings: selectedStars(request).map(String),
         budgetRange: request.budgetRange ?? '',
         groupType: request.groupType ?? '',
         groupSize: request.groupSize?.toString() ?? '',
@@ -293,19 +349,11 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close datepickers when modal scrolls to keep calendar in view
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    const handleScroll = () => {
-      // Trigger a document click to close any open datepicker
-      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    };
-
-    scrollContainer.addEventListener('scroll', handleScroll);
-    return () => scrollContainer.removeEventListener('scroll', handleScroll);
-  }, []);
+  // We deliberately do NOT close datepickers on every scroll anymore — the
+  // calendar now lives inside the modal body and may need the modal to scroll
+  // to fit fully on screen. Closing on programmatic scroll defeated that.
+  // (Outside-click and Escape still close the calendar via react-datepicker's
+  // own listeners.)
 
   const handleDestinationInputChange = useCallback((value: string) => {
     justSelectedRef.current = false;
@@ -357,8 +405,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     if (!form.destinationName?.trim()) {
       errors.destinationName = t.createForm.destinationRequired || 'Destination is required';
     }
-    if (!form.starRating) {
-      errors.starRating = t.createForm.hotelCategoryRequired || 'Hotel category is required';
+    if (form.starRatings.length === 0) {
+      errors.starRatings = t.createForm.hotelCategoryPickAtLeastOne || 'Pick at least one star category';
     }
     if (!form.checkinDate) {
       errors.checkinDate = t.createForm.checkinDateRequired;
@@ -460,7 +508,11 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         destinationName: form.destinationName,
         checkinDate: form.checkinDate,
         checkoutDate: form.checkoutDate || undefined,
-        starRating: form.starRating ? Number(form.starRating) : undefined,
+        // Send both fields during the migration window. Backend prefers `starRatings`.
+        starRatings: form.starRatings.length > 0
+          ? form.starRatings.map(Number).sort((a, b) => a - b)
+          : undefined,
+        starRating: form.starRatings.length > 0 ? Number(form.starRatings[0]) : undefined,
         budgetRange: form.budgetRange || undefined,
         // Always send the canonical code. If the form still carries a legacy
         // value (loaded from an older saved request), normalize it on write.
@@ -504,18 +556,14 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     }
   };
 
+  // Whole stars only (1–5) — matches the Create Request form. Half-star and
+  // 6-star values are intentionally not offered to staff.
   const hotelCategoryOptions = [
     { value: '1', label: t.createForm.star1, node: <StarDisplay rating={1} label={t.createForm.star1} /> },
-    { value: '1.5', label: t.createForm.star1_5, node: <StarDisplay rating={1.5} label={t.createForm.star1_5} /> },
     { value: '2', label: t.createForm.star2, node: <StarDisplay rating={2} label={t.createForm.star2} /> },
-    { value: '2.5', label: t.createForm.star2_5, node: <StarDisplay rating={2.5} label={t.createForm.star2_5} /> },
     { value: '3', label: t.createForm.star3, node: <StarDisplay rating={3} label={t.createForm.star3} /> },
-    { value: '3.5', label: t.createForm.star3_5, node: <StarDisplay rating={3.5} label={t.createForm.star3_5} /> },
     { value: '4', label: t.createForm.star4, node: <StarDisplay rating={4} label={t.createForm.star4} /> },
-    { value: '4.5', label: t.createForm.star4_5, node: <StarDisplay rating={4.5} label={t.createForm.star4_5} /> },
     { value: '5', label: t.createForm.star5, node: <StarDisplay rating={5} label={t.createForm.star5} /> },
-    { value: '5.5', label: t.createForm.star5_5, node: <StarDisplay rating={5.5} label={t.createForm.star5_5} /> },
-    { value: '6', label: t.createForm.star6, node: <StarDisplay rating={6} label={t.createForm.star6} /> },
   ];
 
   const budgetRangeOptions = [
@@ -533,42 +581,47 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     ? (toCanonicalGroupType(form.groupType) ?? form.groupType)
     : '';
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <ModalOverlay open={open} onClose={onClose}>
       <div
-        className="bg-white rounded-[14px] w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]"
-        style={{ boxShadow: '0px 4px 20px 0px #00000014' }}
+        className="bg-white w-full max-w-xl mx-4 flex flex-col max-h-[90vh] overflow-hidden"
+        style={{
+          borderRadius: 8, // §5.3 panel
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
       >
+        {/* §5.3 emphasis accent — 3px green strip at top */}
+        <div aria-hidden className="h-[3px] w-full bg-sett-primary shrink-0" />
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-sett-border-light">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E0E0E0]">
           <div>
-            <h2 className="font-montserrat text-[18px] font-semibold leading-none text-sett-text-primary">
+            <h2 className="font-montserrat text-[18px] font-bold leading-tight text-sett-navy">
               {t.offer.editRequestTitle}
             </h2>
-            <p className="font-montserrat text-[13px] text-sett-text-accent mt-1">
+            <p className="font-montserrat text-[13px] text-sett-grey mt-1 leading-snug">
               {t.offer.editRequestDesc}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-[10px] hover:bg-[#F7F7F7] transition-colors"
+            className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors shrink-0"
+            aria-label="Close"
           >
-            <X className="w-5 h-5 text-sett-text-accent" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Scrollable body */}
         <div
           ref={scrollContainerRef}
-          className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-7"
+          className="overflow-y-auto flex-1 px-5 py-4 flex flex-col gap-5"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
         >
 
           {/* ── Trip Details ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <SectionHeader
               title={t.offer.editTripDetails}
               subtitle={t.createForm.tripDetailsSubtitle}
@@ -582,7 +635,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 value={destQuery}
                 onChange={(e) => handleDestinationInputChange(e.target.value)}
                 onFocus={() => { if (destResults.length > 0) setDestOpen(true); }}
-                placeholder="e.g. Barcelona, Spain"
+                placeholder={t.createForm.destinationPlaceholder}
                 autoComplete="off"
               />
               {destLoading && (
@@ -606,10 +659,10 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   ))}
                 </ul>
               )}
-              {fieldErrors.destinationName && <p className="mt-1 text-caption text-red-500">{fieldErrors.destinationName}</p>}
+              {fieldErrors.destinationName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.destinationName}</p>}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Check-in */}
               <div>
                 <label className={labelCls}>{t.offer.editCheckIn}</label>
@@ -618,21 +671,25 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     selected={form.checkinDate ? new Date(form.checkinDate) : null}
                     onChange={(date: Date | null) =>
                       setField('checkinDate', date
-                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                        : '')
+                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
                     }
+                    onCalendarOpen={() => ensureDatePickerVisible('checkin')}
                     minDate={new Date()}
                     maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                     dateFormat="dd.MM.yyyy"
                     placeholderText="DD.MM.YYYY"
-                    popperClassName="sett-datepicker-popper"
+                    popperClassName="sett-datepicker-popper sett-datepicker-popper--in-modal"
                     popperPlacement="bottom-start"
                     wrapperClassName="w-full"
                     showPopperArrow={false}
-                    customInput={<DateInput />}
+                    customInput={<DateInput ref={checkinAnchorRef} />}
                   />
                 </div>
-                {fieldErrors.checkinDate && <p className="mt-1 text-caption text-red-500">{fieldErrors.checkinDate}</p>}
+                {fieldErrors.checkinDate && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.checkinDate}</p>}
+                {/* Passive hint matching the Create form. */}
+                <p className="mt-1.5 font-montserrat text-[11px] italic text-sett-text-secondary leading-snug">
+                  {t.createForm.checkInDateHint}
+                </p>
               </div>
 
               {/* Check-out */}
@@ -643,50 +700,177 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     selected={form.checkoutDate ? new Date(form.checkoutDate) : null}
                     onChange={(date: Date | null) =>
                       setField('checkoutDate', date
-                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                        : '')
+                        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : '')
                     }
+                    onCalendarOpen={() => ensureDatePickerVisible('checkout')}
                     minDate={form.checkinDate ? new Date(form.checkinDate) : new Date()}
                     maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
                     dateFormat="dd.MM.yyyy"
                     placeholderText="DD.MM.YYYY"
-                    popperClassName="sett-datepicker-popper"
+                    popperClassName="sett-datepicker-popper sett-datepicker-popper--in-modal"
                     popperPlacement="bottom-start"
                     wrapperClassName="w-full"
                     showPopperArrow={false}
-                    customInput={<DateInput />}
+                    customInput={<DateInput ref={checkoutAnchorRef} />}
                   />
                 </div>
-                {fieldErrors.checkoutDate && <p className="mt-1 text-caption text-red-500">{fieldErrors.checkoutDate}</p>}
+                {fieldErrors.checkoutDate && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.checkoutDate}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Select
-                  label={t.offer.editHotelCategory}
-                  options={hotelCategoryOptions}
-                  value={form.starRating}
-                  onChange={(e) => setField('starRating', e.target.value)}
-                  placeholder={t.createForm.selectHotelCategory}
-                />
-                {fieldErrors.starRating && <p className="mt-1 text-caption text-red-500">{fieldErrors.starRating}</p>}
-              </div>
-              <div>
-                <Select
-                  label={`${t.offer.editBudgetRange} ${t.createForm.optional}`}
-                  options={budgetRangeOptions}
-                  value={form.budgetRange}
-                  onChange={(e) => setField('budgetRange', e.target.value)}
-                  placeholder={t.createForm.selectBudgetRange}
-                />
+            {/* Free-cancellation contextual banner — same component as the
+                Create form. Surfaces graded warnings when the user edits the
+                check-in to a near date. */}
+            <FreeCancellationDateBanner checkInDate={form.checkinDate} />
+
+            {/* Hotel Category sits on its own full-width row. The chip list
+                can grow to ~5 rows when all star tiers are picked; pairing
+                it with a short sibling (Budget Range) left a tall empty
+                column on the right. Budget Range now follows after Group
+                Type / Group Size for a cleaner vertical rhythm. */}
+            <div>
+              {/* Lift wrapper z-index while open so the dropdown panel renders
+                  above the sibling Group Size field below it. */}
+              <div
+                ref={hotelCatWrapperRef}
+                className={hotelCatDropdownOpen ? 'relative z-[9999]' : undefined}
+              >
+                <label className={labelCls}>{t.offer.editHotelCategory}</label>
+                <div className="relative">
+                  {/* Multi-select trigger — same pattern as the create form */}
+                  <div
+                    role="combobox"
+                    aria-haspopup="listbox"
+                    aria-expanded={hotelCatDropdownOpen}
+                    aria-controls="edit-hotel-category-listbox"
+                    tabIndex={0}
+                    onClick={() => setHotelCatDropdownOpen((v) => !v)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setHotelCatDropdownOpen((v) => !v);
+                      }
+                    }}
+                    className={cn(
+                      'w-full min-h-[44px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-[14px] border bg-white cursor-pointer transition-all duration-150',
+                      fieldErrors.starRatings
+                        ? 'border-[#CC3333]'
+                        : hotelCatDropdownOpen
+                          ? 'border-sett-primary ring-2 ring-sett-primary/20'
+                          : 'border-sett-border-light hover:border-sett-primary/40',
+                    )}
+                  >
+                    {form.starRatings.length === 0 ? (
+                      <span className="font-montserrat text-[14px] font-normal text-sett-text-accent flex-1">
+                        {t.createForm.selectHotelCategory}
+                      </span>
+                    ) : (
+                      <>
+                        {hotelCategoryOptions
+                          .filter((o) => form.starRatings.includes(o.value))
+                          .map((opt) => (
+                            <span
+                              key={opt.value}
+                              // Hover micro-interaction matches the Create
+                              // form: chip lifts 1px, border deepens, soft
+                              // green shadow underneath.
+                              className="group/chip inline-flex items-center gap-1.5 px-2 py-1 rounded-[8px] bg-sett-light-green-bg border border-sett-primary/30 font-montserrat text-[12px] font-semibold text-sett-primary leading-tight cursor-default transition-all duration-200 ease-sett-out hover:-translate-y-0.5 hover:border-sett-primary hover:shadow-[0_4px_12px_-2px_rgba(170,199,55,0.35)] hover:bg-sett-light-green-bg/80"
+                            >
+                              {opt.node}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleHotelCategory(opt.value);
+                                }}
+                                className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ease-sett-out group-hover/chip:scale-110 hover:bg-sett-destructive/10 hover:text-sett-destructive hover:rotate-90"
+                                aria-label={`Remove ${opt.label}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                      </>
+                    )}
+                    <ChevronDown
+                      className={cn(
+                        'shrink-0 w-4 h-4 ml-auto text-sett-text-muted transition-transform duration-200',
+                        hotelCatDropdownOpen && 'rotate-180',
+                      )}
+                    />
+                  </div>
+
+                  {hotelCatDropdownOpen && (
+                    <div
+                      id="edit-hotel-category-listbox"
+                      role="listbox"
+                      aria-multiselectable="true"
+                      className="absolute z-20 w-full mt-1.5 bg-white border border-sett-border-light rounded-[14px] shadow-[0_8px_24px_0_rgba(0,0,0,0.12)] overflow-hidden"
+                    >
+                      <div className="px-3.5 py-2.5 border-b border-sett-border-light">
+                        <p className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent">
+                          {t.createForm.hotelCategory}
+                        </p>
+                      </div>
+                      <div
+                        className="max-h-[240px] overflow-y-auto py-1.5"
+                        style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
+                      >
+                        {hotelCategoryOptions.map((opt) => {
+                          const isSelected = form.starRatings.includes(opt.value);
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              onClick={() => toggleHotelCategory(opt.value)}
+                              className={cn(
+                                'w-full flex items-center gap-3 px-3.5 py-2.5 font-montserrat text-[14px] transition-colors',
+                                isSelected
+                                  ? 'bg-sett-light-green-bg text-sett-primary font-medium'
+                                  : 'text-sett-text-primary hover:bg-sett-fill',
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  'w-4 h-4 shrink-0 rounded-[4px] border flex items-center justify-center transition-colors',
+                                  isSelected
+                                    ? 'bg-sett-primary border-sett-primary'
+                                    : 'bg-white border-sett-border',
+                                )}
+                              >
+                                {isSelected && (
+                                  <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </span>
+                              {opt.node}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {fieldErrors.starRatings && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.starRatings}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Group Type + Group Size — required fields, side-by-side.
+                Always two columns: the modal is max-w-xl (576px), narrower
+                than Tailwind's md: breakpoint (768px), so a viewport-based
+                md:grid-cols-2 would never activate inside the modal. */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
+                {/* Render our own label with `labelCls` (12px uppercase navy)
+                    and override the Select trigger to match `inputCls` (4px
+                    radius, #D0D0D0 border, px-3 py-2, 13px). Without this the
+                    Select's built-in 14px label + 14px rounded-[14px] trigger
+                    visually mismatch the sibling Group Size input. */}
+                <label className={labelCls}>{t.offer.editGroupType}</label>
                 <Select
-                  label={t.offer.editGroupType}
                   options={groupTypeOptions}
                   value={displayedGroupType}
                   onChange={(e) => {
@@ -697,8 +881,9 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     }
                   }}
                   placeholder={t.createForm.selectGroupType}
+                  triggerClassName="rounded-[4px] border-[#D0D0D0] px-3 py-2 text-[13px]"
                 />
-                {fieldErrors.groupType && <p className="mt-1 text-caption text-red-500">{fieldErrors.groupType}</p>}
+                {fieldErrors.groupType && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.groupType}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editGroupSize}</label>
@@ -708,15 +893,33 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.groupSize}
                   onChange={(e) => setField('groupSize', e.target.value)}
-                  placeholder="e.g. 45"
+                  placeholder={t.createForm.groupSizePlaceholder}
                   onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 />
-                {fieldErrors.groupSize && <p className="mt-1 text-caption text-red-500">{fieldErrors.groupSize}</p>}
+                {fieldErrors.groupSize && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.groupSize}</p>}
               </div>
             </div>
 
+            {/* Budget Range — optional, on its own row at the end of the
+                trip-details block. Demoted here so the tall Hotel Category
+                chip list no longer leaves a big empty column next to it.
+                Label + trigger styled to match the sibling text inputs (see
+                Group Type above for the same pattern). */}
+            <div>
+              <label className={labelCls}>
+                {t.offer.editBudgetRange} {t.createForm.optional}
+              </label>
+              <Select
+                options={budgetRangeOptions}
+                value={form.budgetRange}
+                onChange={(e) => setField('budgetRange', e.target.value)}
+                placeholder={t.createForm.selectBudgetRange}
+                triggerClassName="rounded-[4px] border-[#D0D0D0] px-3 py-2 text-[13px]"
+              />
+            </div>
+
             {groupTypeRequiresAge(form.groupType) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>{t.createForm.averageAge}</label>
                   <input
@@ -739,20 +942,20 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                     placeholder={t.createForm.averageAgePlaceholder}
                     onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   />
-                  {fieldErrors.averageAge && <p className="mt-1 text-caption text-red-500">{fieldErrors.averageAge}</p>}
+                  {fieldErrors.averageAge && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.averageAge}</p>}
                 </div>
               </div>
             )}
           </div>
 
           {/* ── Room & Accommodations ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <SectionHeader
               title={t.offer.editRoomAccommodations}
               subtitle={t.createForm.roomSubtitle}
             />
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <RoomCounter
                 label={t.createForm.singleRoom}
                 value={form.single}
@@ -784,8 +987,8 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 onChange={(v) => setField('quadruple', v)}
               />
             </div>
-            {fieldErrors.rooms && <p className="mt-1 text-caption text-red-500">{fieldErrors.rooms}</p>}
-            {fieldErrors.bedConfig && <p className="mt-1 text-caption text-red-500">{fieldErrors.bedConfig}</p>}
+            {fieldErrors.rooms && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.rooms}</p>}
+            {fieldErrors.bedConfig && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.bedConfig}</p>}
 
             {/* Bed configuration for double rooms */}
             {form.double > 0 && (
@@ -793,7 +996,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 <h4 className="font-montserrat text-[14px] font-semibold text-sett-text-primary mb-4">
                   {t.offer.bedConfiguration}
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <RoomCounter
                     label={t.offer.standardDoubleBed}
                     value={form.standardDoubleBeds}
@@ -856,7 +1059,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 rows={2}
                 value={form.extraRoomsNote}
                 onChange={(e) => setField('extraRoomsNote', e.target.value)}
-                placeholder="Any extra room requirements..."
+                placeholder={t.offer.editExtraRoomsPlaceholder}
               />
             </div>
 
@@ -870,28 +1073,28 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 rows={2}
                 value={form.specialRequirements}
                 onChange={(e) => setField('specialRequirements', e.target.value)}
-                placeholder="e.g. Wheelchair access, Food allergies"
+                placeholder={t.createForm.specialRequestsCustomerPlaceholder}
               />
             </div>
           </div>
 
           {/* ── Customer Details ── */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <SectionHeader
               title={t.offer.editCustomerDetails}
               subtitle={t.createForm.customerSubtitle}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>{t.offer.editCompanyName}</label>
                 <input
                   className={inputCls}
                   value={form.companyName}
                   onChange={(e) => setField('companyName', e.target.value)}
-                  placeholder="Company name"
+                  placeholder={t.createForm.companyNamePlaceholder}
                 />
-                {fieldErrors.companyName && <p className="mt-1 text-caption text-red-500">{fieldErrors.companyName}</p>}
+                {fieldErrors.companyName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.companyName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editFirstName}</label>
@@ -899,9 +1102,9 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.firstName}
                   onChange={(e) => setField('firstName', e.target.value)}
-                  placeholder="First name"
+                  placeholder={t.createForm.firstNamePlaceholder}
                 />
-                {fieldErrors.firstName && <p className="mt-1 text-caption text-red-500">{fieldErrors.firstName}</p>}
+                {fieldErrors.firstName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.firstName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editLastName}</label>
@@ -909,9 +1112,9 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.lastName}
                   onChange={(e) => setField('lastName', e.target.value)}
-                  placeholder="Last name"
+                  placeholder={t.createForm.lastNamePlaceholder}
                 />
-                {fieldErrors.lastName && <p className="mt-1 text-caption text-red-500">{fieldErrors.lastName}</p>}
+                {fieldErrors.lastName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.lastName}</p>}
               </div>
               <div>
                 <label className={labelCls}>{t.offer.editEmail}</label>
@@ -920,9 +1123,9 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                   className={inputCls}
                   value={form.contactEmail}
                   onChange={(e) => setField('contactEmail', e.target.value)}
-                  placeholder="email@example.com"
+                  placeholder={t.createForm.emailPlaceholder}
                 />
-                {fieldErrors.contactEmail && <p className="mt-1 text-caption text-red-500">{fieldErrors.contactEmail}</p>}
+                {fieldErrors.contactEmail && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.contactEmail}</p>}
               </div>
               <div>
                 <PhoneInputSplit
@@ -947,19 +1150,19 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 rows={2}
                 value={form.customerNotes}
                 onChange={(e) => setField('customerNotes', e.target.value)}
-                placeholder="Any additional notes..."
+                placeholder={t.offer.editCustomerNotesPlaceholder}
               />
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-sett-border-light">
+        {/* Footer — §5.1 buttons */}
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-[#E0E0E0]">
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="inline-flex py-3 px-5 justify-center items-center rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] font-semibold leading-normal text-sett-text-secondary transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-[#EBEBEB] hover:text-sett-text-primary hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms] disabled:opacity-50"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] border-2 border-sett-primary bg-transparent font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-primary hover:bg-sett-primary/5 active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
             {t.modals.cancel}
           </button>
@@ -967,7 +1170,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex py-3 px-5 justify-center items-center rounded-[14px] bg-sett-primary shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[14px] font-semibold leading-normal text-white transition-all duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-sett-primary-hover hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms] disabled:opacity-50"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] bg-sett-primary hover:bg-sett-green-dark font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-navy active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
             {saving ? (
               <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -977,6 +1180,6 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

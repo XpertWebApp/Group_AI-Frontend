@@ -25,8 +25,13 @@ export function HotelName({ hotel, className = '', showIcon = true }: HotelNameP
       href={sethubDetailsUrl}
       target="_blank"
       rel="noopener noreferrer"
+      // inline-flex without min-w-0 + negative margins used to push the bounding
+      // box past the parent on narrow viewports, causing long DE CTA labels to
+      // overlap the title. Switched to a regular inline flow + max-w-full so the
+      // anchor honors the parent's clip region and the title text wraps cleanly.
       className={`
-        inline-flex items-center gap-2 rounded-md px-2 py-1 -mx-2 -my-1
+        inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5
+        max-w-full min-w-0 align-baseline break-words
         text-sett-primary hover:text-sett-primary-hover active:text-sett-primary-active
         hover:bg-sett-primary/5 active:bg-sett-primary/10
         transition-all duration-200 ease-out
@@ -36,7 +41,7 @@ export function HotelName({ hotel, className = '', showIcon = true }: HotelNameP
       `}
       title={`Open ${hotelName} details in SETTHub (opens in new tab)`}
     >
-      <span className="font-medium underline-offset-2 group-hover:underline">
+      <span className="font-medium underline-offset-2 group-hover:underline min-w-0 break-words">
         {hotelName}
       </span>
       {showIcon && (

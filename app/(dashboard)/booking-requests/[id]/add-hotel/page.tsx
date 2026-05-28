@@ -1,16 +1,19 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, ArrowRight, MapPin, Star, Check, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus,
+  ArrowLeft, ArrowRight, MapPin, Star, Check, BadgeCheck, AlertTriangle, SlidersHorizontal, Info, Clock, Hotel, ChevronDown, ChevronRight, Plus, Search,
   Wifi, Cigarette, CigaretteOff, ShowerHead, Bath, Coffee, ShieldCheck,
   Tv, UtensilsCrossed, ParkingSquare, Wine, Snowflake, Accessibility,
   Sofa, Dumbbell, Waves, Briefcase, ConciergeBell, Sparkles,
-  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, Users, type LucideIcon,
+  WashingMachine, Dog, Flower2, TreePine, RotateCcw, X, SquarePen, ZoomIn, Users,
+  Phone, Shirt, ShoppingBag, Scissors, Car, Stethoscope, MoveVertical,
+  type LucideIcon,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -19,12 +22,14 @@ import { StarRating } from '@/components/ui/StarRating';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { HotelName } from '@/components/ui/HotelName';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
 import { formatDateEU } from '@/lib/dateFormatter';
 import { cn } from '@/lib/utils/cn';
 import { groupTypeRequiresAge } from '@/lib/utils/groupType';
+import { selectedStars, hotelStarBucket, hotelMatchesSelectedStars } from '@/lib/utils/starRatings';
 import type {
   HotelSearchResult,
   HotelSearchPhase,
@@ -33,6 +38,7 @@ import type {
   HotelSearchInitResponse,
 } from '@/types';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { localizeHotelNote, localizeCapacityStatus } from '@/lib/i18n/localizeHotelNote';
 
 type SearchPhase = 'idle' | 'searching' | 'polling' | 'done' | 'error';
 
@@ -42,23 +48,34 @@ const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds instead of 3 to reduce AP
 const AMENITY_ICON_MAP: Record<string, LucideIcon> = {
   'air conditioning': Snowflake,
   'bar': Wine,
+  'bar(s)': Wine,
+  'bars': Wine,
   'bathroom with bath': Bath,
   'bathroom with shower': ShowerHead,
   'business center': Briefcase,
   'business centre': Briefcase,
   'disabled access': Accessibility,
   'internet': Wifi,
+  'internet access': Wifi,
   'wi-fi': Wifi,
   'wifi': Wifi,
+  'wlan': Wifi,
+  'wlan access': Wifi,
   'free wifi': Wifi,
   'non smoking rooms': CigaretteOff,
   'non-smoking rooms': CigaretteOff,
   'smoking rooms': Cigarette,
   'parking': ParkingSquare,
+  'car park': ParkingSquare,
+  'garage': Car,
   'restaurant': UtensilsCrossed,
+  'restaurant(s)': UtensilsCrossed,
+  'restaurants': UtensilsCrossed,
   'safe': ShieldCheck,
+  'hotel safe': ShieldCheck,
   'tv cable / satellite': Tv,
   'tv cable/satellite': Tv,
+  'tv room': Tv,
   'tea / coffee facilities': Coffee,
   'tea/coffee facilities': Coffee,
   'lounge area': Sofa,
@@ -76,12 +93,30 @@ const AMENITY_ICON_MAP: Record<string, LucideIcon> = {
   'spa': Sparkles,
   'laundry': WashingMachine,
   'laundry service': WashingMachine,
+  'laundry facilities': WashingMachine,
   'pets allowed': Dog,
   'pet friendly': Dog,
+  'pets': Dog,
   'garden': Flower2,
   'terrace': TreePine,
   'concierge': ConciergeBell,
   'room service': ConciergeBell,
+  // Newly mapped GIATA entries spotted in the wild — see screenshot from QA.
+  'telephone': Phone,
+  'phone': Phone,
+  'iron / ironing board': Shirt,
+  'iron/ironing board': Shirt,
+  'ironing board': Shirt,
+  'iron': Shirt,
+  'shops': ShoppingBag,
+  'hairdresser': Scissors,
+  'conference room': Briefcase,
+  'medical assistance': Stethoscope,
+  'lifts': MoveVertical,
+  'elevators': MoveVertical,
+  'elevator': MoveVertical,
+  '24-hour reception': ConciergeBell,
+  '24h reception': ConciergeBell,
 };
 
 function getAmenityIcon(name: string): LucideIcon | null {
@@ -119,7 +154,7 @@ const DateInputComponent = forwardRef<HTMLInputElement, DateInputProps>(
         ref={ref}
         value={value as string}
         onClick={onClick}
-        onChange={() => {}}
+        onChange={() => { }}
         placeholder={placeholder}
         readOnly
         className="w-full px-3 py-2 rounded-[10px] border border-sett-primary bg-white font-montserrat text-[14px] text-sett-text-primary focus:outline-none focus:ring-2 focus:ring-sett-primary/30 cursor-pointer pr-10"
@@ -136,6 +171,118 @@ const DateInputComponent = forwardRef<HTMLInputElement, DateInputProps>(
   )
 );
 DateInputComponent.displayName = 'DateInputComponent';
+
+function FilterDropdown({
+  label,
+  icon: Icon,
+  children,
+  isOpen,
+  onToggle,
+  onClose,
+  active,
+  valueDisplay,
+}: {
+  label: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  active?: boolean;
+  valueDisplay?: string | React.ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({ position: 'fixed', visibility: 'hidden' });
+
+  // Close on outside click
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!containerRef.current?.contains(target) && !popoverRef.current?.contains(target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [isOpen, onClose]);
+
+  // Position logic
+  const updatePosition = useCallback(() => {
+    if (!isOpen || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const dropdownWidth = 280;
+
+    // Default: bottom-start
+    let top = rect.bottom + 8;
+    let left = rect.left;
+
+    // Boundary check (right)
+    if (left + dropdownWidth > window.innerWidth) {
+      left = window.innerWidth - dropdownWidth - 16;
+    }
+
+    setPopoverStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${dropdownWidth}px`,
+      zIndex: 100,
+      visibility: 'visible',
+    });
+  }, [isOpen]);
+
+  useEffect(() => {
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, { capture: true });
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, { capture: true });
+    };
+  }, [updatePosition]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-200 shadow-sm hover:shadow-md h-[40px]',
+          active
+            ? 'bg-sett-primary/10 border-sett-primary text-sett-primary'
+            : 'bg-white border-sett-border hover:border-sett-primary/40 text-sett-text-primary'
+        )}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="font-montserrat text-[14px] font-semibold whitespace-nowrap">{label}</span>
+        {valueDisplay && (
+          <span className="font-montserrat text-[13px] font-medium opacity-80 border-l border-current/20 pl-2 ml-1">
+            {valueDisplay}
+          </span>
+        )}
+        <ChevronDown className={cn('w-4 h-4 ml-1 transition-transform', isOpen && 'rotate-180')} />
+      </button>
+
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={popoverRef}
+          style={popoverStyle}
+          className="bg-white rounded-[20px] border border-sett-border-light shadow-xl overflow-hidden animate-modal-overlay-in"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4">
+            {children}
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
 
 const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
 
@@ -164,22 +311,35 @@ function getHotelImageChain(hotel: { imageUrls?: string[]; imageUrl?: string | n
   return chain;
 }
 
-// Known API room type names → human-readable labels
-const ROOM_TYPE_LABELS: Record<string, string> = {
-  twinbeds: 'Twin Rooms',
-  standarddoublebeds: 'Standard Double Rooms',
-  single: 'Single',
-  double: 'Double',
-  twin: 'Twin',
-  triple: 'Triple',
-  quadruple: 'Quadruple',
-  suite: 'Suite',
-  suites: 'Suites',
-};
-
-function formatRoomType(raw: string): string {
-  // Check known map first (case-insensitive)
-  const known = ROOM_TYPE_LABELS[raw.toLowerCase().replace(/[_\s]/g, '')];
+/**
+ * Map an API-shaped room-type code (e.g. "StandardDoubleBeds", "twin_beds",
+ * "Single") to the user's current locale label. Pass the addHotel slice of
+ * translations so the labels respect EN ↔ DE without making this a hook.
+ *
+ * Falls back to a generated camelCase split when the code isn't in our
+ * known set (so a brand-new server-side room type still renders sanely).
+ */
+function formatRoomType(
+  raw: string,
+  tAddHotel: {
+    roomSingle: string; roomDouble: string; roomTriple: string;
+    roomQuadruple: string; roomSuite: string; roomSuites: string;
+    standardDoubleBed: string; twinBed: string;
+  },
+): string {
+  const normalized = raw.toLowerCase().replace(/[_\s]/g, '');
+  const map: Record<string, string> = {
+    twinbeds: tAddHotel.twinBed,
+    twin: tAddHotel.twinBed,
+    standarddoublebeds: tAddHotel.standardDoubleBed,
+    single: tAddHotel.roomSingle,
+    double: tAddHotel.roomDouble,
+    triple: tAddHotel.roomTriple,
+    quadruple: tAddHotel.roomQuadruple,
+    suite: tAddHotel.roomSuite,
+    suites: tAddHotel.roomSuites,
+  };
+  const known = map[normalized];
   if (known) return known;
   // Split camelCase: "TwinBeds" → "Twin Beds", "StandardDoubleBeds" → "Standard Double Beds"
   return raw
@@ -253,6 +413,11 @@ export default function AddHotelPage() {
   const hotelUpdateThrottledRef = useRef(false);
   const previousTotalRef = useRef(0);
   const widerAreaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the 90-second alternatives-safety setTimeout(s) so they can be
+  // cancelled on unmount — otherwise the user navigates back to Request
+  // Summary mid-search and gets a "No alternative hotels found" toast 90s
+  // later, even though they already left the page.
+  const altsSafetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRequestStatusCheckRef = useRef(0);
   const isPollingActiveRef = useRef(false);
   // Mirror alternatives state into refs so the long-lived poll closure (created
@@ -264,11 +429,45 @@ export default function AddHotelPage() {
   useEffect(() => { alternativesFetchedRef.current = alternativesFetched; }, [alternativesFetched]);
   useEffect(() => { alternativesLoadingRef.current = alternativesLoading; }, [alternativesLoading]);
 
+  // While a "Search More" batch is polling, the backend's /status response
+  // sometimes returns only the new batch's jobs (without the prior batch's
+  // COMPLETED ones), so naively replacing completedResults from each poll
+  // wipes the visible list and the skeleton flashes back. We track the
+  // mode + a snapshot of prior results in refs (poll closure has [] deps
+  // and would otherwise read stale state) so the poll can union rather
+  // than overwrite. See feedback_poll_closure_refs.md.
+  const searchMoreActiveRef = useRef(false);
+  const completedResultsRef = useRef<HotelSearchResult[]>([]);
+  useEffect(() => { completedResultsRef.current = completedResults; }, [completedResults]);
+
+  // Stream-order tracking: first poll to see a given hotelCode stamps an
+  // incrementing arrival index. Render-time we sort descending by this so
+  // newly-arrived hotels appear at the top of the list (user doesn't have
+  // to scroll to see them stream in). Already-displayed cards keep their
+  // arrival stamp so they don't shuffle on later polls.
+  const arrivalOrderRef = useRef<Map<string, number>>(new Map());
+  const arrivalCounterRef = useRef(0);
+  const stampArrivals = useCallback((hotels: HotelSearchResult[]) => {
+    for (const h of hotels) {
+      if (!arrivalOrderRef.current.has(h.hotelCode)) {
+        arrivalCounterRef.current += 1;
+        arrivalOrderRef.current.set(h.hotelCode, arrivalCounterRef.current);
+      }
+    }
+  }, []);
+
+  // Set by the poll loop the first time an alternative hotel actually shows
+  // up in the results. Used by the 90s safety timeout in handleShowAlternatives
+  // so we don't pop a false "No alternative hotels found" toast in cases where
+  // alternatives DID arrive but the loading-state hand-off didn't clean up the
+  // spinner (e.g. user navigated away, poll throttled at the wrong tick, etc).
+  const hasAlternativeArrivedRef = useRef(false);
+
   // Filters
   const [starFilters, setStarFilters] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [amenityFilters, setAmenityFilters] = useState<number[]>([]);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<'stars' | 'price' | 'amenities' | null>(null);
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string; sethubDetailsUrl?: string | null } | null>(null);
@@ -298,8 +497,17 @@ export default function AddHotelPage() {
         if (!mountedRef.current) return;
         if (updatedRequest) {
           setRequest(updatedRequest);
-          // If backend says needs_manual_handling, watcher is done exhausting ladder
-          if (updatedRequest.status === 'needs_manual_handling') {
+          // If backend says needs_manual_handling, watcher is done exhausting ladder.
+          // BUT: if the user just clicked "Show Alternatives" from the manual-request
+          // screen, the backend request will still read needs_manual_handling until
+          // the alternatives finish — flipping back to the manual card here would
+          // wipe the alternatives polling UI mid-flight. Skip the revert while
+          // alternatives are loading or have been fetched in this session.
+          if (
+            updatedRequest.status === 'needs_manual_handling' &&
+            !alternativesLoadingRef.current &&
+            !alternativesFetchedRef.current
+          ) {
             // Mark search as exhausted since backend confirmed watcher finished
             setSearchExhausted(true);
             setManualRequestOnly(true);
@@ -351,6 +559,10 @@ export default function AddHotelPage() {
       mountedRef.current = false;
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
+      // Cancel the alternatives-safety timer so it can't fire a false
+      // "No alternative hotels found" toast on whatever page the user
+      // navigated to (Request Summary, Dashboard, etc.).
+      if (altsSafetyTimerRef.current) clearTimeout(altsSafetyTimerRef.current);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
@@ -366,6 +578,7 @@ export default function AddHotelPage() {
       const finalHotels = status.jobs
         .filter((j) => j.status === 'COMPLETED' && j.resultJson)
         .map((j) => j.resultJson!);
+      stampArrivals(finalHotels);
       setCompletedResults(finalHotels);
       const checked = status.summary.completed + status.summary.skipped + status.summary.failed;
       setSearchSummary({
@@ -428,10 +641,16 @@ export default function AddHotelPage() {
             if (req?.status === 'needs_manual_handling') {
               hasBackendSignal = true;
               setSearchExhausted(true);
-              // When backend marks as needs_manual_handling, show the manual request card
               if (!mountedRef.current) return;
-              setManualRequestOnly(true);
-              setPhase('done');
+              // When backend says needs_manual_handling, normally we show the
+              // manual-request card. BUT: when the user clicked Show Alternatives
+              // from that same screen, the backend status stays needs_manual_handling
+              // while alternatives are running. Reverting here would blank the UI
+              // mid-flight. Skip the flip while alternatives are loading/fetched.
+              if (!alternativesLoadingRef.current && !alternativesFetchedRef.current) {
+                setManualRequestOnly(true);
+                setPhase('done');
+              }
             }
           } catch {
             // Silently ignore request status fetch errors
@@ -490,17 +709,45 @@ export default function AddHotelPage() {
         // values from the initial render.
         const altFetched = alternativesFetchedRef.current;
         const altLoading = alternativesLoadingRef.current;
+
+        // During Search More, the backend may transiently return only the new
+        // batch's jobs. Merge with what's already on screen (by hotelCode) so
+        // the visible list grows monotonically and never flashes the skeleton.
+        const applyHotelResults = (next: HotelSearchResult[]) => {
+          // Stamp arrival order before committing — render-time sort uses this
+          // to surface newest hotels at the top of the list.
+          stampArrivals(next);
+          if (searchMoreActiveRef.current) {
+            const prev = completedResultsRef.current;
+            const byCode = new Map<string, HotelSearchResult>();
+            for (const h of prev) byCode.set(h.hotelCode, h);
+            for (const h of next) byCode.set(h.hotelCode, h);
+            setCompletedResults(Array.from(byCode.values()));
+          } else {
+            setCompletedResults(next);
+          }
+        };
+
         // Stream alternative hotels into the UI as they arrive — but keep the
         // "loading" spinner up until ALL alternative probes have drained, so the
         // user understands more results may still be coming. (Previously we
         // cleared the spinner on the first alternative, then polling terminated
         // before the rest arrived.)
+        // Record (in a ref) whether any alternative has materialized this poll
+        // so the 90s safety timeout in handleShowAlternatives can avoid
+        // toasting "No alternative hotels found" after alternatives in fact
+        // arrived.
+        if (altFetched && results.some(h => h.searchKind === 'alternative')) {
+          hasAlternativeArrivedRef.current = true;
+        }
+
         if (altFetched && altLoading) {
           const altsProbesDone = status.summary.queued === 0 && status.summary.running === 0;
+          const altsBackendDone = status.summary.phase === 'settled' || status.summary.phase === 'exhausted';
           const hasAlt = results.some(h => h.searchKind === 'alternative');
-          if (hasAlt && altsProbesDone) {
+          if (altsProbesDone && (hasAlt || altsBackendDone)) {
             setAlternativesLoading(false);
-            setCompletedResults(results);
+            applyHotelResults(results);
           }
         }
 
@@ -510,12 +757,12 @@ export default function AddHotelPage() {
           // For alternatives, update immediately without throttling
           if (results.length !== lastHotelCountRef.current) {
             lastHotelCountRef.current = results.length;
-            setCompletedResults(results);
+            applyHotelResults(results);
           }
         } else if (!hotelUpdateThrottledRef.current && results.length !== lastHotelCountRef.current) {
           // For main search, apply throttling
           lastHotelCountRef.current = results.length;
-          setCompletedResults(results);
+          applyHotelResults(results);
 
           // Mark as throttled for next 1 second
           hotelUpdateThrottledRef.current = true;
@@ -552,26 +799,30 @@ export default function AddHotelPage() {
         // Terminal logic depends on which search mode we're in:
         //
         // ── Alternatives mode (altFetched === true) ──
-        //   The main search's `phase` may still be 'settled' from before the user
-        //   clicked Show Alternatives — that doesn't mean alternatives are done.
-        //   The only reliable "alternatives finished" signal is: no more probes
-        //   queued or running AND at least one alternative has actually arrived.
-        //   We ignore `phase` here entirely because the watcher's phase value is
-        //   tied to the main search lifecycle, not alternatives.
+        //   Terminal = no more probes queued/running AND the backend has settled
+        //   or exhausted. We do NOT require an alternative to actually appear in
+        //   results: a destination with zero viable rooms (e.g. all probes return
+        //   SKIPPED_INSUFFICIENT) is a valid terminal-with-zero outcome and the
+        //   UI needs to flip to the empty state instead of polling forever.
         //
         // ── Main search mode ──
         //   Use `summary.phase` per backend's handover ('settled' / 'exhausted'
         //   are terminal; 'in_progress' keeps polling).
         const hasAlternativeInResults = results.some(h => h.searchKind === 'alternative');
         const altsProbesDrained = status.summary.queued === 0 && status.summary.running === 0;
+        const altsBackendTerminal = backendPhase === 'settled' || backendPhase === 'exhausted';
 
         const isSearchDone = altFetched
-          // Alternatives mode: terminal = probes drained AND at least one alt visible
-          ? altsProbesDrained && hasAlternativeInResults
+          // Alternatives mode: probes drained AND backend has signed off.
+          ? altsProbesDrained && altsBackendTerminal
           // Main mode: rely on backend phase signal (with legacy fallback)
           : (phaseTerminal || legacyTerminal);
 
-        const showEmptyState = !altFetched && (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
+        // Empty-state covers both modes: main-search exhausted with nothing,
+        // OR alternatives finished and zero alternative hotels actually arrived.
+        const showEmptyState = altFetched
+          ? (altsProbesDrained && altsBackendTerminal && !hasAlternativeInResults && results.length === 0)
+          : (phaseExhausted || (legacyTerminal && status.summary.completed === 0 && searchExhausted));
 
         if (status.summary.total === 0) {
           // No jobs queued yet — keep polling
@@ -594,6 +845,8 @@ export default function AddHotelPage() {
           // the button re-renders correctly (visible if more batches available,
           // hidden if the destination is now drained).
           setSearchingMore(false);
+          // Search More batch finished — go back to replace-mode for future polls.
+          searchMoreActiveRef.current = false;
           if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
 
           // Only show "No Hotels Found" if search exhausted with zero results
@@ -699,6 +952,10 @@ export default function AddHotelPage() {
     setSearchSummary(null);
     setCanSearchMore(false);
     setSearchingMore(false);
+    searchMoreActiveRef.current = false;
+    // Reset arrival order so the next stream starts fresh.
+    arrivalOrderRef.current = new Map();
+    arrivalCounterRef.current = 0;
     setSearchingWiderArea(false);
     previousTotalRef.current = 0;
     if (widerAreaTimerRef.current) clearTimeout(widerAreaTimerRef.current);
@@ -755,6 +1012,10 @@ export default function AddHotelPage() {
         if (destinationId !== undefined) {
           localStorage.setItem(`lastSearchDest_${requestId}`, String(destinationId));
         }
+        // Resuming an existing search: stamp arrivals so all already-found
+        // hotels get a baseline index. Subsequent poll updates will stamp
+        // newer hotels with higher indices and render them first.
+        stampArrivals(completedHotels);
         setCompletedResults(completedHotels);
         setSearchSummary({
           total: status.summary.total,
@@ -798,10 +1059,17 @@ export default function AddHotelPage() {
     startNewSearch();
   }, [requestId, startPollingFallback, startNewSearch]);
 
+  // Kick off the search exactly once per requestId. We deliberately do NOT
+  // depend on `request` here: the polling status-check effect calls
+  // setRequest() periodically to detect needs_manual_handling, and rerunning
+  // runSearch on every such update would wipe completedResults and flash the
+  // skeleton (this is what made "Search More" look like a fresh search).
+  const searchKickedOffForRef = useRef<string | null>(null);
   useEffect(() => {
-    if (request) {
-      runSearch(request.destinationId);
-    }
+    if (!request) return;
+    if (searchKickedOffForRef.current === request.id) return;
+    searchKickedOffForRef.current = request.id;
+    runSearch(request.destinationId);
   }, [request, runSearch]);
 
   // Restart search from scratch
@@ -815,6 +1083,8 @@ export default function AddHotelPage() {
     setDestinationFallback(null);
     setManualRequestOnly(false);
     setPhase('searching');
+    arrivalOrderRef.current = new Map();
+    arrivalCounterRef.current = 0;
     // Clear localStorage to force a fresh search
     localStorage.removeItem(`lastSearchDest_${requestId}`);
     // Directly start a new search via API
@@ -828,10 +1098,6 @@ export default function AddHotelPage() {
     setEditCheckinDate(isoToDate(request.checkinDate ?? ''));
     setEditCheckoutDate(isoToDate(request.checkoutDate ?? ''));
     setEditingTripDetails(true);
-    // The sidebar (which holds Trip Details) is hidden by default below xl
-    // (1280px). Force it open so the edit form is actually visible when the
-    // user clicks "Edit Trip Details" on the no-hotels-available screen.
-    setFiltersOpen(true);
     // Scroll sidebar into view with a small delay to ensure state is updated
     // and the sidebar has had time to render.
     setTimeout(() => {
@@ -930,6 +1196,9 @@ export default function AddHotelPage() {
 
   // Show alternatives (relaxed criteria search)
   const handleShowAlternatives = useCallback(async () => {
+    // Fresh attempt — reset the "alternative arrived" tracker so the 90s
+    // safety timeout below only fires if no alt actually shows up.
+    hasAlternativeArrivedRef.current = false;
     setAlternativesLoading(true);
     try {
       const resp = await requestsApi.startHotelSearchAlternatives(requestId, {
@@ -938,8 +1207,15 @@ export default function AddHotelPage() {
         nationalityCode: request?.nationalityCode || undefined,
         lang: locale === 'de' ? 'de' : 'en',
       });
+      // totalCandidates === 0 means the BE found nothing new to probe THIS
+      // attempt. But if hotels are already visible from a prior attempt,
+      // toasting "no alternatives found" is false from the user's POV —
+      // they're looking at alternatives on screen right now. Only toast when
+      // the results list is also empty.
       if (resp.totalCandidates === 0) {
-        toast.error(t.addHotel.noAlternativesFound);
+        if (completedResultsRef.current.length === 0) {
+          toast.error(t.addHotel.noAlternativesFound);
+        }
         setAlternativesLoading(false);
         return;
       }
@@ -948,12 +1224,31 @@ export default function AddHotelPage() {
       // Start polling for alternatives WITHOUT changing main phase
       // This keeps main results visible while only alternatives section loads
       startPollingFallback(requestId);
-      // Safety: if alternatives never arrive within 90s, stop the spinner so the
-      // user isn't stuck staring at it forever (rare backend-stall edge case).
-      setTimeout(() => {
+      // Safety net: if 90 seconds pass while we're still showing the spinner
+      // AND no alternative ever materialized, stop the spinner and tell the
+      // user. The two guards are critical:
+      //   - hasAlternativeArrivedRef: flipped by the poll when it sees a
+      //     hotel with searchKind === 'alternative'.
+      //   - completedResultsRef.current.length: catches the case where the BE
+      //     returned alternatives without the explicit searchKind tag, so
+      //     they're visible on screen but the type-discriminated ref stayed
+      //     false. Toasting "no alternatives" while results are on screen
+      //     would be false (Offer #447 regression).
+      // Cancel any previous safety timer (e.g. from a prior Show Alternatives
+      // click) before scheduling a new one so the older one can't fire late.
+      if (altsSafetyTimerRef.current) clearTimeout(altsSafetyTimerRef.current);
+      altsSafetyTimerRef.current = setTimeout(() => {
+        // If the user navigated away, do nothing — no spinner to clear and
+        // no page to toast on. Without this guard the toast appears on
+        // Request Summary 90s after the user backed out mid-search.
+        if (!mountedRef.current) return;
         if (alternativesLoadingRef.current) {
           setAlternativesLoading(false);
-          toast.error(t.addHotel.noAlternativesFound);
+          const altsArrived = hasAlternativeArrivedRef.current
+            || completedResultsRef.current.length > 0;
+          if (!altsArrived) {
+            toast.error(t.addHotel.noAlternativesFound);
+          }
         }
       }, 90000);
     } catch {
@@ -962,6 +1257,75 @@ export default function AddHotelPage() {
     }
   }, [requestId, relaxation, request, startPollingFallback, locale, t]);
 
+  // Wrapper for the "No Hotels Available" screen. Triggers the same relaxed-
+  // criteria search, then decides what to show next:
+  //   - alternatives queued → drop the manual card, flip to polling so the
+  //     streaming alternatives grid replaces the empty-state screen.
+  //   - zero candidates → keep the manual card in place; handleShowAlternatives
+  //     toasts the user so they understand why nothing changed.
+  const handleShowAlternativesFromManual = useCallback(async () => {
+    setAlternativesLoading(true);
+    // Sync the ref immediately so the polling status-check effect (which fires
+    // the moment we flip phase to 'polling' below) doesn't read stale `false`
+    // and revert manualRequestOnly back to true.
+    alternativesLoadingRef.current = true;
+    try {
+      const resp = await requestsApi.startHotelSearchAlternatives(requestId, {
+        appliedLevel: relaxation?.level ?? 'exact',
+        currencyCode: request?.currencyCode || 'EUR',
+        nationalityCode: request?.nationalityCode || undefined,
+        lang: locale === 'de' ? 'de' : 'en',
+      });
+      if (resp.totalCandidates === 0) {
+        // Same logic as handleShowAlternatives — don't false-toast when
+        // hotels are already visible from a prior attempt.
+        if (completedResultsRef.current.length === 0) {
+          toast.error(t.addHotel.noAlternativesFound);
+        }
+        setAlternativesLoading(false);
+        return;
+      }
+      // Got candidates — surrender the empty-state UI and let the poll stream
+      // alternatives into completedResults.
+      setManualRequestOnly(false);
+      setAlternativesFetched(true);
+      // Sync the fetched ref immediately. The first poll fires synchronously
+      // inside startPollingFallback() below; without this, that poll reads
+      // `altFetched = false` from the stale ref, takes the main-search terminal
+      // branch (request is still needs_manual_handling), flips manualRequestOnly
+      // and phase back, and the screen ends up blank. See feedback memory on
+      // poll-closure refs.
+      alternativesFetchedRef.current = true;
+      setAlternativesExpanded(true);
+      setPhase('polling');
+      // Reset the "arrived" tracker — this flow may follow a previous attempt
+      // and we want the 90s safety timer to judge this attempt's results only.
+      hasAlternativeArrivedRef.current = false;
+      startPollingFallback(requestId);
+      // Safety: same 90s fail-safe as handleShowAlternatives — guard against
+      // a false "no alternatives" toast when results in fact arrived but the
+      // loading-state hand-off didn't tick in time. Earlier this handler had
+      // no guard at all, which caused the false toast on Offer #447.
+      if (altsSafetyTimerRef.current) clearTimeout(altsSafetyTimerRef.current);
+      altsSafetyTimerRef.current = setTimeout(() => {
+        // Same unmount guard as handleShowAlternatives — don't toast on a
+        // page the user has already left.
+        if (!mountedRef.current) return;
+        if (alternativesLoadingRef.current) {
+          setAlternativesLoading(false);
+          const altsArrived = hasAlternativeArrivedRef.current
+            || completedResultsRef.current.length > 0;
+          if (!altsArrived) {
+            toast.error(t.addHotel.noAlternativesFound);
+          }
+        }
+      }, 90000);
+    } catch {
+      toast.error('Failed to fetch alternatives');
+      setAlternativesLoading(false);
+    }
+  }, [requestId, relaxation, request, locale, t, startPollingFallback]);
+
   // "Search More" — fetches the next ~200 hotels at the same destination + star
   // rating. Reuses the existing polling loop: new hotels stream into the same
   // `completedResults` array as `jobs[]` grows on the /status response.
@@ -969,6 +1333,10 @@ export default function AddHotelPage() {
     setSearchingMore(true);
     // Optimistically hide the button while we wait for the decision + first poll.
     setCanSearchMore(false);
+    // Tell the poll loop to UNION new results with what's already on screen,
+    // instead of replacing — otherwise an interim /status response with only
+    // the new batch's jobs blanks out the previously-loaded cards.
+    searchMoreActiveRef.current = true;
     try {
       const resp = await requestsApi.startHotelSearchMore(requestId, {
         currencyCode: request?.currencyCode || 'EUR',
@@ -1062,6 +1430,9 @@ export default function AddHotelPage() {
         address: hotel.address ?? null,
         addressCity: hotel.addressCity ?? null,
         addressCountry: hotel.addressCountry ?? null,
+        // Persist the SETTHub deep link so the request summary page can make
+        // the hotel name clickable later.
+        sethubDetailsUrl: hotel.sethubDetailsUrl ?? null,
       });
 
       setAddedHotels((prev) => new Set(prev).add(hotel.hotelCode));
@@ -1096,20 +1467,21 @@ export default function AddHotelPage() {
     }, {})
   );
 
-  // Split results into 3 buckets: main, star-mismatch, and true alternatives
-  // Coerce starRating to number — live API may return it as a string or decimal (e.g. "4.5")
-  // Use Math.round so that 4.5 → 5, 3.5 → 4, matching whole-number filter options
-  const hotelStars = (h: { starRating: number }) => Math.round(Number(h.starRating));
-  const requestedStars = Math.round(Number(request?.starRating ?? 0));
+  // Split results into 3 buckets: main, star-mismatch, and true alternatives.
+  // Now multi-aware: a hotel "matches" if its rounded star bucket is in the
+  // user's selected categories (whatever they ticked in the form).
+  const hotelStars = (h: { starRating: number }) => hotelStarBucket(h);
+  const requestedStarBuckets = selectedStars(request ?? {}).map((s) => Math.round(s));
+  const hasRequestedStars = requestedStarBuckets.length > 0;
 
-  // Main results: searchKind=main OR (no searchKind AND star rating matches)
+  // Main results: searchKind=main OR (no searchKind AND star rating matches any selected category)
   const mainResults = deduplicatedResults.filter(
-    (h) => h.searchKind === 'main' || (!h.searchKind && (!requestedStars || hotelStars(h) === requestedStars))
+    (h) => h.searchKind === 'main' || (!h.searchKind && (!hasRequestedStars || hotelMatchesSelectedStars(h, requestedStarBuckets)))
   );
 
-  // Star mismatch results: no searchKind AND star rating doesn't match (old relaxation)
+  // Star mismatch results: no searchKind AND star rating doesn't match any selected category
   const starMismatchResults = deduplicatedResults.filter(
-    (h) => !h.searchKind && requestedStars && hotelStars(h) !== requestedStars
+    (h) => !h.searchKind && hasRequestedStars && !hotelMatchesSelectedStars(h, requestedStarBuckets)
   );
 
   // True alternatives: searchKind=alternative (from alternatives endpoint)
@@ -1137,36 +1509,132 @@ export default function AddHotelPage() {
   // sent by backend but isn't meaningful, so we don't render the badge.
   const isYouthOrSchoolGroup = groupTypeRequiresAge(request?.groupType);
 
+  // Sort by descending arrival order so newly-streamed hotels appear at the
+  // top of each section. Cards that arrived together (same poll tick) tie-break
+  // on their relative order within `completedResults`, which keeps groups stable.
+  // Hotels without an arrival stamp (defensive — shouldn't normally happen)
+  // fall to the bottom.
+  const byNewestFirst = (a: HotelSearchResult, b: HotelSearchResult) => {
+    const ai = arrivalOrderRef.current.get(a.hotelCode) ?? 0;
+    const bi = arrivalOrderRef.current.get(b.hotelCode) ?? 0;
+    return bi - ai;
+  };
+
   // Apply filters separately to main and star-mismatch results (not to true alternatives)
-  const filteredMainResults = applyFilters(mainResults);
-  const filteredStarMismatchResults = applyFilters(starMismatchResults);
+  const filteredMainResults = [...applyFilters(mainResults)].sort(byNewestFirst);
+  const filteredStarMismatchResults = [...applyFilters(starMismatchResults)].sort(byNewestFirst);
   // True alternatives use raw list (no star/price/amenity filters applied)
-  const filteredAltResults = trueAltResults;
+  const filteredAltResults = [...trueAltResults].sort(byNewestFirst);
   // Combine: main results first, then star-mismatch, then true alternatives
   const filteredResults = [...filteredMainResults, ...filteredStarMismatchResults, ...filteredAltResults];
 
-  // Compute "Show Alternatives" button visibility locally
-  // Show button only when 1-4 main hotels succeeded and alternatives not yet fetched
-  const TERMINAL_STATUSES = new Set(['COMPLETED', 'SKIPPED_INSUFFICIENT', 'FAILED']);
-  const mainProbeJobs = completedResults.filter((h) => h.searchKind !== 'alternative') || [];
-  const allMainProbesTerminal = mainProbeJobs.length > 0 && mainProbeJobs.every((h) => {
-    // Check if this hotel was from a completed probe (searchKind=main or no searchKind)
-    return !h.searchKind || h.searchKind === 'main';
-  });
+  // Compute "Show Alternatives" button visibility locally.
+  // Per Oliver's directive: show the button whenever the search has settled
+  // and the main result count hasn't met the 50-hotel target. The user can
+  // then widen the net via the alternatives endpoint. Hide once alternatives
+  // are already being fetched, or when manual-handling is required.
+  const SHOW_ALTERNATIVES_TARGET = 50;
   const mainSuccessfulCount = completedResults.filter((h) => h.searchKind !== 'alternative').length;
   const shouldShowAlternativesButton =
-    allMainProbesTerminal &&
+    // Wait for the search to finish before offering the action so the count is stable.
+    phase === 'done' &&
+    // Need at least one main result so the button appears in context with hotels above it.
     mainSuccessfulCount >= 1 &&
-    mainSuccessfulCount <= 4 &&
+    // Below the target = there's still headroom to widen.
+    mainSuccessfulCount < SHOW_ALTERNATIVES_TARGET &&
     !alternativesFetched &&
     !manualRequestOnly;
 
+  // Search More slot — two renderings of the same state:
+  //   - `searchMoreSlot`        : full-width pill, used at the bottom of the list.
+  //   - `searchMoreInlineSlot`  : compact button sized to sit inside the
+  //     main-results header row, alongside the Search Again icon. Both share
+  //     the same searchingMore / canSearchMore gating so they appear in lockstep.
+  const searchMoreSlot = searchingMore ? (
+    <div
+      className="flex items-center justify-center gap-2.5 py-4 px-5 rounded-[14px] border border-sett-primary/25 bg-sett-primary/5 animate-sidebar-fade-up"
+      role="status"
+      aria-live="polite"
+    >
+      <svg className="w-4 h-4 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      <span className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+        {t.addHotel.searchingMore}
+      </span>
+    </div>
+  ) : canSearchMore && phase === 'done' ? (
+    <div className="flex justify-center py-3 animate-sidebar-fade-up">
+      <button
+        type="button"
+        onClick={handleSearchMore}
+        className="group relative flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-gradient-to-r from-sett-primary via-sett-primary to-sett-green-dark font-montserrat text-[14px] font-bold uppercase tracking-[0.04em] transition-transform duration-200 hover:-translate-y-[1px] animate-button-glow-pulse overflow-hidden"
+      >
+        {/* Hover-state overlay: reverses the gradient direction so the dark
+            green sweeps across on hover, giving a soft fade rather than a flat
+            color swap. */}
+        <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-sett-green-dark via-sett-green-dark to-sett-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Soft white sheen sweeping across the surface — adds the "flash"
+            on top of the base gradient. */}
+        <span
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-button-text-shine pointer-events-none"
+        />
+        <Search className="w-4 h-4 relative z-10 text-sett-navy group-hover:text-white transition-colors" />
+        {/* Text shine: stays dark navy the whole time. The middle stop uses
+            a slightly darker navy so a subtle highlight reads as a glint
+            traveling across the letters — never blowing out to white where
+            it would disappear into the green button surface. */}
+        <span
+          className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-sett-navy via-sett-navy/60 to-sett-navy animate-button-text-shine group-hover:from-white group-hover:via-white group-hover:to-white"
+        >
+          {t.addHotel.searchMore}
+        </span>
+      </button>
+    </div>
+  ) : null;
+
+  const searchMoreInlineSlot = searchingMore ? (
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] border border-sett-primary/25 bg-sett-primary/5 shrink-0"
+      role="status"
+      aria-live="polite"
+    >
+      <svg className="w-3.5 h-3.5 animate-spin text-sett-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+      <span className="font-montserrat text-[12px] font-semibold text-sett-text-primary whitespace-nowrap">
+        {t.addHotel.searchingMore}
+      </span>
+    </div>
+  ) : canSearchMore && phase === 'done' ? (
+    <button
+      type="button"
+      onClick={handleSearchMore}
+      className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-gradient-to-r from-sett-primary via-sett-primary to-sett-green-dark font-montserrat text-[12px] font-bold uppercase tracking-[0.04em] transition-transform duration-200 hover:-translate-y-[1px] animate-button-glow-pulse shrink-0 whitespace-nowrap overflow-hidden"
+    >
+      <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-sett-green-dark via-sett-green-dark to-sett-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <span
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-button-text-shine pointer-events-none"
+      />
+      <Search className="w-3.5 h-3.5 relative z-10 text-sett-navy group-hover:text-white transition-colors" />
+      <span
+        className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-sett-navy via-sett-navy/60 to-sett-navy animate-button-text-shine group-hover:from-white group-hover:via-white group-hover:to-white"
+      >
+        {t.addHotel.searchMore}
+      </span>
+    </button>
+  ) : null;
+
   return (
-    <div className="flex flex-col min-h-full xl:h-full xl:overflow-hidden">
+    <div className="flex flex-col min-h-full xl-wide:h-full xl-wide:overflow-hidden">
       <Header title={t.createForm.title} />
 
       <div
-        className="p-4 md:p-6 flex-1 xl:min-h-0 flex flex-col gap-6"
+        className="p-4 md:p-6 flex-1 xl-wide:min-h-0 flex flex-col gap-6"
         onWheel={(e) => {
           if (!hotelListRef.current) return;
           const target = e.target as Node;
@@ -1183,7 +1651,7 @@ export default function AddHotelPage() {
         }}
       >
         {/* Breadcrumb */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl:shrink-0 animate-sidebar-fade-up">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 xl-wide:shrink-0 animate-sidebar-fade-up">
           <button
             type="button"
             onClick={() => router.push(`/booking-requests/${requestId}`)}
@@ -1210,7 +1678,6 @@ export default function AddHotelPage() {
           const pct = searchSummary && searchSummary.total > 0
             ? Math.round((searchSummary.completed / searchSummary.total) * 100)
             : 0;
-          const remaining = searchSummary ? Math.max(0, searchSummary.total - searchSummary.completed) : 0;
           // Inter-batch lull: backend is paginating but no jobs are in flight yet.
           // The numeric % stops being meaningful here (it'll plateau near 100%), so we
           // switch to an indeterminate "still searching" bar until the next batch enqueues.
@@ -1264,8 +1731,8 @@ export default function AddHotelPage() {
                         {isBetweenBatches
                           ? t.addHotel.searchingWiderTitle
                           : t.addHotel.hotelsChecked
-                              .replace('{completed}', String(searchSummary.completed))
-                              .replace('{total}', String(searchSummary.total))}
+                            .replace('{completed}', String(searchSummary.completed))
+                            .replace('{total}', String(searchSummary.total))}
                       </p>
                     )}
                   </div>
@@ -1312,27 +1779,13 @@ export default function AddHotelPage() {
                   </div>
                 )}
 
-                {/* Divider */}
-                {searchSummary && <div className="hidden sm:block w-px self-stretch bg-sett-border-light shrink-0" />}
-
-                {/* Right: stat pills */}
-                {searchSummary && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    {/* Remaining — show "—" between batches since the count is meaningless there */}
-                    <div className="flex flex-col items-center px-3 py-2 rounded-[10px] border border-sett-border-light min-w-[52px] bg-sett-fill">
-                      <span className="font-montserrat text-[18px] font-bold text-sett-text-primary leading-none tabular-nums">
-                        {isBetweenBatches ? '—' : remaining}
-                      </span>
-                      <span className="font-montserrat text-[11px] font-semibold uppercase tracking-wide text-sett-text-accent mt-0.5">{t.addHotel.searchRemaining}</span>
-                    </div>
-
-                    {/* Scroll hint badge */}
-                    {searchSummary.hotelsFound > 0 && (
-                      <div className="hidden md:flex items-center gap-1 pl-1 text-sett-primary shrink-0">
-                        <ChevronDown className="w-4 h-4 animate-bounce" />
-                        <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
-                      </div>
-                    )}
+                {/* Right: scroll hint (Remaining pill removed — the number
+                    was misleading because the backend's total grows as the
+                    ring widens, so "Remaining" would shift mid-search). */}
+                {searchSummary && searchSummary.hotelsFound > 0 && (
+                  <div className="hidden md:flex items-center gap-1 text-sett-primary shrink-0">
+                    <ChevronDown className="w-4 h-4 animate-bounce" />
+                    <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
                   </div>
                 )}
               </div>
@@ -1348,11 +1801,13 @@ export default function AddHotelPage() {
           );
         })()}
 
-        {/* Skeleton — searching/polling with no results yet */}
-        {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && (
-          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
+        {/* Skeleton — searching/polling with no results yet.
+            Suppressed during "Search More" so a transient empty poll response
+            doesn't blank out the already-loaded cards. */}
+        {(phase === 'searching' || phase === 'polling') && completedResults.length === 0 && !manualRequestOnly && !searchingMore && (
+          <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
             {/* Left sidebar skeleton — hidden on mobile */}
-            <div className="hidden xl:block xl:w-[300px] shrink-0 xl:overflow-y-auto">
+            <div className="hidden xl-wide:block xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto">
               <div className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-pulse">
                 {/* Section title */}
                 <div className="h-4 w-24 rounded bg-sett-border mb-5" />
@@ -1405,7 +1860,7 @@ export default function AddHotelPage() {
             </div>
 
             {/* Right hotel cards skeleton */}
-            <div className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1 space-y-4">
+            <div className="flex-1 min-w-0 xl-wide:overflow-y-auto xl-wide:pr-1 space-y-4">
               {[1, 2, 3].map((n) => (
                 <div key={n} className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden animate-pulse">
                   <div className="flex flex-col sm:flex-row">
@@ -1519,26 +1974,10 @@ export default function AddHotelPage() {
 
         {/* Manual request card + sidebar — when no hotels found */}
         {phase === 'done' && manualRequestOnly && (
-          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
-            {/* ── Mobile/tablet sidebar toggle ── */}
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
-            </button>
-
-            {/* ── Left Sidebar: Trip Details + Filters (always visible in manual mode) ── */}
-            <aside ref={sidebarRef} className={cn(
-              'xl:w-[300px] shrink-0 xl:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden xl:block'
-            )}>
-              <div
-                className="bg-white rounded-[14px] border border-sett-border-light p-5 animate-card-rise-in"
-                style={{ animationDelay: '160ms' }}
-              >
+          <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
+            {/* ── Left Sidebar: Trip Details (Information Only) ── */}
+            <aside ref={sidebarRef} className="xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto h-full hidden xl-wide:flex xl-wide:flex-col">
+              <div className="bg-white xl-wide:rounded-[14px] xl-wide:border xl-wide:border-sett-border-light p-5 animate-card-rise-in flex-1 overflow-y-auto" style={{ animationDelay: '160ms' }}>
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
                 {editingTripDetails && (
                   <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
@@ -1654,6 +2093,117 @@ export default function AddHotelPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Desktop Only Filters */}
+                  <div className="hidden xl-wide:block space-y-5 pt-5 border-t border-sett-border-light">
+                    {/* Star Rating */}
+                    <div className="flex flex-col gap-3">
+                      <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        {t.addHotel.starRating}
+                      </label>
+                      <div className="flex flex-col gap-3">
+                        {[5, 4, 3, 2, 1].map((star) => (
+                          <label
+                            key={star}
+                            className={cn(
+                              'flex items-center gap-3 cursor-pointer transition-opacity',
+                              starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
+                            )}
+                            onClick={() => toggleStar(star)}
+                          >
+                            <span className={cn(
+                              'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                              starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                            )}>
+                              {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
+                            </span>
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: star }).map((_, i) => (
+                                <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
+                              ))}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Price Per Night */}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.pricePerNight}
+                        </label>
+                        <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
+                          style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
+                          &euro;{maxPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="relative pt-1 pb-1">
+                        <input
+                          type="range"
+                          min={0}
+                          max={3000}
+                          step={50}
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(Number(e.target.value))}
+                          style={{
+                            background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
+                          }}
+                          className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Amenities */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.amenities}
+                        </label>
+                        {availableFacilities.length > 6 && (
+                          <button
+                            type="button"
+                            className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                            onClick={() => setShowAllAmenities((prev) => !prev)}
+                          >
+                            {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
+                          const AmenityIcon = getAmenityIcon(facility.name);
+                          return (
+                            <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                              <span className={cn(
+                                'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                                amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                              )}
+                                onClick={() => toggleAmenity(facility.id)}
+                              >
+                                {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                              </span>
+                              {AmenityIcon && (
+                                <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
+                              )}
+                              <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                                {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -1664,6 +2214,8 @@ export default function AddHotelPage() {
                 requestRef={request?.referenceNumber?.toString() ?? requestId}
                 onSent={() => toast.success(t.addHotel.manualRequestSent)}
                 onEditTripDetails={handleEditTripDetails}
+                onShowAlternatives={handleShowAlternativesFromManual}
+                alternativesLoading={alternativesLoading}
               />
             </div>
           </div>
@@ -1671,192 +2223,59 @@ export default function AddHotelPage() {
 
         {/* Normal results grid — show results as soon as they arrive, even while polling */}
         {completedResults.length > 0 && !manualRequestOnly && (
-          <div className="flex flex-col xl:flex-row gap-6 xl:flex-1 xl:min-h-0">
-            {/* ── Mobile/tablet filter toggle ── */}
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className="xl:hidden flex items-center justify-center gap-2 px-4 py-2.5 bg-sett-card rounded-card border border-sett-border text-body font-medium text-sett-text-primary"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              {filtersOpen ? t.addHotel.hideFilters : t.addHotel.showFilters}
-              {(starFilters.length > 0 || amenityFilters.length > 0 || maxPrice < 3000) && (
-                <span className="w-2 h-2 rounded-full bg-sett-primary" />
-              )}
-            </button>
-
-            {/* ── Left Sidebar: Trip Details + Filters ── */}
-            <aside ref={sidebarRef} className={cn(
-              'xl:w-[300px] shrink-0 xl:overflow-y-auto',
-              filtersOpen ? 'block' : 'hidden xl:block'
-            )}>
-              <div className="bg-white rounded-[14px] border border-sett-border-light p-5">
-                <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
-                {editingTripDetails && (
-                  <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
-                    <SquarePen className="w-3.5 h-3.5 text-sett-primary shrink-0" />
-                    <span className="font-montserrat text-[12px] font-semibold text-sett-primary">{t.addHotel.editingTripDetails}</span>
-                  </div>
-                )}
-                <hr className="border-sett-border-light mb-5" />
-
-                <div className="space-y-5">
-                  {/* Destination */}
-                  <div className="flex flex-col gap-[6px]">
-                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                      {t.addHotel.destination}
-                    </label>
-                    <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
-                      {request?.destinationName || '—'}
-                    </div>
-                  </div>
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Stay Dates */}
-                  <div className="flex flex-col gap-[6px]">
-                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                      {t.addHotel.stayDates}
-                    </label>
-                    {editingTripDetails ? (
-                      <div className="flex flex-col gap-2">
-                        <DatePicker
-                          selected={editCheckinDate}
-                          onChange={(date: Date | null) => setEditCheckinDate(date)}
-                          minDate={new Date()}
-                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                          dateFormat="dd.MM.yyyy"
-                          placeholderText="DD.MM.YYYY"
-                          popperClassName="sett-datepicker-popper"
-                          popperPlacement="bottom-start"
-                          wrapperClassName="w-full"
-                          todayButton={t.addHotel.today}
-                          showPopperArrow={false}
-                          customInput={<DateInputComponent />}
-                        />
-                        <DatePicker
-                          selected={editCheckoutDate}
-                          onChange={(date: Date | null) => setEditCheckoutDate(date)}
-                          minDate={editCheckinDate || new Date()}
-                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
-                          dateFormat="dd.MM.yyyy"
-                          placeholderText="DD.MM.YYYY"
-                          popperClassName="sett-datepicker-popper"
-                          popperPlacement="bottom-start"
-                          wrapperClassName="w-full"
-                          todayButton={t.addHotel.today}
-                          showPopperArrow={false}
-                          customInput={<DateInputComponent />}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                        {formatDateEU(request?.checkinDate)}
-                        {' - '}
-                        {formatDateEU(request?.checkoutDate)}
-                      </div>
-                    )}
-                  </div>
-
-                  {editingTripDetails && (
-                    <div className="flex gap-2 pb-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        className="flex-1"
-                        disabled={!editCheckinDate || savingTripDetails}
-                        onClick={handleSaveTripDetails}
+          <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
+            {/* ── Sticky Header Filter Bar (Mobile Only) ── */}
+            <div className="xl-wide:hidden sticky top-[64px] z-20 py-2 -mx-4 px-4 md:-mx-6 md:px-6 bg-sett-background/80 backdrop-blur-sm transition-all duration-300">
+              <div className="flex flex-wrap items-center gap-2">
+                <FilterDropdown
+                  label={t.addHotel.starRating}
+                  icon={Star}
+                  isOpen={activeDropdown === 'stars'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'stars' ? null : 'stars')}
+                  onClose={() => setActiveDropdown(null)}
+                  active={starFilters.length > 0}
+                  valueDisplay={starFilters.length > 0 ? `${starFilters.length}` : null}
+                >
+                  <div className="flex flex-col gap-3 min-w-[180px]">
+                    {[5, 4, 3, 2, 1].map((star) => (
+                      <label
+                        key={star}
+                        className={cn(
+                          'flex items-center gap-3 cursor-pointer hover:bg-sett-background p-2 rounded-lg transition-colors',
+                          starFilters.includes(star) ? 'opacity-100' : 'opacity-40'
+                        )}
+                        onClick={() => toggleStar(star)}
                       >
-                        {savingTripDetails ? `${t.common.loading}` : t.addHotel.saveAndResearch}
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setEditingTripDetails(false)}
-                        disabled={savingTripDetails}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Rooms Required */}
-                  {request?.rooms && (
-                    <div className="flex flex-col gap-[6px]">
-                      <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
-                        {t.addHotel.roomsrequired}
-                      </label>
-                      <div className="space-y-2">
-                        {[
-                          { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
-                          { key: 'roomStandardDouble', label: t.addHotel.standardDoubleBed, value: request.rooms.standardDoubleBeds },
-                          { key: 'roomTwin', label: t.addHotel.twinBed, value: request.rooms.twinBeds },
-                          { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
-                          { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
-                        ]
-                          .filter((r) => r.value && r.value > 0)
-                          .map((r) => (
-                            <div key={r.key} className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
-                              <span>{r.label}</span>
-                              <span className="font-semibold text-sett-text-primary">{r.value}</span>
-                            </div>
+                        <span className={cn(
+                          'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                          starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                        )}>
+                          {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
+                        </span>
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: star }).map((_, i) => (
+                            <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
                           ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Star Rating */}
-                  <div className="flex flex-col gap-3">
-                    <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                      {t.addHotel.starRating}
-                    </label>
-                    <div className="flex flex-col gap-3">
-                      {[5, 4, 3].map((star) => (
-                        <label
-                          key={star}
-                          className={cn(
-                            'flex items-center gap-3 cursor-pointer transition-opacity',
-                            starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
-                          )}
-                          onClick={() => toggleStar(star)}
-                        >
-                          <span className={cn(
-                            'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
-                            starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
-                          )}>
-                            {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
-                          </span>
-                          <div className="flex gap-0.5">
-                            {Array.from({ length: star }).map((_, i) => (
-                              <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
-                            ))}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <hr className="border-sett-border-light" />
-
-                  {/* Price Per Night */}
-                  <div className="flex flex-col gap-3">
-                    {/* Label row */}
-                    <div className="flex items-center justify-between">
-                      <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                        {t.addHotel.pricePerNight}
+                        </div>
                       </label>
-                      {/* Active value badge */}
-                      <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
-                        style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
-                        &euro;{maxPrice.toLocaleString()}
-                      </span>
-                    </div>
+                    ))}
+                  </div>
+                </FilterDropdown>
 
-                    {/* Slider track */}
+                <FilterDropdown
+                  label={t.addHotel.pricePerNight}
+                  icon={MoveVertical}
+                  isOpen={activeDropdown === 'price'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'price' ? null : 'price')}
+                  onClose={() => setActiveDropdown(null)}
+                  active={maxPrice < 3000}
+                  valueDisplay={maxPrice < 3000 ? `€${maxPrice}` : null}
+                >
+                  <div className="flex flex-col gap-3 min-w-[220px]">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-semibold text-sett-text-primary">Max Price</span>
+                      <span className="text-[13px] font-bold text-sett-primary">€{maxPrice.toLocaleString()}</span>
+                    </div>
                     <div className="relative pt-1 pb-1">
                       <input
                         type="range"
@@ -1869,69 +2288,293 @@ export default function AddHotelPage() {
                           background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
                         }}
                         className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
-                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110
-                        [&::-moz-range-thumb]:w-[18px] [&::-moz-range-thumb]:h-[18px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-sett-primary [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:cursor-pointer"
+                      [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
                       />
                     </div>
-
-                    {/* Min / Max labels */}
                     <div className="flex items-center justify-between">
-                      <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
-                      <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
+                      <span className="text-[11px] font-medium text-sett-text-accent">€0</span>
+                      <span className="text-[11px] font-medium text-sett-text-accent">€3,000</span>
+                    </div>
+                  </div>
+                </FilterDropdown>
+
+                <FilterDropdown
+                  label={t.addHotel.amenities}
+                  icon={SlidersHorizontal}
+                  isOpen={activeDropdown === 'amenities'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'amenities' ? null : 'amenities')}
+                  onClose={() => setActiveDropdown(null)}
+                  active={amenityFilters.length > 0}
+                  valueDisplay={amenityFilters.length > 0 ? amenityFilters.length : null}
+                >
+                  <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto min-w-[220px] pr-1">
+                    {availableFacilities.map((facility) => {
+                      const AmenityIcon = getAmenityIcon(facility.name);
+                      const isSelected = amenityFilters.includes(facility.id);
+                      return (
+                        <label
+                          key={facility.id}
+                          className={cn(
+                            "flex items-center gap-2.5 p-2 rounded-lg cursor-pointer transition-colors hover:bg-sett-background",
+                            isSelected ? "bg-sett-primary/5" : ""
+                          )}
+                          onClick={() => toggleAmenity(facility.id)}
+                        >
+                          <span className={cn(
+                            'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                            isSelected ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                          )}>
+                            {isSelected && <span className="w-2 h-2 rounded-full bg-white" />}
+                          </span>
+                          {AmenityIcon && <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />}
+                          <span className="font-montserrat text-[13px] text-sett-text-secondary truncate">
+                            {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </FilterDropdown>
+              </div>
+            </div>
+
+            {/* ── Left Sidebar: Trip Details (Information Only) ── */}
+            <aside ref={sidebarRef} className="xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto h-full hidden xl-wide:flex xl-wide:flex-col">
+              <div className="bg-white xl-wide:rounded-[14px] xl-wide:border xl-wide:border-sett-border-light p-5 flex-1 overflow-y-auto">
+                <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
+                {editingTripDetails && (
+                  <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-sett-primary/10 border border-sett-primary/30">
+                    <SquarePen className="w-3.5 h-3.5 text-sett-primary shrink-0" />
+                    <span className="font-montserrat text-[12px] font-semibold text-sett-primary">{t.addHotel.editingTripDetails}</span>
+                  </div>
+                )}
+                <hr className="border-sett-border-light mb-5" />
+
+                <div className="space-y-5">
+                  {/* Destination */}
+                  <div className="flex flex-col gap-[6px]">
+                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                      {t.addHotel.destination}
+                    </label>
+                    <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
+                      {request?.destinationName || '—'}
                     </div>
                   </div>
 
                   <hr className="border-sett-border-light" />
 
-                  {/* Amenities */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
-                        {t.addHotel.amenities}
-                      </label>
-                      {availableFacilities.length > 6 && (
-                        <button
-                          type="button"
-                          className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
-                          onClick={() => setShowAllAmenities((prev) => !prev)}
-                        >
-                          {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
-                        </button>
-                      )}
+                  {/* Stay Dates */}
+                  <div className="flex flex-col gap-[6px]">
+                    <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                      {t.addHotel.stayDates}
+                    </label>
+                    {editingTripDetails ? (
+                      <div className="flex flex-col gap-2">
+                        <DatePicker
+                          selected={editCheckinDate}
+                          onChange={(date: Date | null) => setEditCheckinDate(date)}
+                          minDate={new Date()}
+                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                          dateFormat="dd.MM.yyyy"
+                          placeholderText="DD.MM.YYYY"
+                          popperClassName="sett-datepicker-popper"
+                          popperPlacement="bottom-start"
+                          wrapperClassName="w-full"
+                          todayButton={t.addHotel.today}
+                          showPopperArrow={false}
+                          customInput={<DateInputComponent />}
+                        />
+                        <DatePicker
+                          selected={editCheckoutDate}
+                          onChange={(date: Date | null) => setEditCheckoutDate(date)}
+                          minDate={editCheckinDate || new Date()}
+                          maxDate={new Date(new Date().setFullYear(new Date().getFullYear() + 2))}
+                          dateFormat="dd.MM.yyyy"
+                          placeholderText="DD.MM.YYYY"
+                          popperClassName="sett-datepicker-popper"
+                          popperPlacement="bottom-start"
+                          wrapperClassName="w-full"
+                          todayButton={t.addHotel.today}
+                          showPopperArrow={false}
+                          customInput={<DateInputComponent />}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                        {formatDateEU(request?.checkinDate)}
+                        {' - '}
+                        {formatDateEU(request?.checkoutDate)}
+                      </div>
+                    )}
+                  </div>
+
+                  {editingTripDetails && (
+                    <div className="flex gap-2 pb-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1"
+                        disabled={!editCheckinDate || savingTripDetails}
+                        onClick={handleSaveTripDetails}
+                      >
+                        {savingTripDetails ? `${t.common.loading}` : t.addHotel.saveAndResearch}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setEditingTripDetails(false)}
+                        disabled={savingTripDetails}
+                      >
+                        Cancel
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
-                        const AmenityIcon = getAmenityIcon(facility.name);
-                        return (
-                          <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                  )}
+
+                  <hr className="border-sett-border-light" />
+
+                  {/* Rooms Required */}
+                  {request?.rooms && (
+                    <div className="flex flex-col gap-[6px]">
+                      <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                        {t.addHotel.roomsrequired}
+                      </label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
+                          { key: 'roomStandardDouble', label: t.addHotel.standardDoubleBed, value: request.rooms.standardDoubleBeds },
+                          { key: 'roomTwin', label: t.addHotel.twinBed, value: request.rooms.twinBeds },
+                          { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
+                          { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
+                        ]
+                          .filter((r) => r.value && r.value > 0)
+                          .map((r) => (
+                            <div key={r.key} className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                              <span>{r.label}</span>
+                              <span className="font-semibold text-sett-text-primary">{r.value}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Desktop Only Filters */}
+                  <div className="hidden xl-wide:block space-y-5 pt-5 border-t border-sett-border-light">
+                    {/* Star Rating */}
+                    <div className="flex flex-col gap-3">
+                      <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                        {t.addHotel.starRating}
+                      </label>
+                      <div className="flex flex-col gap-3">
+                        {[5, 4, 3, 2, 1].map((star) => (
+                          <label
+                            key={star}
+                            className={cn(
+                              'flex items-center gap-3 cursor-pointer transition-opacity',
+                              starFilters.includes(star) ? 'opacity-100' : 'opacity-30'
+                            )}
+                            onClick={() => toggleStar(star)}
+                          >
                             <span className={cn(
-                              'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
-                              amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
-                            )}
-                              onClick={() => toggleAmenity(facility.id)}
-                            >
-                              {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                              'w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                              starFilters.includes(star) ? 'bg-sett-primary' : 'border-2 border-gray-300 bg-white'
+                            )}>
+                              {starFilters.includes(star) && <span className="w-[8px] h-[8px] rounded-full bg-white" />}
                             </span>
-                            {AmenityIcon && (
-                              <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
-                            )}
-                            <span className="font-montserrat text-[14px] text-sett-text-secondary">
-                              {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
-                            </span>
+                            <div className="flex gap-0.5">
+                              {Array.from({ length: star }).map((_, i) => (
+                                <Star key={i} className="w-4 h-4 fill-sett-primary text-sett-primary" />
+                              ))}
+                            </div>
                           </label>
-                        );
-                      })}
+                        ))}
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Price Per Night */}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.pricePerNight}
+                        </label>
+                        <span className="font-montserrat text-[13px] font-semibold text-white px-2.5 py-1 rounded-[8px]"
+                          style={{ background: 'linear-gradient(135deg, #AAC737 0%, #8FA82B 100%)' }}>
+                          &euro;{maxPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="relative pt-1 pb-1">
+                        <input
+                          type="range"
+                          min={0}
+                          max={3000}
+                          step={50}
+                          value={maxPrice}
+                          onChange={(e) => setMaxPrice(Number(e.target.value))}
+                          style={{
+                            background: `linear-gradient(to right, #AAC737 0%, #AAC737 ${(maxPrice / 3000) * 100}%, #E5E7EB ${(maxPrice / 3000) * 100}%, #E5E7EB 100%)`,
+                          }}
+                          className="w-full h-[5px] rounded-full appearance-none cursor-pointer outline-none
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[18px] [&::-webkit-slider-thumb]:h-[18px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-sett-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;0</span>
+                        <span className="font-montserrat text-[11px] font-medium text-sett-text-accent">&euro;3,000</span>
+                      </div>
+                    </div>
+
+                    <hr className="border-sett-border-light" />
+
+                    {/* Amenities */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                          {t.addHotel.amenities}
+                        </label>
+                        {availableFacilities.length > 6 && (
+                          <button
+                            type="button"
+                            className="font-montserrat text-[12px] text-sett-primary hover:underline font-medium"
+                            onClick={() => setShowAllAmenities((prev) => !prev)}
+                          >
+                            {showAllAmenities ? t.addHotel.showLess : t.addHotel.viewAll}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {(showAllAmenities ? availableFacilities : availableFacilities.slice(0, 6)).map((facility) => {
+                          const AmenityIcon = getAmenityIcon(facility.name);
+                          return (
+                            <label key={facility.id} className="flex items-center gap-2.5 cursor-pointer">
+                              <span className={cn(
+                                'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-colors',
+                                amenityFilters.includes(facility.id) ? 'border-sett-primary bg-sett-primary' : 'border-sett-border-light'
+                              )}
+                                onClick={() => toggleAmenity(facility.id)}
+                              >
+                                {amenityFilters.includes(facility.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+                              </span>
+                              {AmenityIcon && (
+                                <AmenityIcon className="w-4 h-4 text-sett-text-accent shrink-0" />
+                              )}
+                              <span className="font-montserrat text-[14px] text-sett-text-secondary">
+                                {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
-
               </div>
             </aside>
 
             {/* ── Right: Hotel Results ── */}
-            <div ref={hotelListRef} className="flex-1 min-w-0 xl:overflow-y-auto xl:pr-1">
+            <div ref={hotelListRef} className="flex-1 min-w-0 xl-wide:overflow-y-auto xl-wide:pr-1">
               <p
-                className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl:shrink-0 animate-sidebar-fade-up"
+                className="font-montserrat text-[14px] text-sett-text-accent mb-4 xl-wide:shrink-0 animate-sidebar-fade-up"
                 style={{ animationDelay: '220ms' }}
               >
                 {filteredResults.length < deduplicatedResults.length
@@ -1955,7 +2598,7 @@ export default function AddHotelPage() {
                 </div>
               )}
 
-              <div className="space-y-5 pb-6 xl:overflow-visible">
+              <div className="space-y-5 pb-6 xl-wide:overflow-visible">
                 {/* Main Results Section Header */}
                 {filteredMainResults.length > 0 && (
                   <div className="mb-1">
@@ -1968,18 +2611,21 @@ export default function AddHotelPage() {
                           <Check className="w-4 h-4 text-white" strokeWidth={3} />
                         </div>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h2 className="font-montserrat text-[16px] font-bold text-sett-text-primary">
                           {t.addHotel.hotelsMatchingRequest}
                         </h2>
                         <p className="font-montserrat text-[12px] text-sett-text-secondary mt-0.5">
-                          {requestedStars ? `${requestedStars} star hotel${requestedStars !== 1 ? 's' : ''} found` : 'Hotels matching your criteria'}
+                          {hasRequestedStars
+                            ? t.addHotel.starHotelsFound.replace('{stars}', requestedStarBuckets.map((s) => `${s}★`).join(', '))
+                            : t.addHotel.hotelsMatchingCriteria}
                         </p>
                       </div>
+                      {searchMoreInlineSlot}
                       <button
                         type="button"
                         onClick={handleRestartSearch}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                        className="p-2 rounded-full hover:bg-gray-100 transition-colors shrink-0"
                         title="Search again"
                       >
                         <RotateCcw className="w-4 h-4 text-sett-text-secondary hover:text-sett-text-primary transition-colors" />
@@ -2013,34 +2659,10 @@ export default function AddHotelPage() {
                   </div>
                 )}
 
-                {/* Search More button — appears when the backend has paginated
-                    results available AND the current search is settled. Hidden
-                    (not disabled) when canSearchMore is false. */}
-                {canSearchMore && phase === 'done' && (
-                  <div className="flex justify-center py-3 animate-sidebar-fade-up">
-                    <button
-                      type="button"
-                      onClick={handleSearchMore}
-                      disabled={searchingMore}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-sett-primary text-sett-navy font-montserrat text-[14px] font-bold uppercase tracking-[0.04em] hover:bg-sett-green-dark hover:text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_2px_8px_0_rgba(170,199,55,0.25)]"
-                    >
-                      {searchingMore ? (
-                        <>
-                          <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          {t.addHotel.searchingMore}
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4" />
-                          {t.addHotel.searchMore}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
+                {/* Search More slot (bottom copy) — fallback for users who scroll
+                    to the natural end of the list. Top copy lives above the main
+                    results section so the CTA is reachable without scrolling. */}
+                {searchMoreSlot}
 
                 {/* Show Alternatives button — computed locally when 1-4 main hotels succeeded */}
                 {shouldShowAlternativesButton && (
@@ -2107,7 +2729,7 @@ export default function AddHotelPage() {
                       <div className="relative flex items-center gap-4 py-5 my-2">
                         <div className="flex-1 h-px bg-gradient-to-r from-sett-border-light via-sett-border-light to-transparent" />
                         <span className="text-sett-text-secondary font-montserrat text-[12px] font-medium uppercase whitespace-nowrap tracking-wider">
-                          More options
+                          {t.addHotel.moreOptions}
                         </span>
                         <div className="flex-1 h-px bg-gradient-to-l from-sett-border-light via-sett-border-light to-transparent" />
                       </div>
@@ -2138,15 +2760,18 @@ export default function AddHotelPage() {
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                   </svg>
-                                  Loading
+                                  {t.addHotel.alternativesLoading}
                                 </span>
                               ) : (
-                                `${filteredAltResults.length} option${filteredAltResults.length !== 1 ? 's' : ''}`
+                                (filteredAltResults.length === 1
+                                  ? t.addHotel.optionsCount
+                                  : t.addHotel.optionsPluralCount
+                                ).replace('{n}', String(filteredAltResults.length))
                               )}
                             </span>
                           </div>
                           <p className="font-montserrat text-[13px] text-sett-text-secondary leading-relaxed">
-                            Hotels with different locations, amenities, or layouts that match your trip dates and budget
+                            {t.addHotel.alternativesSubline}
                           </p>
                         </div>
 
@@ -2240,7 +2865,7 @@ export default function AddHotelPage() {
       >
         {/* Backdrop blur strip */}
         <div
-          className="max-w-5xl mx-4 md:mx-6 xl:mx-auto mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
+          className="max-w-5xl mx-4 md:mx-6 xl-wide:mx-auto mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
           style={{
             background: 'rgba(255,255,255,0.97)',
             boxShadow: '0 -4px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(170,199,55,0.15)',
@@ -2336,7 +2961,22 @@ function SearchBanner({ type, message, onDismiss }: {
 
 /* ─────────────── Manual Request Card ─────────────── */
 
-function ManualRequestCard({ requestRef, onSent, onEditTripDetails }: { requestRef: string; onSent: () => void; onEditTripDetails: () => void }) {
+function ManualRequestCard({
+  requestRef,
+  onSent,
+  onEditTripDetails,
+  onShowAlternatives,
+  alternativesLoading,
+}: {
+  requestRef: string;
+  onSent: () => void;
+  onEditTripDetails: () => void;
+  /** Optional: when provided, renders a secondary CTA that triggers a
+   *  relaxed-criteria search. Useful when the main search exhausted with
+   *  no matches but alternatives might still surface hotels. */
+  onShowAlternatives?: () => void;
+  alternativesLoading?: boolean;
+}) {
   const { t } = useLanguage();
   return (
     <div className="relative overflow-hidden flex flex-col items-center justify-center py-16 px-6 text-center bg-white rounded-[14px] border border-sett-border-light shadow-card">
@@ -2355,14 +2995,40 @@ function ManualRequestCard({ requestRef, onSent, onEditTripDetails }: { requestR
         {t.addHotel.manualRequestMsg}
       </p>
 
-      <button
-        type="button"
-        onClick={onEditTripDetails}
-        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-white bg-sett-primary hover:bg-sett-primary-hover transition-colors shadow-button"
-      >
-        <SquarePen className="w-4 h-4" />
-        {t.addHotel.editTripDetailsBtn}
-      </button>
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <button
+          type="button"
+          onClick={onEditTripDetails}
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-white bg-sett-primary hover:bg-sett-primary-hover transition-colors shadow-button"
+        >
+          <SquarePen className="w-4 h-4" />
+          {t.addHotel.editTripDetailsBtn}
+        </button>
+
+        {onShowAlternatives && (
+          <button
+            type="button"
+            onClick={onShowAlternatives}
+            disabled={alternativesLoading}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-button font-montserrat text-[14px] font-semibold text-sett-primary border border-sett-primary hover:bg-sett-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {alternativesLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                {t.addHotel.searchingAlternatives}
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                {t.addHotel.showAlternatives}
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -2431,6 +3097,11 @@ function HotelResultCard({
   const sellPrice = hotel.sellingPricePerRoomPerNight;
   const hasCancellation = !!hotel.cxlDeadline;
   const isLimited = hotel.capacityStatus === 'LIMITED';
+  const isInsufficient = hotel.capacityStatus === 'INSUFFICIENT';
+  // Only show a badge for non-CONFIRMED states — CONFIRMED is the default
+  // happy path and doesn't need a callout (the green "Add to Offer" CTA
+  // already signals availability).
+  const showCapacityBadge = isLimited || isInsufficient;
   // Pick the description for the active locale from the multi-language payload.
   // Fallback order: descriptions[locale] → descriptions[other lang] → legacy single
   // `description` field (for older cached results before backend started shipping
@@ -2520,9 +3191,18 @@ function HotelResultCard({
 
         {/* ── Hotel Details ── */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">
-          {/* Top: Name, Address, Stars + Add to Offer */}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 flex flex-col gap-2">
+          {/* Top: Name, Address, Stars + Add to Offer.
+              On mobile (< sm) the action column drops below the title block —
+              a full-width CTA reads better than fighting a long German label
+              ("Zum Angebot hinzufügen") for horizontal space against the hotel
+              name. On sm+ the original side-by-side layout returns. */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3">
+            {/* min-w-[220px] guards against character-per-line wrapping when
+                the right action column (wide DE CTA + free-cancellation pill)
+                squeezes the title at narrow widths or 150% browser zoom.
+                Below 220px the parent's sm:flex-wrap drops the action column
+                to the next line instead of collapsing the title. */}
+            <div className="flex-1 min-w-0 sm:min-w-[220px] flex flex-col gap-2 w-full sm:w-auto">
               {/* Name on its own row so long titles wrap cleanly without
                   interfering with the stars/badges below. */}
               <div
@@ -2542,10 +3222,10 @@ function HotelResultCard({
                 style={{ animationDelay: '120ms' }}
               >
                 <StarRating rating={Number(hotel.starRating)} size={18} />
-                {isLimited && (
+                {showCapacityBadge && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0">
                     <AlertTriangle className="w-3 h-3" />
-                    {t.addHotel.limitedCapacity}
+                    {localizeCapacityStatus(hotel.capacityStatus, t.addHotel)}
                   </span>
                 )}
                 {showYouthFriendlyBadge && hotel.youthFriendly && (
@@ -2602,27 +3282,72 @@ function HotelResultCard({
               )}
             </div>
 
-            {/* Action area — primary CTA only */}
+            {/* Action area — primary CTA + free-cancellation pill.
+                Full-width on mobile so the long DE label can't collide with
+                the hotel title; right-aligned column on sm+. The column is
+                NOT shrink-0 — at 150% zoom or narrow widths the parent's
+                sm:flex-wrap drops this block below the title rather than
+                squeezing the title into one-letter-per-line. */}
             <div
-              className="shrink-0 flex flex-col items-end gap-2 animate-fade-in-right"
+              className="w-full sm:w-auto flex flex-col items-start gap-2 animate-fade-in-right"
               style={{ animationDelay: '80ms' }}
             >
               {isAdded ? (
-                <span className="flex items-center gap-1.5 font-montserrat text-[14px] text-sett-primary font-semibold">
-                  <Check className="w-4 h-4" strokeWidth={2.5} /> {t.addHotel.added}
-                </span>
+                // ── 3D "Added to Offer" success pill ──
+                // Layered design for tactile depth:
+                //   • outer wrapper provides 3D entrance + drop shadow
+                //   • inner pill has a gradient (light→dark green) for bevel
+                //   • inset top highlight + bottom shadow imply a curved surface
+                //   • ripple radiates once on mount as a confirmation cue
+                //   • check icon is drawn via SVG stroke-dashoffset animation
+                <div className="relative inline-flex items-center animate-success-pop-3d origin-bottom">
+                  {/* Soft green ripple — fires once when pill mounts */}
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 rounded-full bg-sett-primary/30 animate-success-ripple"
+                  />
+
+                  {/* The pill itself — clean modern with a soft glow.
+                      Sized down (12px text, px-3 py-1.5) so the success
+                      confirmation feels lighter than the persistent Free
+                      Cancellation card below it, and so it baseline-aligns
+                      with the hotel title to the left rather than floating
+                      above it. */}
+                  <span
+                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-montserrat text-[12px] font-bold uppercase tracking-[0.06em] text-sett-navy transition-transform duration-200 ease-sett-out hover:-translate-y-0.5 hover:scale-[1.02]"
+                    style={{
+                      background: '#AAC737',
+                      boxShadow:
+                        'inset 0 1px 0 rgba(255,255,255,0.22), ' +   // very faint top highlight
+                        '0 3px 8px -2px rgba(170,199,55,0.35)',       // soft green glow under
+                    }}
+                  >
+                    {/* BadgeCheck — Lucide's "verified/confirmed" icon.
+                        Reads instantly as a status indicator (vs. a plain
+                        Check which can be misread as a generic OK glyph).
+                        Navy stroke matches the pill's text color for a
+                        cohesive monochrome treatment on the green pill. */}
+                    <BadgeCheck
+                      className="w-4 h-4 shrink-0"
+                      strokeWidth={2.4}
+                      aria-hidden
+                    />
+                    {t.addHotel.added}
+                  </span>
+                </div>
               ) : (
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={onAddToOffer}
                   isLoading={isAdding}
+                  className="min-w-[140px]"
                 >
                   {t.addHotel.addToOffer}
                 </Button>
               )}
               {hasCancellation && (
-                <div className="flex flex-col items-end gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
+                <div className="flex flex-col items-start gap-1 px-2.5 py-1.5 bg-[#F0F5E3]/60 rounded-[8px] border border-sett-primary/15">
                   <div className="flex items-center gap-1 font-montserrat text-[12px] text-sett-primary font-semibold">
                     <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
                     <span>{t.addHotel.freeCancellation}</span>
@@ -2647,38 +3372,65 @@ function HotelResultCard({
                   <span
                     key={facility.id}
                     // Each chip pops in with a small stagger (capped at 8 so cards
-                    // with 20+ facilities don't drag the cascade out)
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in"
+                    // with 20+ facilities don't drag the cascade out).
+                    // Hover micro-interaction: chip lifts + scales slightly, the
+                    // border deepens to the brand green, and the icon nudges
+                    // upward. Uses an eased spring curve so the motion feels
+                    // organic instead of mechanical. `will-change` keeps the
+                    // transform on the GPU so cards with many chips stay smooth.
+                    className="group/amenity inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sett-light-green-bg text-sett-primary border border-sett-primary/20 animate-badge-pop-in cursor-default origin-center will-change-transform transition-[transform,box-shadow,border-color,background-color] duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-1 hover:scale-[1.25] hover:bg-white hover:border-sett-primary hover:shadow-[0_6px_18px_-3px_rgba(170,199,55,0.5)] hover:z-10 relative"
                     style={{ animationDelay: `${240 + Math.min(i, 7) * 30}ms` }}
                   >
-                    {AmenityIcon && <AmenityIcon className="w-3 h-3" />}
-                    {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                    {AmenityIcon && (
+                      <AmenityIcon className="w-3 h-3 transition-transform duration-300 ease-out group-hover/amenity:-translate-y-0.5 group-hover/amenity:rotate-[-10deg] group-hover/amenity:text-sett-green-dark" />
+                    )}
+                    <span className="transition-colors duration-200 group-hover/amenity:text-sett-green-dark">
+                      {getAmenityLabel(facility.name, t.addHotel.facilityNames)}
+                    </span>
                   </span>
                 );
               })}
             </div>
           )}
 
-          {/* ── Room Table (desktop) ── */}
+          {/* ── Room Table (desktop) ──
+              Column-width tuning for the 1280–1327px viewport range:
+                - The card sits inside the text-flex column (~660px at this
+                  width with the 300px sidebar). The table previously used
+                  uniform px-4 + uncapped first column, so the description
+                  text on Room Type ate all the space and the PER NIGHT cell
+                  was clipped.
+                - Fixed widths on the right three columns + whitespace-nowrap
+                  on the price guarantees PER NIGHT is always fully readable.
+                - First column gets max-width on the description so it can
+                  wrap to two lines instead of pushing the price out.
+                - Container keeps overflow-x-auto as a safety net for even
+                  narrower viewports. */}
           <div
-            className="hidden xl:block mt-4 overflow-x-auto animate-sidebar-fade-up"
+            className="hidden xl-wide:block mt-4 overflow-x-auto animate-sidebar-fade-up"
             style={{ animationDelay: '320ms' }}
           >
             <div className="border border-sett-border-light rounded-[14px] overflow-hidden">
+              {/* Switched back to auto-layout (no table-fixed) so the first
+                  column can grow to fit "Standard Double Rooms" without
+                  character-per-line wrapping. Whitespace-nowrap on the right
+                  three columns keeps headers + price on a single line, and
+                  the parent's overflow-x-auto lets the table scroll if the
+                  combined width exceeds the available space. */}
               <table className="w-full">
                 <thead>
                   {/* §5.2 Header row: Navy background, white text, Montserrat 600–700 */}
                   <tr className="bg-sett-navy">
-                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-left font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-3 whitespace-nowrap">
                       {t.addHotel.roomType}
                     </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-2 whitespace-nowrap">
                       {t.addHotel.rooms}
                     </th>
-                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-center font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-2 whitespace-nowrap">
                       {t.addHotel.rateBasis}
                     </th>
-                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-4">
+                    <th className="text-right font-montserrat text-[12px] font-semibold uppercase tracking-wide text-white py-2.5 px-3 whitespace-nowrap">
                       {t.addHotel.perNight}
                     </th>
                   </tr>
@@ -2686,10 +3438,10 @@ function HotelResultCard({
                 <tbody>
                   {roomTypes.map((rt, i) => (
                     <tr key={i} className="border-t border-sett-border-light">
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-3 align-top">
                         <div>
                           <span className="font-montserrat text-[14px] text-sett-text-primary capitalize">
-                            {formatRoomType(rt.roomType)}
+                            {formatRoomType(rt.roomType, t.addHotel)}
                           </span>
                           {rt.supplierCode && (
                             <span className="ml-2 font-montserrat text-[11px] text-sett-text-accent">
@@ -2699,19 +3451,19 @@ function HotelResultCard({
                         </div>
                         {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
                           <div className="mt-1">
-                            <div className="text-[12px] text-sett-text-accent">
+                            <div className="text-[12px] text-sett-text-accent break-words">
                               ↳ {rt.actualDescriptions[0]}
                             </div>
                           </div>
                         )}
                       </td>
-                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary">
+                      <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary whitespace-nowrap align-top">
                         {rt.roomsAllocated}
                       </td>
-                      <td className="py-2.5 px-4 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize">
+                      <td className="py-2.5 px-2 text-center font-montserrat text-[14px] text-sett-text-secondary capitalize align-top max-w-[180px] break-words">
                         {getMealTypeLabel(rt.mealName || rt.mealType || '', (t.addHotel.mealTypes as any))}
                       </td>
-                      <td className="py-2.5 px-4 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary">
+                      <td className="py-2.5 px-3 text-right font-montserrat text-[14px] font-semibold text-sett-text-primary whitespace-nowrap align-top">
                         &euro;{(rt.pricePerRoomPerNight ?? sellPrice).toFixed(2)}
                       </td>
                     </tr>
@@ -2723,7 +3475,7 @@ function HotelResultCard({
 
           {/* ── Room cards (mobile) ── */}
           <div
-            className="xl:hidden mt-4 space-y-2 animate-sidebar-fade-up"
+            className="xl-wide:hidden mt-4 space-y-2 animate-sidebar-fade-up"
             style={{ animationDelay: '320ms' }}
           >
             {roomTypes.map((rt, i) => (
@@ -2732,7 +3484,7 @@ function HotelResultCard({
                   <div>
                     <span className="block text-[11px] uppercase tracking-wide text-sett-text-accent font-semibold mb-1">{t.addHotel.roomType}</span>
                     <p className="font-montserrat text-[14px] text-sett-text-primary font-medium capitalize leading-tight">
-                      {formatRoomType(rt.roomType)}
+                      {formatRoomType(rt.roomType, t.addHotel)}
                       {rt.supplierCode && <span className="block text-[11px] text-sett-text-accent mt-0.5">{rt.supplierCode}</span>}
                     </p>
                     {rt.actualDescriptions && rt.actualDescriptions.length > 0 && (
@@ -2762,14 +3514,16 @@ function HotelResultCard({
             ))}
           </div>
 
-          {/* Notes */}
+          {/* Notes — backend warning banner. Pattern-matched + localized
+              against the i18n dictionary; falls back to the BE string if
+              no pattern matches so untranslated notes still surface. */}
           {hotel.note && (
             <div
               className="mt-3 animate-sidebar-fade-up"
               style={{ animationDelay: '380ms' }}
             >
-              <p className="font-montserrat text-[12px] text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                {hotel.note}
+              <p className="font-montserrat text-[12px] text-amber-600 bg-amber-50 px-2 py-1 rounded whitespace-pre-line">
+                {localizeHotelNote(hotel.note, t.addHotel)}
               </p>
             </div>
           )}

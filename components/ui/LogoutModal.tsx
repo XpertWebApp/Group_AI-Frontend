@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { ModalOverlay } from './ModalOverlay';
 
 
 interface LogoutModalProps {
@@ -14,15 +15,6 @@ export function LogoutModal({ open, onClose, onConfirm }: LogoutModalProps) {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
-
   const handleConfirm = async () => {
     setLoading(true);
     try {
@@ -32,29 +24,35 @@ export function LogoutModal({ open, onClose, onConfirm }: LogoutModalProps) {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="w-[448px] p-5 flex flex-col justify-center items-start gap-10 rounded-[14px] border-2 border-sett-border-light bg-white shadow-[0_4px_10px_720px_rgba(0,0,0,0.60)]">
-        <div>
-          <h2 className="font-montserrat text-[18px] font-semibold leading-normal text-sett-text-primary mb-2">
+    <ModalOverlay open={open} onClose={onClose} className="p-4">
+      <div
+        className="w-[448px] bg-white overflow-hidden flex flex-col"
+        style={{
+          borderRadius: 8, // §5.3 panel
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
+      >
+        {/* §5.3 emphasis accent — green stripe at top, identifies the brand */}
+        <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
+        <div className="px-5 py-5">
+          <h2 className="font-montserrat text-[20px] font-bold leading-tight text-sett-navy mb-2">
             {t.logoutModal.title}
           </h2>
-          <p className="font-montserrat text-[14px] font-normal leading-normal text-sett-text-secondary">
+          <p className="font-montserrat text-[14px] font-normal leading-relaxed text-sett-grey">
             {t.logoutModal.message}
           </p>
         </div>
-        <div className="flex gap-3 w-full">
+        <div className="h-px bg-[#E0E0E0] mx-5" />
+        {/* §5.1 buttons — secondary (transparent + green border) for cancel,
+            destructive (#CC3333 — brand-spec red) for confirm. */}
+        <div className="flex gap-3 justify-end px-5 py-4">
           <button
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="flex w-[198px] py-3 px-4 justify-center items-center gap-1 rounded-[14px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[16px] font-semibold leading-normal text-sett-text-primary disabled:opacity-50 transition-transform duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] border-2 border-sett-primary bg-transparent font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-primary hover:bg-sett-primary/5 active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
             {t.logoutModal.cancel}
           </button>
@@ -62,12 +60,16 @@ export function LogoutModal({ open, onClose, onConfirm }: LogoutModalProps) {
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className="flex flex-1 py-3 px-4 justify-center items-center gap-1 rounded-[14px] bg-[#FB2C36] shadow-[0_8px_20px_0_rgba(0,0,0,0.13),inset_4px_4px_5px_0_rgba(255,255,255,0.25)] font-montserrat text-[16px] font-semibold leading-normal text-white disabled:opacity-50 transition-transform duration-[120ms] ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-0.5 hover:scale-[1.02] active:translate-y-[3px] active:scale-[0.92] active:duration-[80ms]"
+            className="inline-flex items-center justify-center h-[41px] px-6 rounded-[4px] bg-sett-destructive hover:bg-sett-destructive-hover font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-white active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
           >
-            {loading ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : t.logoutModal.confirm}
+            {loading ? (
+              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              t.logoutModal.confirm
+            )}
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

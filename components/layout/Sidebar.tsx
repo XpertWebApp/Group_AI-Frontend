@@ -14,6 +14,10 @@ import {
   Building2,
   Loader2,
   Menu,
+  Bell,
+  Volume2,
+  VolumeX,
+  LogOut,
 } from 'lucide-react';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -24,6 +28,10 @@ import { requestsApi } from '@/lib/api/requests';
 import type { BookingRequest } from '@/types';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { useAppLayout } from '@/app/(dashboard)/AppLayoutContext';
+import { LanguageToggle } from '@/components/ui/LanguageToggle';
+import { NotificationsModal } from '@/components/ui/NotificationsModal';
+import { useNotifications } from '@/lib/notifications/NotificationsContext';
+import { isMuted, setMuted, playNotificationChime, unlockAudio } from '@/lib/notifications/sound';
 
 function formatStatus(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -40,7 +48,27 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const router = useRouter();
   const user = useAppSelector((s) => s.auth.user);
   const { t } = useLanguage();
-  const { sidebarCollapsed, toggleSidebar, setSidebarCollapsed } = useAppLayout();
+  const { sidebarCollapsed: rawSidebarCollapsed, toggleSidebar, setSidebarCollapsed, onLogoutClick } = useAppLayout();
+  // When the mobile drawer is open, the sidebar takes its full width (via
+  // max-lg:!w-sidebar on the <aside>), so the internal layout must also
+  // render in expanded mode — otherwise users see the desktop's icon-only
+  // chrome inside a wider drawer. Toggle handlers + persisted prefs still
+  // use the raw state; only render-time logic uses this derived value.
+  const sidebarCollapsed = rawSidebarCollapsed && !isMobileOpen;
+  // Mobile-only chrome (notifications + mute) — these controls live in the
+  // sidebar drawer on phones so the header has room for the page title.
+  // On desktop the same controls live in the header; the sidebar versions
+  // simply never render at lg+ (lg:hidden on the wrapper below).
+  const { unreadCount } = useNotifications();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [audioMuted, setAudioMutedState] = useState(false);
+  useEffect(() => { setAudioMutedState(isMuted()); }, []);
+  const toggleMuted = () => {
+    const next = !audioMuted;
+    setMuted(next);
+    setAudioMutedState(next);
+    if (!next) { unlockAudio(); playNotificationChime(); }
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<BookingRequest[]>([]);
@@ -181,16 +209,23 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
           className={cn(
             'h-[64px] flex items-center transition-[padding] duration-320 ease-sett-in-out',
             'animate-sidebar-fade-up',
-            sidebarCollapsed ? 'px-3 justify-center' : 'px-6 justify-between gap-3'
+            sidebarCollapsed ? 'px-1 justify-center' : 'px-6 justify-between gap-3'
           )}
           style={{ animationDelay: '120ms' }}
         >
+          {/* The Link is the clipping container — its width animates between
+              140px (expanded) and 64px (collapsed). The image inside scales
+              to fill the Link's width so the WHOLE logo stays visible when
+              the sidebar collapses; previously the image was pinned at 140px
+              while the container shrank to 36px, which cropped the logo and
+              only "S" was visible. 64px uses ~90% of the 72px collapsed
+              sidebar so the wordmark stays readable at the smaller size. */}
           <Link
             href="/dashboard"
             onClick={onMobileClose}
             className={cn(
-              'block overflow-hidden transition-all duration-320 ease-sett-in-out',
-              sidebarCollapsed ? 'w-[36px]' : 'w-[140px]'
+              'block transition-[width] duration-320 ease-sett-in-out',
+              sidebarCollapsed ? 'w-[64px]' : 'w-[140px]'
             )}
             aria-label="SETT Home"
           >
@@ -199,7 +234,9 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
               alt="SETT Logo"
               width={140}
               height={40}
-              className="h-auto max-w-none w-[140px]"
+              // w-full + h-auto = the logo scales down to whatever the Link
+              // currently is, preserving its 14:4 aspect ratio.
+              className="block w-full h-auto"
               priority
             />
           </Link>
@@ -210,6 +247,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             <SidebarCollapseToggle
               collapsed={sidebarCollapsed}
               onToggle={toggleSidebar}
+              expandLabel={t.nav.expandSidebar}
+              collapseLabel={t.nav.collapseSidebar}
             />
           )}
         </div>
@@ -220,6 +259,8 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
             <SidebarCollapseToggle
               collapsed={sidebarCollapsed}
               onToggle={toggleSidebar}
+              expandLabel={t.nav.expandSidebar}
+              collapseLabel={t.nav.collapseSidebar}
             />
           </div>
         )}
@@ -373,6 +414,43 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
           })}
         </nav>
 
+        {/* Mobile-only chrome row — Language toggle, mute, notifications.
+            These live in the Header on lg+ (where the sidebar can be
+            collapsed to icons), but on phones the Header is title-only and
+            this row carries the same controls. lg:hidden hides the whole
+            row at 1024px+. */}
+        <div className="lg:hidden px-4 py-3 border-t border-sett-sidebar-border">
+          <div className="flex items-center justify-between gap-2">
+            <LanguageToggle />
+            <div className="flex items-center gap-1">
+              {/* Mute toggle */}
+              <button
+                type="button"
+                onClick={toggleMuted}
+                className="p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label={audioMuted ? t.notifications.unmuteSound : t.notifications.muteSound}
+                aria-pressed={audioMuted}
+              >
+                {audioMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+              {/* Notifications */}
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen(true)}
+                className="relative p-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                aria-label={unreadCount > 0 ? `${t.common.notifications} (${unreadCount})` : t.common.notifications}
+              >
+                <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'animate-bell-shake' : ''}`} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-sett-primary text-sett-navy text-[10px] font-bold leading-none font-montserrat shadow-[0_2px_6px_rgba(170,199,55,0.5)] ring-2 ring-sett-sidebar">
+                    {unreadCount > 9 ? '9+' : String(unreadCount)}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* User card */}
         <div
           className={cn(
@@ -406,6 +484,23 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
               </div>
             </div>
           </div>
+
+          {/* Logout — phones-only. Desktop users get this inside the
+              header's user-menu dropdown; mobile users need an explicit
+              entry point inside the drawer. */}
+          {onLogoutClick && (
+            <button
+              type="button"
+              onClick={() => {
+                onLogoutClick();
+                onMobileClose?.();
+              }}
+              className="lg:hidden mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-[10px] border border-white/15 bg-white/[0.04] text-white/85 font-montserrat text-[13px] font-medium hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              {t.common.logout}
+            </button>
+          )}
         </div>
       </div>
     </>
@@ -438,6 +533,14 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
         )}
         onClick={onMobileClose}
         aria-hidden
+      />
+      {/* Notifications modal — same component the Header mounts on desktop.
+          On phones (where the Header doesn't render its bell), this is the
+          only mount, opened from the bell button inside the mobile-chrome
+          row above. */}
+      <NotificationsModal
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
       />
     </>
   );
@@ -477,13 +580,17 @@ function SidebarNavItem({
       <Link
         href={href}
         onClick={onMobileClose}
+        data-active={isActive || undefined}
+        data-collapsed={collapsed || undefined}
         className={cn(
-          'relative flex items-center rounded-lg text-sm font-medium overflow-hidden',
+          // sett-nav-item drives the layered hover effect — green sweep,
+          // icon halo, icon nudge, label slide. See globals.css.
+          'sett-nav-item relative flex items-center rounded-lg text-sm font-medium overflow-hidden',
           'transition-[background-color,color,padding] duration-280 ease-sett-out',
           collapsed ? 'justify-center px-0 py-2.5 h-10' : 'gap-3 px-3 py-2.5',
           isActive
             ? 'bg-white/[0.04] text-white'
-            : 'text-white/85 hover:bg-white/[0.06] hover:text-white'
+            : 'text-white/85 hover:text-white'
         )}
         aria-label={collapsed ? label : undefined}
       >
@@ -494,10 +601,10 @@ function SidebarNavItem({
             className="absolute left-0 top-1/2 -translate-y-1/2 h-[60%] w-[3px] rounded-r-full bg-sett-primary shadow-[0_0_8px_rgba(170,199,55,0.45)]"
           />
         )}
-        <Icon className="w-5 h-5 shrink-0" />
+        <Icon className="sett-nav-icon w-5 h-5 shrink-0" />
         <span
           className={cn(
-            'whitespace-nowrap transition-all duration-280 ease-sett-out',
+            'sett-nav-label whitespace-nowrap transition-all duration-280 ease-sett-out',
             collapsed
               ? 'w-0 opacity-0 -translate-x-1 pointer-events-none'
               : 'w-auto opacity-100 translate-x-0'
@@ -589,11 +696,18 @@ function SidebarIconButton({ label, onClick, icon: Icon }: SidebarIconButtonProp
 function SidebarCollapseToggle({
   collapsed,
   onToggle,
+  expandLabel,
+  collapseLabel,
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  /** Localized "Expand sidebar" tooltip — passed in so this component
+   *  doesn't need its own useLanguage() hook. */
+  expandLabel: string;
+  /** Localized "Collapse sidebar" tooltip. */
+  collapseLabel: string;
 }) {
-  const label = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  const label = collapsed ? expandLabel : collapseLabel;
   return (
     <div className="relative group hidden lg:block">
       <button
