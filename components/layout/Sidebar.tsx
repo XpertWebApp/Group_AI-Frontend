@@ -510,7 +510,7 @@ export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
     <>
       <aside
         className={cn(
-          'sett-motion-collapse fixed top-0 left-0 z-40 h-screen bg-sett-sidebar flex flex-col',
+          'sett-motion-collapse fixed top-0 left-0 z-40 h-[100dvh] bg-sett-sidebar flex flex-col',
           // Subtle vertical seam against the navy header — a tinted-white hairline so the
           // sidebar reads as a distinct column instead of one merged navy block.
           'border-r border-white/[0.06]',

@@ -2344,22 +2344,30 @@ function HotelCard({
 
   return (
     <div className={`bg-sett-card rounded-[16px] border transition-opacity overflow-hidden ${isIncluded ? 'border-sett-border opacity-100' : 'border-sett-border/50 opacity-60'}`}>
-      {/* Unified navy header: identity (left) + controls (right) */}
+      {/* Unified navy header: identity (left) + controls (right).
+          flex-wrap lets the controls cluster drop below the title at narrow
+          widths instead of crushing the name into one-letter-per-line. */}
       <div className="bg-[#1B2B44] rounded-t-[16px] px-3 sm:px-4 py-3 flex items-center gap-3 flex-wrap">
         {/* Identity: hotel name + stars.
-            If the persisted hotel has a SETTHub deep link, render the name as
-            a HotelName link (matches the Add Hotel card behavior); otherwise
-            fall back to a plain heading. `HotelName` uses brand-green by
-            default — overridden here with white text + subtle hover bg so it
-            reads on the navy header surface. */}
+            Wrapped in a min-w-0 flex container so truncation works inside
+            the parent flex row. !whitespace-nowrap + !truncate force the
+            HotelName link to render on a single line with ellipsis on
+            overflow (the component's default break-words behavior caused
+            character-per-line wrapping at narrow widths inside this
+            constrained navy header). A native title= surfaces the full
+            name on hover. */}
         <div className="flex items-center gap-2 min-w-0 flex-1 min-h-[28px]">
           {hotel.sethubDetailsUrl ? (
             <HotelName
               hotel={{ hotelName: hotel.hotelName || hotel.hotelCode, sethubDetailsUrl: hotel.sethubDetailsUrl }}
+              truncate
               className="!text-white hover:!text-white active:!text-white hover:!bg-white/10 active:!bg-white/15 !text-body !font-bold min-w-0"
             />
           ) : (
-            <h4 className="text-body font-bold text-white truncate">
+            <h4
+              className="text-body font-bold text-white truncate min-w-0 max-w-full"
+              title={hotel.hotelName || hotel.hotelCode}
+            >
               {hotel.hotelName || hotel.hotelCode}
             </h4>
           )}

@@ -87,7 +87,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         openMobileSidebar: () => setMobileOpen(true),
       }}
     >
-      <div className="w-screen h-screen flex flex-col overflow-hidden">
+      {/* h-[100dvh] tracks iOS Safari's dynamic viewport (URL bar showing /
+          hiding). With plain h-screen / 100vh the sticky header is pushed
+          off the top of the visible area when the URL bar is shown. The
+          @supports fallback in globals.css restores 100vh for older
+          browsers. */}
+      <div className="w-screen h-[100dvh] flex flex-col overflow-hidden">
         <div className="flex-1 flex overflow-hidden">
           <Sidebar
             isMobileOpen={mobileOpen}

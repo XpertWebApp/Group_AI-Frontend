@@ -25,9 +25,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // h-[100dvh] = dynamic viewport height — accounts for iOS Safari's URL
+  // bar showing/hiding. Without it (plain 100vh) the layout extends past
+  // the visible area when the URL bar is shown, pushing the sticky header
+  // off-screen. Supported in iOS Safari 15.4+ and all current Chromium /
+  // Firefox versions; older browsers fall back to 100vh via the @supports
+  // rule in globals.css.
   return (
-    <html lang="en" className={`${inter.variable} ${montserrat.variable} h-screen overflow-hidden`}>
-      <body className="h-screen font-montserrat overflow-hidden">
+    <html lang="en" className={`${inter.variable} ${montserrat.variable} h-[100dvh] overflow-hidden`}>
+      <body className="h-[100dvh] font-montserrat overflow-hidden">
         <StoreProvider>
           <AuthHydration>{children}</AuthHydration>
           <ToastProvider />

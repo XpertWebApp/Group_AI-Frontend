@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dynamic viewport height fallback ──
+   `h-[100dvh]` resolves to `height: 100dvh` in Tailwind. iOS Safari < 15.4
+   and old desktop browsers don't understand `dvh`. For those, fall back
+   to `100vh` so the layout still gets a viewport-sized container instead
+   of collapsing to 0. The modern `dvh` rule applies for browsers that
+   support it via the @supports check. */
+@supports not (height: 100dvh) {
+  .h-\[100dvh\] {
+    height: 100vh;
+  }
+}
+
 @keyframes shimmer {
   100% { transform: translateX(200%); }
 }
