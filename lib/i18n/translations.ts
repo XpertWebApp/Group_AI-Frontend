@@ -238,6 +238,30 @@ export const translations = {
       searching: 'Searching...',
     },
 
+    // ── Odoo Company Picker (Customer Details · Company Name) ──
+    odooPicker: {
+      label: 'Company Name',
+      placeholder: 'Search Odoo customers…',
+      minChars: 'Type at least 2 characters to search',
+      searching: 'Searching Odoo…',
+      noMatches: 'No matches in Odoo. Create the customer in Odoo first, then return here.',
+      unavailable: 'Odoo is temporarily unreachable. Please try again in a moment.',
+      rateLimited: 'Too many requests — please slow down a moment.',
+      genericError: 'Unable to search Odoo — please retry.',
+      notInList: 'Not in the list?',
+      createInOdooHint: 'Create the customer in Odoo first, then come back.',
+      linkedToOdoo: 'Linked to Odoo',
+      odooId: 'Odoo ID',
+      change: 'Change',
+      remove: 'Remove link',
+      ariaCombobox: 'Search Odoo customers',
+      // Send-offer gate (ODOO_CONTACT_REQUIRED, §2.3)
+      sendBlockedTitle: 'Link Odoo Customer First',
+      sendBlockedBody: 'This request must be linked to an Odoo company before the offer can be sent. Open the request, search the company in the Client field, and save.',
+      sendBlockedCta: 'Open Request',
+      sendBlockedTooltip: 'Link an Odoo customer in the Company Name field before sending.',
+    },
+
     // ── Offer / Request Detail Page ──
     offer: {
       offer: 'Offer',
@@ -1357,6 +1381,29 @@ export const translations = {
       phoneRequired: 'Telefonnummer ist erforderlich',
       invalidPhone: 'Gültige Telefonnummer eingeben',
       searching: 'Suche...',
+    },
+
+    // ── Odoo-Firmenauswahl (Kundendetails · Firmenname) ──
+    odooPicker: {
+      label: 'Firmenname',
+      placeholder: 'Odoo-Kunden suchen…',
+      minChars: 'Mindestens 2 Zeichen eingeben',
+      searching: 'Suche in Odoo…',
+      noMatches: 'Keine Treffer in Odoo. Bitte den Kunden zuerst in Odoo anlegen und dann hierher zurückkehren.',
+      unavailable: 'Odoo ist vorübergehend nicht erreichbar. Bitte später erneut versuchen.',
+      rateLimited: 'Zu viele Anfragen — bitte einen Moment warten.',
+      genericError: 'Odoo-Suche fehlgeschlagen — bitte erneut versuchen.',
+      notInList: 'Nicht in der Liste?',
+      createInOdooHint: 'Bitte den Kunden zuerst in Odoo anlegen und dann zurückkehren.',
+      linkedToOdoo: 'Mit Odoo verknüpft',
+      odooId: 'Odoo-ID',
+      change: 'Ändern',
+      remove: 'Verknüpfung entfernen',
+      ariaCombobox: 'Odoo-Kunden suchen',
+      sendBlockedTitle: 'Odoo-Kunde zuerst verknüpfen',
+      sendBlockedBody: 'Diese Anfrage muss mit einer Odoo-Firma verknüpft werden, bevor das Angebot gesendet werden kann. Öffnen Sie die Anfrage, suchen Sie die Firma im Kundenfeld und speichern Sie.',
+      sendBlockedCta: 'Anfrage öffnen',
+      sendBlockedTooltip: 'Bitte im Firmenname-Feld einen Odoo-Kunden verknüpfen, bevor Sie senden.',
     },
 
     // ── Offer / Request Detail Page ──

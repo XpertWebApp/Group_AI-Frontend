@@ -28,6 +28,8 @@ import {
   groupTypeRequiresAge,
 } from '@/lib/utils/groupType';
 import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
+import { OdooCompanyPicker } from '@/components/forms/OdooCompanyPicker';
+import { detectCountryCode } from '@/lib/constants/countryCodes';
 
 interface FormData {
   // Step 1: Trip Details
@@ -54,6 +56,9 @@ interface FormData {
   specialRequestsRooms: string;
   // Step 3: Customer Details
   companyName: string;
+  // Linked Odoo `res.partner` id (null until staff picks a match in the
+  // OdooCompanyPicker). Required at send-offer time post-cutover.
+  odooContactId: number | null;
   nameListFile: File | null;
   firstName: string;
   lastName: string;
@@ -87,6 +92,7 @@ const defaultFormData: FormData = {
   hotelLocation: 'central',
   specialRequestsRooms: '',
   companyName: '',
+  odooContactId: null,
   nameListFile: null,
   firstName: '',
   lastName: '',
@@ -539,6 +545,7 @@ function CreateBookingRequestPageInner() {
         specialRequirements: formData.specialRequestsRooms || undefined,
         // Step 3: Customer Details
         companyName: formData.companyName,
+        odooContactId: formData.odooContactId,
         firstName: formData.firstName,
         lastName: formData.lastName,
         contactEmail: formData.email,
@@ -1418,19 +1425,35 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
       />
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
-              {t.createForm.companyName} <span className="text-sett-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder={t.createForm.companyNamePlaceholder}
-              value={formData.companyName}
-              onChange={(e) => updateField('companyName', e.target.value)}
-              className={inputClass(!!errors.companyName)}
-            />
-            <FieldError message={errors.companyName} />
-          </div>
+          {/* §BackendGuidelines.md — live Odoo company picker. Replaces the
+              previous plain free-text input. companyName + odooContactId are
+              kept in form state and POSTed together. onPicked autofills
+              Email + Phone from the Odoo row, but only when the fields are
+              still empty — never overwrite staff input. */}
+          <OdooCompanyPicker
+            value={{ companyName: formData.companyName, odooContactId: formData.odooContactId }}
+            onChange={(next) => {
+              updateField('companyName', next.companyName);
+              updateField('odooContactId', next.odooContactId);
+            }}
+            onPicked={(row) => {
+              if (!formData.email.trim() && row.email) {
+                updateField('email', row.email);
+              }
+              if (!formData.phone.trim() && row.phone) {
+                const split = detectCountryCode(row.phone);
+                if (split) {
+                  updateField('phoneCountryCode', split.code);
+                  updateField('phone', split.number);
+                } else {
+                  updateField('phone', row.phone);
+                }
+              }
+            }}
+            label={t.createForm.companyName}
+            required
+            error={errors.companyName}
+          />
           <div>
             <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
               {t.createForm.nameList}
