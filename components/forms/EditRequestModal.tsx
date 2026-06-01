@@ -24,6 +24,7 @@ import {
 } from '@/lib/utils/groupType';
 import { selectedStars } from '@/lib/utils/starRatings';
 import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
+import { OdooCompanyPicker } from '@/components/forms/OdooCompanyPicker';
 import { Spinner } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils/cn';
 import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
@@ -60,6 +61,9 @@ interface FormState {
   hotelLocation: string;
   specialRequirements: string;
   companyName: string;
+  // Linked Odoo `res.partner` id (null until linked). Required at send-offer
+  // time post-cutover — see BackendGuidelines.md §2.3.
+  odooContactId: number | null;
   firstName: string;
   lastName: string;
   contactEmail: string;
@@ -209,6 +213,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     hotelLocation: 'central',
     specialRequirements: '',
     companyName: '',
+    odooContactId: null,
     firstName: '',
     lastName: '',
     contactEmail: '',
@@ -314,6 +319,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         hotelLocation: request.hotelLocation ?? 'central',
         specialRequirements: request.specialRequirements ?? '',
         companyName: request.companyName ?? '',
+        odooContactId: request.odooContactId ?? null,
         firstName: request.firstName ?? '',
         lastName: request.lastName ?? '',
         contactEmail: request.contactEmail ?? '',
@@ -536,6 +542,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         hotelLocation: form.hotelLocation as 'central' | 'outside_city_center',
         specialRequirements: form.specialRequirements || undefined,
         companyName: form.companyName,
+        odooContactId: form.odooContactId,
         firstName: form.firstName,
         lastName: form.lastName,
         contactEmail: form.contactEmail,
@@ -1086,16 +1093,36 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>{t.offer.editCompanyName}</label>
-                <input
-                  className={inputCls}
-                  value={form.companyName}
-                  onChange={(e) => setField('companyName', e.target.value)}
-                  placeholder={t.createForm.companyNamePlaceholder}
-                />
-                {fieldErrors.companyName && <p className="mt-1 text-caption text-[#CC3333]">{fieldErrors.companyName}</p>}
-              </div>
+              {/* Odoo company picker — replaces the previous free-text input.
+                  See BackendGuidelines.md §3.1. companyName + odooContactId
+                  are saved together via PATCH /requests/:id. */}
+              <OdooCompanyPicker
+                value={{ companyName: form.companyName, odooContactId: form.odooContactId }}
+                onChange={(next) => {
+                  setField('companyName', next.companyName);
+                  setField('odooContactId', next.odooContactId);
+                }}
+                onPicked={(row) => {
+                  // Autofill Email + Phone from the Odoo row, but only when
+                  // the host field is still empty — staff may have already
+                  // typed a different contact and we never overwrite that.
+                  if (!form.contactEmail.trim() && row.email) {
+                    setField('contactEmail', row.email);
+                  }
+                  if (!form.contactPhone.trim() && row.phone) {
+                    const split = detectCountryCode(row.phone);
+                    if (split) {
+                      setField('contactPhoneCountryCode', split.code);
+                      setField('contactPhone', split.number);
+                    } else {
+                      setField('contactPhone', row.phone);
+                    }
+                  }
+                }}
+                label={t.offer.editCompanyName}
+                required
+                error={fieldErrors.companyName}
+              />
               <div>
                 <label className={labelCls}>{t.offer.editFirstName}</label>
                 <input

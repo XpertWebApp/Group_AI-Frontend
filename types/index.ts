@@ -88,6 +88,10 @@ export interface BookingRequest {
 
   // Step 3: Customer Details
   companyName?: string | null;
+  // Linked Odoo `res.partner` id. Set when staff picked a match via the
+  // OdooCompanyPicker. Required (post-cutover) before the offer can be sent —
+  // see ODOO_GATE_ACTIVE_SINCE in BackendGuidelines.md §2.3.
+  odooContactId?: number | null;
   firstName?: string | null;
   lastName?: string | null;
   contactName?: string | null;
