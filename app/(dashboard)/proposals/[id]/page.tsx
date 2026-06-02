@@ -12,7 +12,8 @@ import { AddServiceModal } from '@/components/forms/AddServiceModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { proposalsApi } from '@/lib/api/proposals';
 import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
-import { isOdooContactRequiredError } from '@/lib/utils/odooGate';
+import { SendOfferDualPreviewModal, type SendOfferResult } from '@/components/ui/SendOfferDualPreviewModal';
+import { useDefaultMarkup } from '@/hooks/useDefaultMarkup';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU } from '@/lib/dateFormatter';
 import type { Proposal, ProposalHotel, ProposalService } from '@/types';
@@ -25,8 +26,15 @@ export default function ProposalPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [loading, setLoading] = useState(true);
   const [markupPercent, setMarkupPercent] = useState(0);
+  // Whether the current markup value came from the proposal's own override
+  // (proposal.markupSettings.percent). When false, the slider is "tracking"
+  // the live Settings default — we keep it in sync until the user touches
+  // the slider, after which it locks to whatever they picked.
+  const [hasMarkupOverride, setHasMarkupOverride] = useState(false);
+  const { markup: defaultMarkup } = useDefaultMarkup();
   const [addHotelOpen, setAddHotelOpen] = useState(false);
   const [addServiceOpen, setAddServiceOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ type: 'hotel' | 'service'; id: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   // Odoo gate (§2.3) — opened reactively when the BE returns 400 ODOO_CONTACT_REQUIRED.
@@ -44,7 +52,10 @@ export default function ProposalPage() {
         if (!cancelled && data) {
           setProposal(data);
           const pct = (data.markupSettings as { percent?: number })?.percent;
-          if (typeof pct === 'number') setMarkupPercent(pct);
+          if (typeof pct === 'number') {
+            setMarkupPercent(pct);
+            setHasMarkupOverride(true);
+          }
         }
       } catch {
         if (!cancelled) setProposal(null);
@@ -55,6 +66,15 @@ export default function ProposalPage() {
     load();
     return () => { cancelled = true; };
   }, [id]);
+
+  // Seed the slider from Settings → General once the default arrives, but
+  // only if the proposal didn't already carry its own markup override.
+  // Stops tracking the moment the user moves the slider.
+  useEffect(() => {
+    if (hasMarkupOverride) return;
+    if (defaultMarkup == null) return;
+    setMarkupPercent(defaultMarkup);
+  }, [defaultMarkup, hasMarkupOverride]);
 
   const totals = useMemo(() => {
     if (!proposal) return { hotelSubtotal: 0, serviceSubtotal: 0, totalBuy: 0, totalSell: 0 };
@@ -153,45 +173,19 @@ export default function ProposalPage() {
     }
   };
 
-  const handleSend = async () => {
-    setActionLoading(true);
-    try {
-      const result = await proposalsApi.send(id);
-      setProposal(result.proposal);
-      toast.success(t.toasts.proposalSent);
-    } catch (err: unknown) {
-      const ax = await import('axios');
-      if (ax.isAxiosError(err)) {
-        const errorCode = err.response?.data?.error as string | undefined;
-        const backendMessage = err.response?.data?.message as string | undefined;
-        const emailError = err.response?.data?.data?.emailError as string | undefined;
-        const proposalData = err.response?.data?.data?.proposal;
-        if (proposalData) setProposal(proposalData);
-
-        if (errorCode === 'ODOO_CONTACT_REQUIRED' || isOdooContactRequiredError(err)) {
-          setOdooGateMessage(backendMessage);
-          setOdooGateOpen(true);
-        } else if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
-          toast.error(emailError || t.toasts.emailSendFailed, { duration: 8000 });
-        } else if (errorCode === 'SMTP_NOT_CONFIGURED') {
-          toast.error(emailError || t.toasts.smtpNotConfigured, { duration: 8000 });
-        } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
-          toast.error(t.toasts.noRecipientEmail);
-        } else if (errorCode === 'PDF_GENERATION_FAILED') {
-          toast.error(t.toasts.pdfGenerationFailed);
-        } else if (errorCode === 'PROPOSAL_ALREADY_SENT') {
-          toast.success(t.toasts.proposalAlreadySent);
-        } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE') {
-          toast.error(t.toasts.proposalNotModifiable);
-        } else {
-          toast.error(err.response?.data?.message || t.toasts.emailSendFailed, { duration: 6000 });
-        }
-      } else {
-        toast.error(t.toasts.emailSendFailed, { duration: 6000 });
-      }
-    } finally {
-      setActionLoading(false);
-    }
+  // Post-send: refresh local proposal from the BE response and surface the
+  // language-explicit toast. All error handling lives inside the dual-preview
+  // modal — staff can fix recipients and retry without re-opening anything.
+  const handleAfterSend = (result: SendOfferResult) => {
+    const payload = result.data as { proposal?: Proposal } | null;
+    if (payload?.proposal) setProposal(payload.proposal);
+    setSendOpen(false);
+    const recipientsLabel = result.recipients.join(', ');
+    const toastMsg =
+      result.language === 'de'
+        ? t.offer.sendOfferSentInGermanToast.replace('{recipients}', recipientsLabel)
+        : t.offer.sendOfferSentInEnglishToast.replace('{recipients}', recipientsLabel);
+    toast.success(toastMsg);
   };
 
   if (loading) {
@@ -370,7 +364,10 @@ export default function ProposalPage() {
                   min={0}
                   step={0.5}
                   value={markupPercent}
-                  onChange={(e) => setMarkupPercent(Number(e.target.value) || 0)}
+                  onChange={(e) => {
+                    setMarkupPercent(Number(e.target.value) || 0);
+                    setHasMarkupOverride(true);
+                  }}
                   className="w-20 px-2 py-1 rounded-input border border-sett-border text-body"
                 />
               )}
@@ -404,9 +401,8 @@ export default function ProposalPage() {
         </Button>
         <Button
           variant="primary"
-          onClick={handleSend}
-          isLoading={actionLoading}
-          disabled={isLocked}
+          onClick={() => setSendOpen(true)}
+          disabled={actionLoading || isLocked}
         >
           Send
         </Button>
@@ -443,6 +439,15 @@ export default function ProposalPage() {
         }}
         bodyOverride={odooGateMessage}
       />
+      {sendOpen && (
+        <SendOfferDualPreviewModal
+          open={sendOpen}
+          proposalId={proposal.id}
+          initialRecipients={[]}
+          onSent={handleAfterSend}
+          onClose={() => setSendOpen(false)}
+        />
+      )}
     </div>
   );
 }

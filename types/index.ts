@@ -381,14 +381,6 @@ export interface OptionDetailResult {
   data?: unknown;
 }
 
-export interface CalculatePriceResult {
-  buyingPrice: number;
-  sellPrice: number;
-  markupPercent: number;
-  rawSellPrice?: number;
-  markup?: number;
-  effectiveMarkupPercent?: number;
-}
 
 // ──── Async Hotel Search Types ────
 

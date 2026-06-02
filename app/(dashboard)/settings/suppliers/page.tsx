@@ -101,14 +101,15 @@ export default function SupplierLimitsPage() {
               </div>
             </div>
             <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-[14px] h-[14px]" style={{ color: '#4A4A4A' }} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-sett-text-secondary pointer-events-none" />
+              {/* Brand-spec §5.5 styling — matches the shared Input but
+                  with a left-padding bump to clear the search icon. */}
               <input
                 type="text"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search by supplier code, provider name, or ACC code..."
-                className="w-full h-[41px] pl-9 pr-3 rounded-[14px] font-montserrat text-[14px] font-normal text-[#1D1D1D] placeholder:text-[#4A4A4A] focus:outline-none focus:border-sett-primary focus:ring-1 focus:ring-sett-primary"
-                style={{ border: '1px solid #E6EAF0', padding: 12, paddingLeft: 36 }}
+                className="w-full h-[41px] pl-10 pr-3 rounded-[14px] border border-sett-border bg-white font-montserrat text-[14px] font-normal text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150"
               />
             </div>
           </div>

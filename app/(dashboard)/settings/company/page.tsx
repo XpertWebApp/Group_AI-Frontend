@@ -117,15 +117,19 @@ export default function CompanyDetailsPage() {
     setErrors({});
   };
 
-  const inputBase = 'w-full h-[41px] rounded-[14px] font-montserrat text-[14px] text-[#1D1D1D] placeholder:text-[#A3A3A3] focus:outline-none';
+  // Match the shared §5.5 Input styling: 14px radius, #E0E0E0 border,
+  // soft brand-green focus glow (shadow-input-focus), navy text. View
+  // mode (disabled, no border) intentionally diverges so read-only data
+  // reads as a static label, not an editable field.
+  const inputBase = 'w-full h-[41px] rounded-[14px] font-montserrat text-[14px] text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none transition-[border-color,box-shadow] duration-150';
 
   const getInputCls = (field: keyof CompanySettings) =>
     cn(
       inputBase,
       editing
         ? errors[field]
-          ? 'bg-white border border-[#FB2C36] focus:ring-2 focus:ring-[#FB2C36]/20'
-          : 'bg-white border border-[#E6EAF0] focus:ring-2 focus:ring-sett-primary'
+          ? 'bg-white border border-sett-destructive focus:border-sett-destructive focus:shadow-[0_0_0_3px_rgba(251,44,54,0.15)]'
+          : 'bg-white border border-sett-border focus:border-sett-primary focus:shadow-input-focus'
         : 'bg-[#F7F7F7] border-none'
     );
 

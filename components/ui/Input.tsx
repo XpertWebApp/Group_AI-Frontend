@@ -9,10 +9,14 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   isPassword?: boolean;
   labelClassName?: string;
+  /** Optional inline suffix shown inside the field on the right (e.g.
+   *  `%`, `€`, `kg`). Non-interactive; absolutely positioned and offset
+   *  via `pr-8` on the input so text doesn't run underneath. */
+  suffix?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, isPassword, labelClassName, type, ...props }, ref) => {
+  ({ className, label, error, isPassword, labelClassName, suffix, type, ...props }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
     const inputType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
@@ -49,6 +53,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'disabled:opacity-50 disabled:cursor-not-allowed',
               error ? 'border-sett-destructive' : 'border-sett-border',
               isPassword && 'pr-10',
+              suffix && 'pr-10',
               isPassword && !showPassword && 'text-[20px] tracking-[0.2em] placeholder:text-[14px] placeholder:tracking-normal',
               className
             )}
@@ -63,6 +68,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             >
               {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </button>
+          )}
+          {suffix && !isPassword && (
+            <span
+              aria-hidden
+              className="absolute right-3 top-1/2 -translate-y-1/2 font-montserrat text-[14px] text-sett-text-accent pointer-events-none select-none"
+            >
+              {suffix}
+            </span>
           )}
         </div>
         {error && <p className="mt-1 text-caption text-red-500">{error}</p>}

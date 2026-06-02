@@ -58,11 +58,18 @@ export interface AddProposalServicePayload {
 
 export interface SendProposalPayload {
   sendToEmails?: string[];
+  /** ISO 639-1 language code for the PDF + email body. 'en' / 'de'. The
+   *  backend honors this on the SEND endpoint per the multi-language PDF
+   *  API (May 2026 handover). Omit to default to EN. */
+  language?: string;
 }
 
 export interface ApproveProposalPayload {
   agentEmail?: string;
   adminNotes?: string;
+  /** ISO 639-1 language code for the generated PDF. Backend already
+   *  accepts this; surfaced here so call sites can pass it through. */
+  language?: string;
 }
 
 export interface DeclineProposalPayload {

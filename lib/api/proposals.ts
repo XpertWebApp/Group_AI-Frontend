@@ -143,7 +143,7 @@ export const proposalsApi = {
     return data.data.offers ?? [];
   },
 
-  async previewPdf(proposalId: string, language?: string): Promise<string> {
+  async previewPdf(proposalId: string, language?: string, signal?: AbortSignal): Promise<string> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     const baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
     const body: Record<string, string> = {};
@@ -156,6 +156,7 @@ export const proposalsApi = {
         'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify(body),
+      signal,
     });
     if (!response.ok) {
       throw new Error(`Failed to generate PDF preview (${response.status})`);
@@ -181,6 +182,71 @@ export const proposalsApi = {
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to decline');
     return data.data;
   },
+
+  /**
+   * Download the proposal's current PDF in the chosen language. Triggers a
+   * browser save-as dialog using the filename from the Content-Disposition
+   * header (the BE includes the language suffix in the filename so users
+   * can tell EN/DE downloads apart).
+   *
+   * Re-rendered server-side from CURRENT proposal data — distinct from the
+   * snapshot version captured at send-time. Slower than a cached download
+   * (BE: ~1-2s for the DeepL translation step). UX: show a "Downloading…"
+   * spinner while this awaits.
+   */
+  async downloadPdf(proposalId: string, language: string): Promise<void> {
+    await downloadBlob(
+      `/proposals/${proposalId}/pdf?language=${encodeURIComponent(language)}`,
+    );
+  },
+
+  /**
+   * Download a specific historical offer's PDF in the chosen language.
+   * Same re-render semantics as downloadPdf — the cached PDF in storage
+   * stays in whichever language it was originally sent in; this endpoint
+   * re-renders on demand with CURRENT proposal data.
+   */
+  async downloadOfferPdf(proposalId: string, offerId: string, language: string): Promise<void> {
+    await downloadBlob(
+      `/proposals/${proposalId}/offers/${offerId}/pdf?language=${encodeURIComponent(language)}`,
+    );
+  },
 };
+
+/** Shared download helper — fetches a PDF, pulls the filename from
+ *  Content-Disposition, and triggers a browser save-as via a synthetic
+ *  <a download> click. Handles auth header + ngrok skip + error surface. */
+async function downloadBlob(path: string): Promise<void> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  const response = await fetch(`${baseURL}${path}`, {
+    method: 'GET',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'ngrok-skip-browser-warning': 'true',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to download PDF (${response.status})`);
+  }
+
+  // Pull filename from Content-Disposition. Backend sends it with the
+  // language suffix baked in (e.g. "offer-447-de.pdf") so users can tell
+  // EN/DE downloads apart in their downloads folder.
+  const cd = response.headers.get('Content-Disposition') ?? '';
+  const match = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+  const filename = match ? decodeURIComponent(match[1]) : 'offer.pdf';
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Free the blob URL on the next tick (after the click has consumed it).
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
 
 export { getApiError };

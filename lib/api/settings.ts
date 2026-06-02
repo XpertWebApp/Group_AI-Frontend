@@ -16,28 +16,59 @@ export interface GeneralSettings {
   defaultMarkupPercentage: string;
 }
 
-/* ── Email / SMTP ── */
-export interface EmailSettings {
-  smtpHost: string;
-  smtpPort: string;
-  smtpUsername: string;
-  smtpPassword: string;
+/* ── Email Configuration (Brevo SMTP via nodemailer) ──
+ *
+ * Architecture (per BE handover 2026-06-02):
+ *   - SMTP credentials live in .env, never in the DB, never on the wire
+ *   - Sender identity (fromName / fromEmail / replyToFallback /
+ *     staffNotificationEmail) lives in DB; env is the boot-time default
+ *   - Google OAuth flow is gone — single transport, Brevo
+ */
+export interface SenderIdentity {
+  fromName: string;
   fromEmail: string;
-  fromName: string;
+  replyToFallback: string;
+  staffNotificationEmail: string;
 }
 
-export interface EmailConfigUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string | null;
-  isActive: boolean;
-  googleConnected: boolean;
+export type EmailConnectionStatus = 'connected' | 'error' | 'untested';
+
+export interface BrevoConnection {
+  provider: string;                          // "Brevo (SMTP relay)"
+  host: string | null;                       // null when SMTP_HOST is unset
+  port: number | null;
+  security: string | null;                   // "STARTTLS" / "SSL"
+  usernameMasked: string | null;             // pre-masked by BE
+  passwordMasked: string | null;
+  configured: boolean;                       // true ⇒ BE can build a transport
+  status: EmailConnectionStatus;
+  statusError: string | null;                // human-readable when status === 'error'
+  lastTestedAt: string | null;               // ISO 8601 or null
 }
 
-export interface EmailConfig {
-  users: EmailConfigUser[];
-  fromName: string;
+export interface InterceptStatus {
+  active: boolean;                           // EMAIL_INTERCEPT_TO is set on the BE
+  target: string | null;                     // the address all outbound mail is rerouted to
+}
+
+export interface EmailSettingsResponse {
+  senderIdentity: SenderIdentity;
+  connection: BrevoConnection;
+  intercept: InterceptStatus;
+}
+
+/** Live connection-status payload from /settings/email/test-status */
+export interface EmailTestStatus {
+  configured: boolean;
+  status: EmailConnectionStatus;
+  statusError: string | null;
+  lastTestedAt: string | null;
+}
+
+export interface EmailTestSendResult {
+  delivered: boolean;
+  messageId: string;
+  sentAt: string;
 }
 
 /* ── Company ── */
@@ -79,8 +110,6 @@ export interface SupplierLimitsResponse {
   limit: number;
 }
 
-const SMTP_PASSWORD_MASK = '••••••••••••';
-
 export const settingsApi = {
   /* Overview */
   getOverview: async () => {
@@ -98,37 +127,31 @@ export const settingsApi = {
     return data.data;
   },
 
-  /* Email */
-  getEmail: async () => {
-    const { data } = await apiClient.get<{ data: EmailSettings }>('/settings/email');
-    return data.data;
-  },
-  updateEmail: async (payload: Partial<EmailSettings>) => {
-    // If password is still the mask, omit it so backend doesn't overwrite
-    const body = { ...payload };
-    if (body.smtpPassword === SMTP_PASSWORD_MASK) {
-      delete body.smtpPassword;
-    }
-    const { data } = await apiClient.put<{ data: EmailSettings }>('/settings/email', body);
+  /* Email Configuration (Brevo SMTP) */
+  getEmailSettings: async (): Promise<EmailSettingsResponse> => {
+    const { data } = await apiClient.get<ApiResponse<EmailSettingsResponse>>('/settings/email');
+    if (!data.success || !data.data) throw new Error('Failed to load email settings');
     return data.data;
   },
 
-  /* Email Config (new Google-based) */
-  getEmailConfig: async (): Promise<EmailConfig> => {
-    const { data } = await apiClient.get<ApiResponse<EmailConfig>>('/settings/email');
-    if (!data.success || !data.data) throw new Error('Failed to load email config');
+  updateSenderIdentity: async (payload: Partial<SenderIdentity>): Promise<EmailSettingsResponse> => {
+    // Empty string `""` is a valid value (BE treats it as "clear, fall back
+    // to env at send time"). Don't strip empty strings before send.
+    const { data } = await apiClient.put<ApiResponse<EmailSettingsResponse>>('/settings/email', payload);
+    if (!data.success || !data.data) throw new Error('Failed to update email settings');
     return data.data;
   },
-  updateFromName: async (fromName: string): Promise<void> => {
-    await apiClient.put('/settings/email', { fromName });
+
+  getEmailTestStatus: async (): Promise<EmailTestStatus> => {
+    const { data } = await apiClient.get<ApiResponse<EmailTestStatus>>('/settings/email/test-status');
+    if (!data.success || !data.data) throw new Error('Failed to load test status');
+    return data.data;
   },
-  disconnectGoogle: async (userId: string): Promise<void> => {
-    await apiClient.post(`/settings/email/disconnect/${userId}`);
-  },
-  getGoogleConnectUrl: async (): Promise<string> => {
-    const { data } = await apiClient.get<ApiResponse<{ url: string }>>('/auth/google/connect');
-    if (!data.success || !data.data?.url) throw new Error('Failed to get Google connect URL');
-    return data.data.url;
+
+  sendEmailTest: async (to: string): Promise<EmailTestSendResult> => {
+    const { data } = await apiClient.post<ApiResponse<EmailTestSendResult>>('/settings/email/test-send', { to });
+    if (!data.success || !data.data) throw new Error('Failed to send test email');
+    return data.data;
   },
 
   /* Company */
@@ -161,5 +184,4 @@ export const settingsApi = {
     return data.data;
   },
 
-  SMTP_PASSWORD_MASK,
 };

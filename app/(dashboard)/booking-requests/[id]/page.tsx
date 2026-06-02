@@ -43,6 +43,10 @@ import { isOdooLinkRequired, isOdooContactRequiredError } from '@/lib/utils/odoo
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
+import { PdfLanguagePicker } from '@/components/ui/PdfLanguagePicker';
+import { usePdfLanguage } from '@/hooks/usePdfLanguage';
+import { useDefaultMarkup } from '@/hooks/useDefaultMarkup';
+import { SendOfferDualPreviewModal, type SendOfferResult } from '@/components/ui/SendOfferDualPreviewModal';
 import type { Attachment, BookingRequest, OfferHistoryEntry, Proposal, ProposalHotel, ProposalService } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
@@ -155,6 +159,16 @@ export default function RequestDetailPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Per-proposal PDF language preference — drives Preview, Send, Approve,
+  // and all Offer History Downloads. Persisted to localStorage so the
+  // user's choice for this proposal sticks across visits.
+  const { language: pdfLanguage, setLanguage: setPdfLanguage } = usePdfLanguage(proposal?.id);
+  // Tracks which offerId's download is in-flight so we can show a per-row
+  // "Downloading…" affordance and disable the rest.
+  const [downloadingOfferId, setDownloadingOfferId] = useState<string | null>(null);
+  // Same for the current-proposal download (header / Preview area).
+  const [downloadingProposal, setDownloadingProposal] = useState(false);
   const [offerHistory, setOfferHistory] = useState<OfferHistoryEntry[]>([]);
   const [offerHistoryLoading, setOfferHistoryLoading] = useState(false);
 
@@ -176,11 +190,7 @@ export default function RequestDetailPage() {
   const [saveDraftOpen, setSaveDraftOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const [sendEmails, setSendEmails] = useState<string[]>([]);
-  const [emailInput, setEmailInput] = useState('');
-  const emailInputRef = useRef<HTMLInputElement>(null);
   const [sendNotes, setSendNotes] = useState('');
-  const [sendError, setSendError] = useState('');
-  const [sendEmailError, setSendEmailError] = useState('');
   const [approveStepDone, setApproveStepDone] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -463,79 +473,34 @@ export default function RequestDetailPage() {
 
   const isValidEmail = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
 
-  const addEmailChip = (raw = emailInput) => {
-    const val = raw.trim().replace(/,+$/, '');
-    if (!val) return;
-    if (!isValidEmail(val)) {
-      setSendEmailError(t.offer.emailInvalid);
-      return;
-    }
-    if (sendEmails.length >= 20) {
-      setSendEmailError(t.offer.emailsMaxLimit);
-      return;
-    }
-    const lower = val.toLowerCase();
-    if (!sendEmails.map((e) => e.toLowerCase()).includes(lower)) {
-      setSendEmails((prev) => [...prev, val]);
-    }
-    setEmailInput('');
-    setSendEmailError('');
-  };
-
-  const handleEmailInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addEmailChip();
-    } else if (e.key === 'Backspace' && emailInput === '' && sendEmails.length > 0) {
-      setSendEmails((prev) => prev.slice(0, -1));
-    }
-  };
-
-  const handleEmailInputBlur = () => {
-    if (emailInput.trim()) addEmailChip();
-  };
-
-  const handleApproveAndSend = async () => {
-    if (!proposal) return;
-    setSendError('');
-    setSendEmailError('');
-
-    // Validate at least 1 hotel
-    if (!proposal.hotels || proposal.hotels.length === 0) {
-      setSendError(t.offer.noHotelsError);
-      return;
-    }
-
-    // Flush any email typed but not yet added as a chip
-    let finalEmails = [...sendEmails];
-    const pending = emailInput.trim();
-    if (pending) {
-      if (!isValidEmail(pending)) {
-        setSendEmailError(t.offer.emailInvalid);
-        return;
+  // ── New bilingual Send Offer flow (per BE handover 2026-06-02) ─────
+  // The dual-preview modal handles previews, language pick, recipients,
+  // and the /actions/send call. We just provide:
+  //   1. beforeSend(language)  — the existing approve step. Generates
+  //      the agent-facing PDF + email and transitions the proposal status
+  //      to 'approved' so /send can proceed.
+  //   2. onSent(result)        — refresh proposal state, refresh offer
+  //      history, toast with the LANGUAGE explicit ("Offer sent in German
+  //      to …").
+  const handleApproveBeforeSend = useCallback(
+    async (language: 'en' | 'de') => {
+      if (!proposal) throw new Error('No proposal');
+      if (!proposal.hotels || proposal.hotels.length === 0) {
+        throw new Error(t.offer.noHotelsError);
       }
-      const lower = pending.toLowerCase();
-      if (!finalEmails.map((e) => e.toLowerCase()).includes(lower)) {
-        finalEmails = [...finalEmails, pending];
-        setSendEmails(finalEmails);
-      }
-      setEmailInput('');
-    }
-
-    if (finalEmails.length === 0) {
-      setSendEmailError(t.offer.emailsRequired);
-      return;
-    }
-
-    setActionLoading(true);
-
-    // Step 1: Approve — generates PDF, emails agent.
-    // Skipped if a previous attempt already completed this step successfully.
-    if (!approveStepDone) {
+      // Only call approve once per modal session — guard with the existing
+      // approveStepDone state so a Send retry doesn't re-approve.
+      if (approveStepDone) return;
+      // We need at least one email for approve's agentEmail param. Pull
+      // it from sendEmails state which the modal mirrors via initialRecipients.
+      // The modal passes its own recipients to /send; for approve we just
+      // need any valid one.
+      const agentEmail = sendEmails[0] || request?.contactEmail || '';
       try {
         await proposalsApi.approve(proposal.id, {
-          agentEmail: finalEmails[0],
+          agentEmail,
           adminNotes: sendNotes.trim() || undefined,
+          language,
         });
         setApproveStepDone(true);
       } catch (err: unknown) {
@@ -543,90 +508,45 @@ export default function RequestDetailPage() {
         if (ax.isAxiosError(err)) {
           const errorCode = err.response?.data?.error as string | undefined;
           const backendMessage = err.response?.data?.message as string | undefined;
-          const status = err.response?.status;
-
-          if (errorCode === 'PROPOSAL_NOT_APPROVABLE' || status === 412) {
-            setSendError('This offer cannot be approved in its current state. Please refresh the page and try again.');
-          } else if (errorCode === 'PDF_GENERATION_FAILED') {
-            setSendError(t.toasts.pdfGenerationFailed);
-          } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
-            setSendError(t.toasts.noRecipientEmail);
-          } else if (status === 403) {
-            setSendError('You do not have permission to approve this offer.');
-          } else if (status && status >= 500) {
-            setSendError('A server error occurred while approving the offer. Please try again.');
-          } else {
-            setSendError(backendMessage || t.toasts.failedToApprove);
+          if (errorCode === 'PROPOSAL_NOT_APPROVABLE') {
+            throw new Error('This offer cannot be approved in its current state.');
           }
-        } else {
-          setSendError(t.toasts.failedToApprove);
+          if (errorCode === 'PDF_GENERATION_FAILED') {
+            throw new Error(t.toasts.pdfGenerationFailed);
+          }
+          throw new Error(backendMessage || t.toasts.failedToApprove);
         }
-        setActionLoading(false);
-        return;
+        throw new Error(t.toasts.failedToApprove);
       }
-    }
+    },
+    [proposal, approveStepDone, sendEmails, request, sendNotes, t],
+  );
 
-    // Step 2: Send — marks proposal as sent
-    try {
-      const result = await proposalsApi.send(proposal.id, {
-        sendToEmails: finalEmails,
-      });
-      setProposal(result.proposal);
+  const handleAfterSend = useCallback(
+    (result: SendOfferResult) => {
+      // The result.data is the raw /send response payload — pull the
+      // refreshed proposal out so we can update local state.
+      const payload = result.data as { proposal?: Proposal } | null;
+      if (payload?.proposal) setProposal(payload.proposal);
       setSendOpen(false);
       setSendEmails([]);
-      setEmailInput('');
       setSendNotes('');
-      setSendError('');
       setApproveStepDone(false);
       setSuccessOpen(true);
-      toast.success(t.toasts.proposalSent);
-      proposalsApi.listOffers(proposal.id).then(setOfferHistory).catch(() => { });
-    } catch (err: unknown) {
-      const ax = await import('axios');
-      if (ax.isAxiosError(err)) {
-        const errorCode = err.response?.data?.error as string | undefined;
-        const backendMessage = err.response?.data?.message as string | undefined;
-        const emailError = err.response?.data?.data?.emailError as string | undefined;
-        const proposalData = err.response?.data?.data?.proposal;
-        const status = err.response?.status;
-        if (proposalData) setProposal((p) => p ? { ...p, ...proposalData } : p);
-
-        if (errorCode === 'ODOO_CONTACT_REQUIRED' || isOdooContactRequiredError(err)) {
-          // Gate fired despite our pre-disable (e.g. race with a recent
-          // unlink). Close the send dialog and open the dedicated blocking
-          // modal, preserving the BE-supplied user-facing sentence.
-          setSendOpen(false);
-          setOdooGateMessage(backendMessage);
-          setOdooGateOpen(true);
-        } else if (errorCode === 'SMTP_FAILED' || errorCode === 'EMAIL_SEND_FAILED') {
-          setSendError(emailError || t.toasts.emailSendFailed);
-        } else if (errorCode === 'SMTP_NOT_CONFIGURED') {
-          setSendError(emailError || t.toasts.smtpNotConfigured);
-        } else if (errorCode === 'NO_RECIPIENT_EMAIL') {
-          setSendError(t.toasts.noRecipientEmail);
-        } else if (errorCode === 'PDF_GENERATION_FAILED') {
-          setSendError(t.toasts.pdfGenerationFailed);
-        } else if (errorCode === 'PROPOSAL_ALREADY_SENT') {
-          setSendOpen(false);
-          toast.success(t.toasts.proposalAlreadySent);
-        } else if (errorCode === 'PROPOSAL_NOT_MODIFIABLE' || status === 412) {
-          setSendError('This offer cannot be sent in its current state. Please refresh and try again.');
-        } else if (status === 403) {
-          setSendError('You do not have permission to send this offer.');
-        } else if (status === 409) {
-          setSendError('A conflict occurred — the offer may have already been updated. Please refresh and try again.');
-        } else if (status && status >= 500) {
-          setSendError('A server error occurred while sending the offer. Please try again or contact support.');
-        } else {
-          setSendError(backendMessage || `${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
-        }
-      } else {
-        setSendError(`${t.offer.approvedButNotSent}. ${t.offer.tryAgain}`);
+      // Language-explicit toast per BE doc §4.3 — "this is your last chance
+      // to surface what just happened."
+      const recipientsLabel = result.recipients.join(', ');
+      const toastMsg =
+        result.language === 'de'
+          ? t.offer.sendOfferSentInGermanToast.replace('{recipients}', recipientsLabel)
+          : t.offer.sendOfferSentInEnglishToast.replace('{recipients}', recipientsLabel);
+      toast.success(toastMsg);
+      if (proposal) {
+        proposalsApi.listOffers(proposal.id).then(setOfferHistory).catch(() => { });
       }
-    } finally {
-      setActionLoading(false);
-    }
-  };
+    },
+    [proposal, t],
+  );
 
   const handleDecline = async () => {
     if (!proposal) return;
@@ -1665,19 +1585,42 @@ export default function RequestDetailPage() {
                               </div>
 
                               {/* ── Row 4 — Download CTA ──
-                                  Compact secondary-style: green text on
-                                  light-green tint, full-width, doesn't try
-                                  to compete with the chip above. */}
+                                  Compact secondary-style. Uses the
+                                  language-aware GET endpoint so DE users
+                                  get the German PDF even when the cached
+                                  copy was sent in EN (BE re-renders with
+                                  current proposal data). Shows a per-row
+                                  "Downloading…" spinner while the BE
+                                  generates (~1-2s with DeepL). */}
                               {entry.pdfUrl ? (
-                                <a
-                                  href={entry.pdfUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-light-green-bg/70 border border-sett-primary/30 font-montserrat text-[12px] font-bold uppercase tracking-[0.06em] text-sett-green-dark hover:bg-sett-primary hover:text-sett-navy hover:border-sett-primary transition-colors duration-200 active:scale-[0.98]"
+                                <button
+                                  type="button"
+                                  disabled={downloadingOfferId === entry.id}
+                                  onClick={async () => {
+                                    if (!proposal) return;
+                                    setDownloadingOfferId(entry.id);
+                                    try {
+                                      await proposalsApi.downloadOfferPdf(proposal.id, entry.id, pdfLanguage);
+                                    } catch {
+                                      toast.error(t.toasts.pdfGenerationFailed);
+                                    } finally {
+                                      setDownloadingOfferId(null);
+                                    }
+                                  }}
+                                  className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-light-green-bg/70 border border-sett-primary/30 font-montserrat text-[12px] font-bold uppercase tracking-[0.06em] text-sett-green-dark hover:bg-sett-primary hover:text-sett-navy hover:border-sett-primary transition-colors duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait"
                                 >
-                                  <Download className="w-3.5 h-3.5" />
-                                  {t.modals.downloadPdf}
-                                </a>
+                                  {downloadingOfferId === entry.id ? (
+                                    <>
+                                      <span className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                      {t.offer.pdfDownloading}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="w-3.5 h-3.5" />
+                                      {t.modals.downloadPdf}
+                                    </>
+                                  )}
+                                </button>
                               ) : (
                                 <div className="inline-flex items-center justify-center gap-1.5 w-full h-9 rounded-[6px] bg-sett-fill border border-sett-border-light font-montserrat text-[11px] font-medium text-sett-text-accent">
                                   <AlertTriangle className="w-3 h-3" />
@@ -1746,12 +1689,38 @@ export default function RequestDetailPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
+                {/* PDF Language Picker — scopes Preview / Send / Approve to
+                    the chosen language. Per-proposal preference, persisted to
+                    localStorage so the staff member's choice for this offer
+                    sticks across visits. */}
                 <div
-                  className="grid grid-cols-2 lg:grid-cols-1 gap-3 animate-sidebar-fade-up"
+                  className="flex items-center justify-end animate-sidebar-fade-up"
+                  style={{ animationDelay: '620ms' }}
+                >
+                  <PdfLanguagePicker
+                    value={pdfLanguage}
+                    onChange={setPdfLanguage}
+                    disabled={actionLoading || downloadingProposal}
+                  />
+                </div>
+
+                {/* Action Buttons — opacity-only animation per
+                    [[form-animations]] memory: the PdfLanguagePicker tooltip
+                    that sits just above renders downward into this block, so
+                    a transform-based animation here would create a new
+                    stacking context that traps the tooltip behind the
+                    buttons. animate-field-fade-in keeps the entry feel
+                    without breaking the overlay. */}
+                <div
+                  className="grid grid-cols-2 lg:grid-cols-1 gap-3 animate-field-fade-in"
                   style={{ animationDelay: '640ms' }}
                 >
-                  <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPreviewOpen(true)}
+                    disabled={downloadingProposal}
+                  >
                     <Eye className="w-4 h-4" />
                     {t.offer.previewPdf}
                   </Button>
@@ -1764,14 +1733,32 @@ export default function RequestDetailPage() {
                     <Save className="w-4 h-4" />
                     {t.offer.saveDraft}
                   </Button>
-                  {/* The Send-Offer trigger is pre-disabled when the Odoo
+                  {/* The Send-Offer triggers are pre-disabled when the Odoo
                       gate would fire (§2.3 — post-cutover request with no
                       odooContactId). Hovering the wrapper exposes a tooltip
-                      explaining how to unblock. The BE still enforces; this is
-                      pure UX so staff never see a 400 in the modal. */}
+                      explaining how to unblock. The BE still enforces; this
+                      is pure UX so staff never see a 400 in the modal.
+                      Two triggers share the same /send endpoint and modal:
+                       - "Send Initial Offer" / "Send Revision" — depends on
+                         offerHistory.length (0 ⇒ initial, 1+ ⇒ revision)
+                       - "Send Final Offer" — always available so staff can
+                         mark a definitive version regardless of history. */}
                   {(() => {
                     const sendBlockedByOdoo = isOdooLinkRequired(request);
                     const statusBlocked = ['declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase());
+                    const openSendModal = () => {
+                      if (sendBlockedByOdoo) {
+                        setOdooGateMessage(undefined);
+                        setOdooGateOpen(true);
+                        return;
+                      }
+                      const status = (proposal?.status ?? request.status).toLowerCase();
+                      if (status === 'approved') setApproveStepDone(true);
+                      if (sendEmails.length === 0 && request.contactEmail) {
+                        setSendEmails([request.contactEmail]);
+                      }
+                      setSendOpen(true);
+                    };
                     return (
                       <span
                         title={sendBlockedByOdoo ? t.odooPicker.sendBlockedTooltip : undefined}
@@ -1780,27 +1767,22 @@ export default function RequestDetailPage() {
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={() => {
-                            if (sendBlockedByOdoo) {
-                              setOdooGateMessage(undefined);
-                              setOdooGateOpen(true);
-                              return;
-                            }
-                            const status = (proposal?.status ?? request.status).toLowerCase();
-                            if (status === 'approved') setApproveStepDone(true);
-                            if (sendEmails.length === 0 && request.contactEmail) {
-                              setSendEmails([request.contactEmail]);
-                            }
-                            setSendOpen(true);
-                          }}
+                          onClick={openSendModal}
                           disabled={statusBlocked || sendBlockedByOdoo}
                         >
                           <Send className="w-4 h-4" />
                           {offerHistory.length === 0
                             ? t.offer.sendInitialOffer
-                            : offerHistory.length === 1
-                              ? t.offer.sendFinalOffer
-                              : t.offer.sendRevision}
+                            : t.offer.sendRevision}
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={openSendModal}
+                          disabled={statusBlocked || sendBlockedByOdoo}
+                        >
+                          <Send className="w-4 h-4" />
+                          {t.offer.sendFinalOffer}
                         </Button>
                       </span>
                     );
@@ -1870,144 +1852,38 @@ export default function RequestDetailPage() {
             variant="primary"
           />
 
-          {/* Approve & Send Modal */}
-          <ModalOverlay
-            open={sendOpen}
-            onClose={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
-          >
-              <div
-                className="bg-white w-full max-w-md mx-4 flex flex-col overflow-hidden"
-                style={{
-                  borderRadius: 8, // §5.3 panel
-                  border: '1px solid #E0E0E0',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                }}
-              >
-                {/* §5.3 accent strip */}
-                <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
-                <div className="px-5 py-5">
-                <div className="flex items-start justify-between mb-5">
-                  <div className="flex flex-col gap-1.5">
-                    <h3 className="font-montserrat text-[18px] font-bold text-sett-navy leading-tight">
-                      {offerHistory.length === 0
-                        ? t.offer.sendInitialOffer
-                        : offerHistory.length === 1
-                          ? t.offer.sendFinalOffer
-                          : t.offer.sendRevision}
-                    </h3>
-                    <p className="font-montserrat text-[13px] text-sett-grey leading-snug">
-                      {approveStepDone ? t.offer.resendMsg : t.offer.approveMsg}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
-                    className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors -mt-1"
-                    aria-label="Close"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
 
-                {sendError && (
-                  <div className="flex flex-col gap-2 mb-4 p-3 rounded-[4px]" style={{ background: '#FCEBEB', border: '1px solid #CC3333' }}>
-                    <div className="flex items-start gap-2">
-                      <XCircle className="w-4 h-4 text-[#CC3333] mt-0.5 shrink-0" />
-                      <p className="font-montserrat text-[13px] text-[#CC3333]">{sendError}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-navy mb-1.5">
-                      {t.offer.emailsLabel} <span className="text-[#CC3333]">*</span>
-                    </label>
-                    {/* Multi-email chip input — §5.5 input */}
-                    <div
-                      className={`min-h-[41px] w-full px-2 py-1.5 rounded-[4px] border flex flex-wrap gap-1.5 cursor-text transition-[border-color,box-shadow] duration-150 ${sendEmailError
-                        ? 'border-[#CC3333] focus-within:shadow-[0_0_0_3px_rgba(204,51,51,0.15)]'
-                        : 'border-[#D0D0D0] focus-within:border-sett-primary focus-within:shadow-[0_0_0_3px_rgba(170,199,55,0.15)]'
-                        }`}
-                      onClick={() => emailInputRef.current?.focus()}
-                    >
-                      {sendEmails.map((email, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#F5F9E8] border border-sett-primary text-sett-navy rounded-[4px] font-montserrat text-[13px] font-semibold max-w-full"
-                        >
-                          <span className="truncate max-w-[200px]">{email}</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSendEmails((prev) => prev.filter((_, i) => i !== idx));
-                              if (sendEmailError) setSendEmailError('');
-                            }}
-                            className="shrink-0 text-sett-navy hover:text-sett-green-dark ml-0.5 focus:outline-none"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </span>
-                      ))}
-                      {sendEmails.length < 20 && (
-                        <input
-                          ref={emailInputRef}
-                          type="email"
-                          value={emailInput}
-                          onChange={(e) => { setEmailInput(e.target.value); if (sendEmailError) setSendEmailError(''); }}
-                          onKeyDown={handleEmailInputKeyDown}
-                          onBlur={handleEmailInputBlur}
-                          placeholder={sendEmails.length === 0 ? t.offer.addEmailPlaceholder : ''}
-                          className="flex-1 min-w-[180px] px-1 py-0.5 font-montserrat text-[14px] text-sett-navy placeholder:text-sett-grey focus:outline-none bg-transparent"
-                        />
-                      )}
-                    </div>
-                    {sendEmailError && (
-                      <p className="mt-1 font-montserrat text-[12px] text-[#CC3333]">{sendEmailError}</p>
-                    )}
-                    <p className="mt-1 font-montserrat text-[12px] text-sett-grey">{t.offer.emailsMaxLimit}</p>
-                  </div>
-                  <div>
-                    <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-navy mb-1.5">
-                      {t.offer.adminNotes} <span className="font-normal text-sett-grey normal-case tracking-normal">{t.offer.adminNotesOptional}</span>
-                    </label>
-                    <textarea
-                      value={sendNotes}
-                      onChange={(e) => setSendNotes(e.target.value)}
-                      placeholder={t.offer.notesPlaceholder}
-                      rows={3}
-                      className="w-full px-3 py-2 rounded-[4px] border border-[#D0D0D0] font-montserrat text-[14px] text-sett-navy placeholder:text-sett-grey focus:outline-none focus:border-sett-primary focus:shadow-[0_0_0_3px_rgba(170,199,55,0.15)] resize-none transition-[border-color,box-shadow] duration-150"
-                    />
-                  </div>
-                </div>
-                </div>
-                <div className="h-px bg-[#E0E0E0] mx-5" />
-                <div className="flex gap-3 px-5 py-4 justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => { setSendOpen(false); setSendError(''); setSendEmailError(''); setSendEmails([]); setEmailInput(''); setSendNotes(''); setApproveStepDone(false); }}
-                    disabled={actionLoading}
-                  >
-                    {t.common.cancel}
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleApproveAndSend}
-                    isLoading={actionLoading}
-                  >
-                    <Send className="w-4 h-4" />
-                    {offerHistory.length === 0
-                      ? t.offer.sendInitialOffer
-                      : offerHistory.length === 1
-                        ? t.offer.sendFinalOffer
-                        : t.offer.sendRevision}
-                  </Button>
-                </div>
-              </div>
-          </ModalOverlay>
+          {/* ── Bilingual Send Offer modal (BE handover 2026-06-02) ──
+              Replaces the previous single-language Approve & Send modal.
+              The modal handles previews + recipients + send in one screen.
+              The parent provides the approve-step pre-hook and a post-send
+              callback for proposal refresh + offer-history reload + toast. */}
+          {proposal && (
+            <SendOfferDualPreviewModal
+              open={sendOpen}
+              proposalId={proposal.id}
+              initialRecipients={
+                sendEmails.length > 0
+                  ? sendEmails
+                  : request.contactEmail
+                    ? [request.contactEmail]
+                    : []
+              }
+              headerSubtitle={
+                request.referenceNumber
+                  ? `#${request.referenceNumber}${request.destinationName ? ` — ${request.destinationName}` : ''}`
+                  : request.destinationName ?? undefined
+              }
+              beforeSend={handleApproveBeforeSend}
+              onSent={handleAfterSend}
+              onClose={() => {
+                setSendOpen(false);
+                setSendEmails([]);
+                setSendNotes('');
+                setApproveStepDone(false);
+              }}
+            />
+          )}
 
           {/* Odoo link-required gate — pre-emptive (clicked a disabled Send)
               and reactive (BE returned 400 ODOO_CONTACT_REQUIRED). */}
@@ -2056,6 +1932,7 @@ export default function RequestDetailPage() {
               onClose={() => setPreviewOpen(false)}
               request={request}
               proposal={proposal}
+              pdfLanguage={pdfLanguage}
             />
           )}
         </div>
@@ -2083,7 +1960,20 @@ function MarkupDropdown({
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
 
-  const isPreset = MARKUP_PRESETS.includes(Math.round(value) as typeof MARKUP_PRESETS[number]);
+  // Live default from Settings → General. Merged into the preset list so the
+  // admin's chosen default is always one click away, even when it isn't one
+  // of the canonical [10, 15, 18, 20, 25] chips.
+  const { markup: defaultMarkup } = useDefaultMarkup();
+  const presets = useMemo(() => {
+    const list: number[] = [...MARKUP_PRESETS];
+    if (defaultMarkup != null) {
+      const rounded = Math.round(defaultMarkup);
+      if (!list.includes(rounded)) list.push(rounded);
+    }
+    return list.sort((a, b) => a - b);
+  }, [defaultMarkup]);
+
+  const isPreset = presets.includes(Math.round(value));
 
   // Position the dropdown using getBoundingClientRect
   useEffect(() => {
@@ -2183,17 +2073,25 @@ function MarkupDropdown({
             className="fixed z-[9999] bg-white border border-sett-border rounded-lg shadow-lg min-w-[140px] py-1"
             style={{ top: pos.top, left: pos.left }}
           >
-            {MARKUP_PRESETS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => handleSelect(preset)}
-                className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors ${Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
-                  }`}
-              >
-                {preset}%
-              </button>
-            ))}
+            {presets.map((preset) => {
+              const isDefault = defaultMarkup != null && Math.round(defaultMarkup) === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => handleSelect(preset)}
+                  className={`w-full text-left px-3 py-1.5 text-body hover:bg-sett-fill transition-colors flex items-center justify-between ${Math.round(value) === preset ? 'text-sett-primary font-semibold bg-sett-fill' : 'text-sett-text-primary'
+                    }`}
+                >
+                  <span>{preset}%</span>
+                  {isDefault && (
+                    <span className="ml-2 text-[10px] uppercase tracking-wide text-sett-text-accent font-semibold">
+                      Default
+                    </span>
+                  )}
+                </button>
+              );
+            })}
             <hr className="border-sett-border my-1" />
             {isCustom ? (
               <div className="px-3 py-1.5">

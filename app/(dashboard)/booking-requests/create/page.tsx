@@ -20,6 +20,7 @@ import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { translations } from '@/lib/i18n/translations';
+import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
 import {
   AGE_REQUIRED_GROUP_TYPES,
   AVERAGE_AGE_MAX,
@@ -323,6 +324,19 @@ function CreateBookingRequestPageInner() {
   // overwriting any edits the user has typed.
   const enTranslations = translations.en.createForm;
   const deTranslations = translations.de.createForm;
+  // Live T&C + Cancellation defaults from Settings → Policies. Loaded
+  // once on mount; the seeding effect below prefers these over the i18n
+  // boilerplate so the admin's edits in Settings drive the Create
+  // Request form. Stays null while loading and on fetch failure — the
+  // i18n boilerplate kicks in as a fallback in both cases.
+  const [policies, setPolicies] = useState<PoliciesSettings | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    settingsApi.getPolicies()
+      .then((data) => { if (!cancelled) setPolicies(data); })
+      .catch(() => { /* silent — fall back to i18n boilerplate */ });
+    return () => { cancelled = true; };
+  }, []);
   const [currentStep, setCurrentStep] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const params = new URLSearchParams(window.location.search);
@@ -424,34 +438,59 @@ function CreateBookingRequestPageInner() {
     }
   }, [currentStep, formData, draftRequestId]);
 
-  // Seed (and re-seed on language toggle) the boilerplate text in the policy
-  // editors. We only overwrite the field if it's empty OR currently holds the
-  // OTHER locale's default — that way any edit the user has typed is
-  // preserved across language switches.
+  // Seed (and re-seed on language toggle) the boilerplate text in the
+  // policy editors.
+  //
+  // Source-of-truth precedence per BE handover:
+  //   1. Live values from Settings → Policies (admin-edited), per locale
+  //   2. i18n boilerplate fallback (used while policies are loading and
+  //      if Settings has nothing saved)
+  //
+  // We only overwrite a field when it's empty OR currently holds one of
+  // the recognised defaults (live or i18n, EN or DE). That preserves any
+  // edit the user has actually typed across language switches and when
+  // /settings/policies finishes loading mid-edit.
   useEffect(() => {
     setFormData((prev) => {
-      const enTerms = enTranslations.defaultTermsHtml;
-      const deTerms = deTranslations.defaultTermsHtml;
-      const enCancel = enTranslations.defaultCancellationHtml;
-      const deCancel = deTranslations.defaultCancellationHtml;
+      const enTerms = policies?.termsConditionsEn || enTranslations.defaultTermsHtml;
+      const deTerms = policies?.termsConditionsDe || deTranslations.defaultTermsHtml;
+      const enCancel = policies?.cancellationConditionsEn || enTranslations.defaultCancellationHtml;
+      const deCancel = policies?.cancellationConditionsDe || deTranslations.defaultCancellationHtml;
       const wantedTerms = locale === 'de' ? deTerms : enTerms;
       const wantedCancel = locale === 'de' ? deCancel : enCancel;
 
-      const termsIsDefault = !prev.termsAndConditions
-        || prev.termsAndConditions === enTerms
-        || prev.termsAndConditions === deTerms;
-      const cancelIsDefault = !prev.cancellationConditions
-        || prev.cancellationConditions === enCancel
-        || prev.cancellationConditions === deCancel;
+      // "Default" recognisers — include BOTH the i18n fallback and the
+      // live policy values so we correctly identify the field as still
+      // default after policies arrive (or after the locale flips).
+      const termsDefaults = new Set([
+        enTranslations.defaultTermsHtml,
+        deTranslations.defaultTermsHtml,
+        policies?.termsConditionsEn ?? '',
+        policies?.termsConditionsDe ?? '',
+      ]);
+      const cancelDefaults = new Set([
+        enTranslations.defaultCancellationHtml,
+        deTranslations.defaultCancellationHtml,
+        policies?.cancellationConditionsEn ?? '',
+        policies?.cancellationConditionsDe ?? '',
+      ]);
+
+      const termsIsDefault = !prev.termsAndConditions || termsDefaults.has(prev.termsAndConditions);
+      const cancelIsDefault = !prev.cancellationConditions || cancelDefaults.has(prev.cancellationConditions);
 
       if (!termsIsDefault && !cancelIsDefault) return prev;
+      // Skip a no-op write — prevents the effect from re-rendering the
+      // editors when nothing actually changed (avoids cursor jitter mid-edit).
+      const nextTerms = termsIsDefault ? wantedTerms : prev.termsAndConditions;
+      const nextCancel = cancelIsDefault ? wantedCancel : prev.cancellationConditions;
+      if (nextTerms === prev.termsAndConditions && nextCancel === prev.cancellationConditions) return prev;
       return {
         ...prev,
-        termsAndConditions: termsIsDefault ? wantedTerms : prev.termsAndConditions,
-        cancellationConditions: cancelIsDefault ? wantedCancel : prev.cancellationConditions,
+        termsAndConditions: nextTerms,
+        cancellationConditions: nextCancel,
       };
     });
-  }, [locale, enTranslations, deTranslations]);
+  }, [locale, enTranslations, deTranslations, policies]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => {

@@ -7,7 +7,6 @@ import type {
   HotelSearchMoreResponse,
   HotelSearchStatusResponse,
   OptionDetailResult,
-  CalculatePriceResult,
   PaginatedResponse,
 } from '@/types';
 import type { CreateBookingRequestPayload, UpdateBookingRequestPayload } from '@/types/requests';
@@ -236,21 +235,6 @@ export const requestsApi = {
       { selections }
     );
     if (!data.success || !Array.isArray(data.data)) return [];
-    return data.data;
-  },
-
-  async calculatePrice(
-    requestId: string,
-    buyingPrice: number,
-    markupPercent?: number
-  ): Promise<CalculatePriceResult> {
-    const { data } = await apiClient.post<ApiResponse<CalculatePriceResult>>(
-      `/requests/${requestId}/hotel-search/calculate-price`,
-      { buyingPrice, markupPercent: markupPercent ?? 18 }
-    );
-    if (!data.success || !data.data) {
-      throw new Error(data.message || 'Price calculation failed');
-    }
     return data.data;
   },
 

@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Download } from 'lucide-react';
+import { ModalOverlay } from './ModalOverlay';
 import { proposalsApi } from '@/lib/api/proposals';
+import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { translations } from '@/lib/i18n/translations';
 import { formatDateEU } from '@/lib/dateFormatter';
-import { formatPriceEU, formatCurrencyEU, formatPercentageEU } from '@/lib/numberFormatter';
-import type { BookingRequest, Proposal, ProposalHotel, ProposalService } from '@/types';
+import { formatPriceEU, formatCurrencyEU } from '@/lib/numberFormatter';
+import type { BookingRequest, Proposal } from '@/types';
 import type { RoomsConfig } from '@/types/requests';
 
 interface ContractPreviewModalProps {
@@ -14,60 +17,103 @@ interface ContractPreviewModalProps {
   onClose: () => void;
   request: BookingRequest;
   proposal: Proposal;
+  /** PDF language explicitly chosen via the PdfLanguagePicker. When
+   *  omitted, falls back to the UI's current locale. */
+  pdfLanguage?: 'en' | 'de';
 }
 
 function formatDate(dateStr: string | null | undefined): string {
   return formatDateEU(dateStr);
 }
 
-const ROOM_TYPE_LABELS: Record<string, string> = {
-  twinbeds: 'Twin Rooms',
-  standarddoublebeds: 'Standard Double Rooms',
-  single: 'Single',
-  double: 'Double',
-  twin: 'Twin',
-  triple: 'Triple',
-  quadruple: 'Quadruple',
-  suite: 'Suite',
-  suites: 'Suites',
-};
-
-function formatRoomType(raw: string): string {
-  const known = ROOM_TYPE_LABELS[raw.toLowerCase().replace(/[_\s]/g, '')];
-  if (known) return known;
+/**
+ * Localize an API room-type code into the user's current language by looking
+ * up the addHotel slice of the i18n bundle. Falls back to a CamelCase split
+ * when the code isn't known.
+ */
+function formatRoomType(
+  raw: string,
+  tAddHotel?: {
+    roomSingle: string; roomDouble: string; roomTriple: string;
+    roomQuadruple: string; roomSuite: string; roomSuites: string;
+    standardDoubleBed: string; twinBed: string;
+  },
+): string {
+  if (tAddHotel) {
+    const normalized = raw.toLowerCase().replace(/[_\s]/g, '');
+    const map: Record<string, string> = {
+      twinbeds: tAddHotel.twinBed,
+      twin: tAddHotel.twinBed,
+      standarddoublebeds: tAddHotel.standardDoubleBed,
+      single: tAddHotel.roomSingle,
+      double: tAddHotel.roomDouble,
+      triple: tAddHotel.roomTriple,
+      quadruple: tAddHotel.roomQuadruple,
+      suite: tAddHotel.roomSuite,
+      suites: tAddHotel.roomSuites,
+    };
+    if (map[normalized]) return map[normalized];
+  }
   return raw
     .replace(/_/g, ' ')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function getRoomLabel(type: string, detail: any): string {
-  // If actual descriptions are available from the hotel, use those
+function getRoomLabel(
+  type: string,
+  detail: any,
+  tAddHotel?: Parameters<typeof formatRoomType>[1],
+): string {
   if (detail.actualDescriptions && detail.actualDescriptions.length > 0) {
     return detail.actualDescriptions[0];
   }
-  // Otherwise, use the requested room type
-  return formatRoomType(type);
+  return formatRoomType(type, tAddHotel);
 }
 
-export function ContractPreviewModal({ open, onClose, request, proposal }: ContractPreviewModalProps) {
-  const { t, locale } = useLanguage();
+export function ContractPreviewModal({ open, onClose, request, proposal, pdfLanguage }: ContractPreviewModalProps) {
+  const { locale } = useLanguage();
+  // Prefer the explicit picker choice when present; otherwise fall back to
+  // the UI locale (legacy callers that haven't wired the picker yet).
+  const previewLang: 'en' | 'de' = pdfLanguage ?? (locale === 'de' ? 'de' : 'en');
+  // Drive the on-screen preview body from the picker, NOT the UI locale —
+  // staff flips the picker to see what the PDF will look like in that lang.
+  const t = translations[previewLang];
   const [downloading, setDownloading] = useState(false);
-  // Only show hotels/services that are included in the total
+
+  // Pull live T&C / Cancellation policies from /settings/policies and pick
+  // the EN or DE block based on the picker. The customer always sees the
+  // current policy text (live, not snapshotted) — admin edits in Settings
+  // take effect immediately on every preview. If the call fails, fall back
+  // to the per-request snapshot saved on the BookingRequest.
+  const [policies, setPolicies] = useState<PoliciesSettings | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    settingsApi.getPolicies()
+      .then((data) => { if (!cancelled) setPolicies(data); })
+      .catch(() => { /* silent — fall back to request snapshot */ });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  const termsHtml =
+    (previewLang === 'de' ? policies?.termsConditionsDe : policies?.termsConditionsEn)
+    ?? request.termsAndConditions
+    ?? '';
+  const cancellationHtml =
+    (previewLang === 'de' ? policies?.cancellationConditionsDe : policies?.cancellationConditionsEn)
+    ?? request.cancellationConditions
+    ?? '';
   const hotels = (proposal.hotels ?? []).filter((h) => h.includedInTotal !== false);
   const services = (proposal.services ?? []).filter((sv) => sv.includedInTotal !== false);
-  const rooms = request.rooms as RoomsConfig | null | undefined;
+  // rooms not directly referenced — guest count comes from request.groupSize.
+  void (request.rooms as RoomsConfig | null | undefined);
   const contactName = [request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—';
-
-  useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
 
   const handleDownloadPdf = async () => {
     setDownloading(true);
     try {
-      const blobUrl = await proposalsApi.previewPdf(proposal.id, locale);
+      const blobUrl = await proposalsApi.previewPdf(proposal.id, previewLang);
       window.open(blobUrl, '_blank');
     } catch {
       window.print();
@@ -78,53 +124,46 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
 
   const hotelTotal = hotels.reduce((s, h) => s + Number(h.totalPrice ?? 0), 0);
   const serviceTotal = services.reduce(
-    (s, sv) => s + Number(sv.sellPrice ?? 0) * (sv.quantity ?? 1),
-    0
+    (sum, sv) => sum + Number(sv.sellPrice ?? 0) * (sv.quantity ?? 1),
+    0,
   );
   const grandTotal = hotelTotal + serviceTotal;
 
-  if (!open) return null;
+  const documentCode = `${request.referenceNumber ?? request.id.slice(0, 8)}/${new Date(request.createdAt).getFullYear()}`;
+  const paymentDueDate = request.checkoutDate
+    ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
+    : null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      role="dialog"
-      aria-modal="true"
-    >
+    <ModalOverlay open={open} onClose={onClose}>
+      {/* §5.3 outer panel — radius 8, 1px border #E0E0E0, light shadow. The
+          modal frame itself stays understated so the inner document carries
+          the brand presentation. */}
       <div
         className="bg-white flex flex-col max-h-[90vh] overflow-hidden"
-        style={{ width: 790, borderRadius: 14, boxShadow: '0px 4px 20px 0px #00000014' }}
+        style={{
+          width: 820,
+          borderRadius: 8,
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Top Section ── */}
-        <div
-          className="flex items-center justify-between shrink-0 bg-white px-5"
-          style={{ height: 83, borderBottom: '1px solid #68686866' }}
-        >
-          <div className="flex flex-col gap-1">
-            <h2 className="font-montserrat font-semibold text-[18px] leading-none tracking-normal" style={{ color: '#071C42' }}>
-              {t.contract.title}
-            </h2>
-            <p className="font-montserrat font-normal text-[14px] leading-none tracking-normal" style={{ color: '#4A4A4A' }}>
-              {t.contract.companySubtitle} {contactName}
-            </p>
-          </div>
+        {/* §5.3 accent stripe — identifies the brand at the top of the modal */}
+        <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
+
+        {/* Modal title bar (sits above the document) */}
+        <div className="flex items-center justify-between shrink-0 bg-white px-5 py-4" style={{ borderBottom: '1px solid #E0E0E0' }}>
+          <h2 className="font-montserrat font-bold text-[18px] leading-tight text-sett-navy">
+            {t.contract.title}
+          </h2>
           <div className="flex items-center gap-3">
+            {/* §5.1 primary CTA — green bg, NAVY text, 4px radius, uppercase */}
             <button
               type="button"
               onClick={handleDownloadPdf}
               disabled={downloading}
-              className="flex items-center justify-center gap-1 font-montserrat font-semibold text-[16px] leading-none tracking-normal text-white hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95 transition-all duration-200 disabled:opacity-60"
-              style={{
-                width: 176,
-                height: 44,
-                borderRadius: 14,
-                paddingTop: 12,
-                paddingRight: 16,
-                paddingBottom: 12,
-                paddingLeft: 16,
-                background: '#AAC737',
-                boxShadow: '4px 4px 5px 0px #FFFFFF40 inset, 0px 8px 20px 0px #00000021',
-              }}
+              className="inline-flex items-center justify-center gap-2 h-[41px] px-6 rounded-[4px] bg-sett-primary hover:bg-sett-green-dark font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-navy active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
             >
               <Download className="w-4 h-4" />
               {downloading ? t.common.loading : t.modals.downloadPdf}
@@ -132,7 +171,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-[#F7F7F7] text-[#686868] transition-colors"
+              className="p-1.5 rounded-[4px] hover:bg-[#F8F9FA] text-sett-grey hover:text-sett-navy transition-colors"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
@@ -140,383 +179,416 @@ export function ContractPreviewModal({ open, onClose, request, proposal }: Contr
           </div>
         </div>
 
-        {/* ── Scrollable Content ── */}
+        {/* ── Scrollable Document Body ── */}
         <div
-          className="flex-1 overflow-y-auto p-5"
+          className="flex-1 overflow-y-auto bg-[#F8F9FA] p-6"
           style={{ scrollbarWidth: 'thin', scrollbarColor: '#AAC737 #F0F0F0' }}
         >
+          {/* §6.1 the document itself — white "page" with subtle border */}
           <div
-            className="bg-white font-montserrat text-[#1D1D1D]"
-            style={{ borderRadius: 14, border: '1px solid #68686866' }}
+            className="bg-white font-montserrat text-sett-navy mx-auto"
+            style={{ borderRadius: 8, border: '1px solid #E0E0E0', overflow: 'hidden' }}
           >
-            {/* ── Logo + TAX ID ── */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-5" style={{ borderBottom: '1px solid #68686866' }}>
-              <img src="/icons/sett_logo.svg" alt="SETT" style={{ height: 40 }} />
-              <div className="flex flex-col items-end" style={{ gap: 8 }}>
+            {/* ─────────── §6.1 HEADER — navy bg, white text, doc number on right ─────────── */}
+            <div
+              className="flex items-center justify-between px-8 py-6"
+              style={{ background: '#071c42' }}
+            >
+              <img src="/icons/sett_logo.svg" alt="SETT" style={{ height: 36 }} />
+              <div className="flex flex-col items-end" style={{ gap: 4 }}>
                 <span
-                  className="font-montserrat uppercase text-center"
-                  style={{ fontWeight: 400, fontSize: 12, lineHeight: '100%', letterSpacing: 0, color: '#4A4A4A' }}
+                  className="font-montserrat uppercase"
+                  style={{ fontWeight: 700, fontSize: 14, letterSpacing: '0.08em', color: '#AAC737' }}
                 >
-                  {t.contract.taxId}
+                  {t.contract.offer}
                 </span>
                 <span
                   className="font-montserrat"
-                  style={{ fontWeight: 500, fontSize: 14, lineHeight: '100%', letterSpacing: 0, color: '#071C42' }}
+                  style={{ fontWeight: 600, fontSize: 13, color: '#FFFFFF' }}
                 >
-                  1001233897
+                  {t.contract.documentNo} {documentCode}
+                </span>
+                <span
+                  className="font-montserrat"
+                  style={{ fontWeight: 400, fontSize: 12, color: '#FFFFFF', opacity: 0.85 }}
+                >
+                  {formatDate(request.createdAt)}
                 </span>
               </div>
             </div>
 
-            {/* ── S-E-T-T WORLDWIDE RESERVATION FZE ── */}
-            <div className="px-5 py-5" style={{ gap: 20 }}>
-              <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#071C42' }}>
-                {t.contract.sectionTitle}
-              </h3>
-              {/* Row 1: Assigned Person | Email Address | Phone Number */}
-              <div className="flex gap-5 mb-5">
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.assignedPerson}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">Vincent Riefler</span>
+            {/* §6.1 — 3px green accent bar directly below the header */}
+            <div aria-hidden style={{ height: 3, background: '#AAC737' }} />
+
+            {/* ─────────── §6.1 TWO-COLUMN METADATA — Supplier (left) | Customer (right) ─────────── */}
+            <div className="grid grid-cols-2 gap-6 px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+              {/* Supplier column */}
+              <div>
+                <div
+                  className="font-montserrat uppercase mb-3"
+                  style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#AAC737' }}
+                >
+                  {t.contract.supplier}
                 </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.emailAddress}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">vincent@s-e-t-t.com</span>
+                <div className="font-montserrat font-bold text-[14px] text-sett-navy mb-2">
+                  {t.contract.sectionTitle}
                 </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.phoneNumber}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">+45 32 74 93 16</span>
+                <div className="space-y-1.5">
+                  <MetaRow label={t.contract.assignedPerson} value="Vincent Riefler" />
+                  <MetaRow label={t.contract.emailAddress} value="vincent@s-e-t-t.com" />
+                  <MetaRow label={t.contract.phoneNumber} value="+45 32 74 93 16" />
+                  <MetaRow label={t.contract.address} value="Fujairah Creative Tower, P.O. Box 4422, Fujairah, UAE" />
+                  <MetaRow label={t.contract.taxId} value="1001233897" />
                 </div>
               </div>
-              {/* Row 2: Website | Address */}
-              <div className="flex gap-5">
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.website}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">https://www.s-e-t-t.com/</span>
-                </div>
-                <div className="flex flex-col flex-1" style={{ gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.address}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">Fujairah Creative Tower, P.O. Box 4422, Fujairah, United Arab Emirates</span>
-                </div>
-              </div>
-            </div>
 
-            {/* ── Divider ── */}
-            <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-
-            {/* ── CONTRACT ── */}
-            <div className="px-5 py-5">
-              <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#071C42' }}>
-                {t.contract.contractSection}
-              </h3>
-              <div className="flex gap-5">
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.companyId}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">4490</span>
+              {/* Customer column */}
+              <div>
+                <div
+                  className="font-montserrat uppercase mb-3"
+                  style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#AAC737' }}
+                >
+                  {t.contract.customer}
                 </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.documentCode}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{request.referenceNumber ?? request.id.slice(0, 8)}/{new Date(request.createdAt).getFullYear()}</span>
+                <div className="font-montserrat font-bold text-[14px] text-sett-navy mb-2">
+                  {contactName}
                 </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.createdDate}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">Fujairah, {formatDate(request.createdAt)}</span>
+                <div className="space-y-1.5">
+                  <MetaRow label={t.contract.emailAddress} value={request.contactEmail ?? '—'} />
+                  <MetaRow label={t.contract.phoneNumber} value={request.contactPhone ?? '—'} />
+                  <MetaRow label={t.contract.address} value={request.hotelLocation ?? request.destinationName ?? '—'} />
                 </div>
               </div>
             </div>
 
-            {/* ── Divider ── */}
-            <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-
-            {/* ── PREPARED FOR ── */}
-            <div className="px-5 py-5">
-              <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#071C42' }}>
-                {t.contract.preparedFor}
-              </h3>
-              {/* Row 1: Customer Person | Email | Phone */}
-              <div className="flex gap-5 mb-5">
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.customerPerson}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{contactName}</span>
-                </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.emailAddress}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{request.contactEmail ?? '—'}</span>
-                </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.phoneNumber}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{request.contactPhone ?? '—'}</span>
-                </div>
-              </div>
-              {/* Row 2: Address */}
-              <div className="flex gap-5">
-                <div className="flex flex-col flex-1" style={{ gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.address}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{request.hotelLocation ?? request.destinationName ?? '—'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Divider ── */}
-            <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-
-            {/* ── TRIP DETAILS ── */}
-            <div className="px-5 py-5">
-              <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#071C42' }}>
+            {/* ─────────── TRIP DETAILS — full-width row ─────────── */}
+            <div className="px-8 py-5" style={{ borderBottom: '1px solid #E0E0E0' }}>
+              <div
+                className="font-montserrat uppercase mb-3"
+                style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#AAC737' }}
+              >
                 {t.contract.tripDetails}
-              </h3>
-              <div className="flex gap-5">
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.destination}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{request.destinationName ?? '—'}</span>
-                </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.checkInOut}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{formatDate(request.checkinDate)} — {formatDate(request.checkoutDate)}</span>
-                </div>
-                <div className="flex flex-col" style={{ width: 223, gap: 8 }}>
-                  <span className="font-semibold text-[12px] uppercase" style={{ color: '#071C42' }}>{t.contract.guests}</span>
-                  <span className="font-normal text-[14px] text-[#1D1D1D]">{request.groupSize ?? '—'}</span>
-                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-6">
+                <MetaRow label={t.contract.destination} value={request.destinationName ?? '—'} />
+                <MetaRow
+                  label={t.contract.checkInOut}
+                  value={`${formatDate(request.checkinDate)} — ${formatDate(request.checkoutDate)}`}
+                />
+                <MetaRow label={t.contract.guests} value={String(request.groupSize ?? '—')} />
               </div>
             </div>
 
-            {/* ── Divider ── */}
-            <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-
-            {/* ── HOTEL DETAILS ── */}
+            {/* ─────────── §6.1 HOTEL DETAILS TABLE — navy header, clean body ─────────── */}
             {hotels.length > 0 && (
-              <>
-                <div className="px-5 py-5">
-                  {/* Section Title */}
-                  <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#1D1D1D' }}>
-                    {t.contract.hotelDetails}
-                  </h3>
-
-                  {hotels.map((hotel) => {
-                    const roomEntries = hotel.rooms
-                      ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
-                      : [];
-                    const subtotal = roomEntries.reduce(
-                      (sum, [, d]) => sum + Number(d.sell ?? 0) * (d.qty ?? 1) * (d.nights ?? 1),
-                      0
-                    );
-                    return (
-                      <div key={hotel.id} className="mb-5 last:mb-0 flex flex-col" style={{ gap: 8 }}>
-                        {/* Hotel name + Reference number row */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <svg className="w-4 h-4 text-[#AAC737]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-                              <path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" />
-                            </svg>
-                            <span className="font-semibold text-[14px] leading-none text-[#1D1D1D]">
-                              {hotel.hotelName ?? hotel.hotelCode}
-                            </span>
-                          </div>
-                          {(hotel.hotelRef || hotel.tid) && (
-                            <span className="text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
-                              <span className="font-semibold">Reference number:</span>{' '}
-                              <span className="font-medium">{hotel.hotelRef ?? hotel.tid ?? `#${hotel.id.slice(0, 8)}`}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Room table */}
-                        {roomEntries.length > 0 && (
-                          <div style={{ borderRadius: 14, border: '1px solid #E6EAF0', overflow: 'hidden' }}>
-                            {/* Table header */}
-                            <div className="flex items-center px-[13px] py-[14px]" style={{ borderBottom: '1px solid #E6EAF0' }}>
-                              <span className="flex-1 font-semibold text-[12px] uppercase" style={{ color: '#4A4A4A' }}>
-                                {t.contract.roomType ?? 'Room Type'}
-                              </span>
-                              <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 80, color: '#4A4A4A' }}>
-                                Rate
-                              </span>
-                              <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 55, color: '#4A4A4A' }}>
-                                {t.contract.qty}
-                              </span>
-                              <span className="font-semibold text-[12px] uppercase text-center" style={{ width: 65, color: '#4A4A4A' }}>
-                                {t.contract.nights}
-                              </span>
-                              <span className="font-semibold text-[12px] uppercase text-right" style={{ width: 100, color: '#4A4A4A' }}>
-                                Total (EUR)
-                              </span>
-                            </div>
-
-                            {/* Room rows */}
-                            {roomEntries.map(([type, detail]) => {
-                              const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
-                              return (
-                                <div key={type} className="flex items-center px-[13px] py-3" style={{ borderBottom: '1px solid #E6EAF0' }}>
-                                  <span className="flex-1 font-normal text-[13px] text-[#1D1D1D]">
-                                    {getRoomLabel(type, detail)}
-                                  </span>
-                                  <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 80 }}>
-                                    €{formatPriceEU(detail.sell ?? 0)}
-                                  </span>
-                                  <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 55 }}>
-                                    {detail.qty ?? 1}
-                                  </span>
-                                  <span className="font-normal text-[13px] text-[#1D1D1D] text-center" style={{ width: 65 }}>
-                                    {detail.nights ?? 1}
-                                  </span>
-                                  <span className="font-bold text-[13px] text-[#1D1D1D] text-right" style={{ width: 100 }}>
-                                    €{formatPriceEU(rowTotal)}
-                                  </span>
-                                </div>
-                              );
-                            })}
-
-                            {/* Subtotal row */}
-                            <div className="flex items-center justify-end px-[13px] py-3">
-                              <span className="font-medium text-[13px] text-[#686868] mr-3">Subtotal</span>
-                              <span className="font-bold text-[14px] text-[#1D1D1D]" style={{ width: 100, textAlign: 'right' }}>
-                                €{formatPriceEU(subtotal)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {roomEntries.length === 0 && (
-                          <p className="text-[13px] text-[#686868]">
-                            Total: {formatCurrencyEU(hotel.totalPrice, hotel.currency)}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-              </>
-            )}
-
-            {/* ── SERVICE DETAILS ── */}
-            {services.length > 0 && (
-              <>
-                <div className="px-5 py-5">
-                  <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#071C42' }}>
-                    {t.contract.serviceDetails}
-                  </h3>
-                  <table className="w-full text-[13px]" style={{ border: '1px solid #68686866', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr className="bg-[#F7F7F7]">
-                        <th className="text-left px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.service}</th>
-                        <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.qty}</th>
-                        <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.buy}</th>
-                        <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.sell}</th>
-                        <th className="text-right px-3 py-2.5 font-semibold text-[11px] uppercase text-[#686868]" style={{ borderBottom: '1px solid #68686866' }}>{t.contract.total}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {services.map((s) => (
-                        <tr key={s.id} style={{ borderBottom: '1px solid #68686866' }}>
-                          <td className="px-3 py-2.5">{s.serviceName ?? '—'}</td>
-                          <td className="px-3 py-2.5 text-right">{s.quantity ?? 1}</td>
-                          <td className="px-3 py-2.5 text-right">{formatPriceEU(s.buyPrice ?? 0)}</td>
-                          <td className="px-3 py-2.5 text-right">{formatPriceEU(s.sellPrice ?? 0)}</td>
-                          <td className="px-3 py-2.5 text-right font-semibold">
-                            {formatPriceEU((Number(s.sellPrice ?? 0) * (s.quantity ?? 1)))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-              </>
-            )}
-
-            {/* ── GRAND TOTAL ── */}
-            <div className="mx-5 my-5 flex justify-between items-center p-4 rounded-[14px]" style={{ background: '#071C42' }}>
-              <span className="font-bold text-[16px] text-white">{t.contract.grandTotal}</span>
-              <span className="font-bold text-[20px] text-white">€{formatPriceEU(grandTotal)}</span>
-            </div>
-
-            {/* ── CANCELLATION CONDITIONS ── */}
-            {request.cancellationConditions && (
-              <>
-                <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-                <div className="px-5 py-5">
-                  <h3 className="font-semibold text-[16px] leading-none uppercase mb-4" style={{ color: '#071C42' }}>{t.contract.cancellationConditions}</h3>
-                  <div
-                    className="font-normal text-[13px] text-[#686868] leading-relaxed contract-html-content"
-                    dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* ── TERMS & CONDITIONS ── */}
-            <>
-              <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
-              <div className="px-5 py-5">
-                <h3 className="font-semibold text-[16px] leading-none uppercase mb-5" style={{ color: '#1D1D1D' }}>
-                  {t.contract.termsConditions}
+              <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+                <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                  {t.contract.hotelDetails}
                 </h3>
 
-                {/* T&C content */}
-                {request.termsAndConditions && (
-                  <div
-                    className="font-normal text-[13px] text-[#1D1D1D] leading-relaxed mb-5 contract-html-content"
-                    dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
-                  />
-                )}
+                {hotels.map((hotel) => {
+                  const roomEntries = hotel.rooms
+                    ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
+                    : [];
+                  const subtotal = roomEntries.reduce(
+                    (sum, [, d]) => sum + Number(d.sell ?? 0) * (d.qty ?? 1) * (d.nights ?? 1),
+                    0,
+                  );
+                  return (
+                    <div key={hotel.id} className="mb-5 last:mb-0">
+                      {/* Hotel name + Reference */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-montserrat font-bold text-[14px] text-sett-navy">
+                          {hotel.hotelName ?? hotel.hotelCode}
+                        </span>
+                        {(hotel.hotelRef || hotel.tid) && (
+                          <span className="font-montserrat text-[12px] text-sett-grey">
+                            <span className="font-semibold">{t.contract.reservationRef}</span>{' '}
+                            <span>{hotel.hotelRef ?? hotel.tid ?? `#${hotel.id.slice(0, 8)}`}</span>
+                          </span>
+                        )}
+                      </div>
 
-                {/* Payment notice */}
-                <div
-                  className="flex items-center px-4 py-3 mb-5"
-                  style={{ background: '#FEF2F2', borderRadius: 14, borderLeft: '3px solid #F87171' }}
-                >
-                  <p className="font-normal text-[14px] text-[#1D1D1D]">
-                    Please pay{' '}
-                    <span className="font-bold">
-                      {formatPriceEU(grandTotal)} EUR
-                    </span>{' '}
-                    until{' '}
-                    <span className="font-bold">
-                      {request.checkoutDate
-                        ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
-                            .toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                        : '—'}
-                    </span>
-                    .
-                  </p>
-                </div>
+                      {roomEntries.length > 0 ? (
+                        <div style={{ borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
+                          {/* Navy header row */}
+                          <div className="flex items-center px-4 py-3" style={{ background: '#071c42' }}>
+                            <span className="flex-1 font-montserrat font-bold text-[11px] uppercase text-white" style={{ letterSpacing: '0.05em' }}>
+                              {t.contract.roomType}
+                            </span>
+                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 80, letterSpacing: '0.05em' }}>
+                              {t.contract.sell}
+                            </span>
+                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 55, letterSpacing: '0.05em' }}>
+                              {t.contract.qty}
+                            </span>
+                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 65, letterSpacing: '0.05em' }}>
+                              {t.contract.nights}
+                            </span>
+                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 100, letterSpacing: '0.05em' }}>
+                              {t.contract.total}
+                            </span>
+                          </div>
 
-                {/* Standard terms */}
-                <ul className="flex flex-col gap-3">
-                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
-                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
-                    <span>Rates and availability is based on the booked number of rooms and passengers / nights only and can be subject to changes if any of these parameters is changed/amended</span>
-                  </li>
-                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
-                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
-                    <span>Should there be any changes in the taxes/city taxes during the contract&apos;s validity, so will the rates be amended according to the resulting new tax/city taxes regulations</span>
-                  </li>
-                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
-                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
-                    <span>All Rates are NET Rates (no commission included) and need to be paid without any deductions or bank fees.</span>
-                  </li>
-                  <li className="flex gap-2 text-[13px] leading-relaxed text-[#1D1D1D]">
-                    <span className="shrink-0 mt-0.5 text-[#686868]">·</span>
-                    <span>This document is printed out electronically and is valid without stamp and signature</span>
-                  </li>
-                </ul>
+                          {/* Body rows */}
+                          {roomEntries.map(([type, detail], idx) => {
+                            const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
+                            return (
+                              <div
+                                key={type}
+                                className="flex items-center px-4 py-3"
+                                style={{ borderTop: idx === 0 ? 'none' : '1px solid #E0E0E0' }}
+                              >
+                                <span className="flex-1 font-montserrat text-[13px] text-sett-navy">
+                                  {getRoomLabel(type, detail, t.addHotel)}
+                                </span>
+                                <span className="font-montserrat text-[13px] text-sett-navy text-right" style={{ width: 80 }}>
+                                  €{formatPriceEU(detail.sell ?? 0)}
+                                </span>
+                                <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 55 }}>
+                                  {detail.qty ?? 1}
+                                </span>
+                                <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 65 }}>
+                                  {detail.nights ?? 1}
+                                </span>
+                                <span className="font-montserrat font-bold text-[13px] text-sett-navy text-right" style={{ width: 100 }}>
+                                  €{formatPriceEU(rowTotal)}
+                                </span>
+                              </div>
+                            );
+                          })}
+
+                          {/* Subtotal */}
+                          <div className="flex items-center justify-end px-4 py-3" style={{ borderTop: '1px solid #E0E0E0', background: '#F8F9FA' }}>
+                            <span className="font-montserrat font-semibold text-[12px] uppercase text-sett-grey mr-4" style={{ letterSpacing: '0.05em' }}>
+                              {t.contract.subtotal}
+                            </span>
+                            <span className="font-montserrat font-bold text-[14px] text-sett-navy text-right" style={{ width: 100 }}>
+                              €{formatPriceEU(subtotal)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="font-montserrat text-[13px] text-sett-grey">
+                          {t.contract.total}: {formatCurrencyEU(hotel.totalPrice, hotel.currency)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </>
+            )}
 
-            {/* ── Divider ── */}
-            <div className="mx-5" style={{ borderTop: '1px solid #68686866' }} />
+            {/* ─────────── §6.1 SERVICE DETAILS TABLE — same brand pattern ─────────── */}
+            {services.length > 0 && (() => {
+              const serviceSubtotal = services.reduce(
+                (sum, s) => sum + Number(s.sellPrice ?? 0) * (s.quantity ?? 1),
+                0,
+              );
+              return (
+                <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+                  <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                    {t.contract.serviceDetails}
+                  </h3>
 
-            {/* ── ISSUED BY ── */}
-            <div className="px-5 py-5 flex flex-col items-end">
-              <span className="font-semibold text-[14px] uppercase text-[#1D1D1D]">Issued By</span>
-              <span className="font-normal text-[14px] text-[#1D1D1D] mt-1">Oliver Riefler</span>
+                  <div style={{ borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
+                    {/* Navy header */}
+                    <div className="flex items-center px-4 py-3" style={{ background: '#071c42' }}>
+                      <span className="flex-1 font-montserrat font-bold text-[11px] uppercase text-white" style={{ letterSpacing: '0.05em' }}>
+                        {t.contract.service}
+                      </span>
+                      <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 130, letterSpacing: '0.05em' }}>
+                        {t.contract.date}
+                      </span>
+                      <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 55, letterSpacing: '0.05em' }}>
+                        {t.contract.qty}
+                      </span>
+                      <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 80, letterSpacing: '0.05em' }}>
+                        {t.contract.sell}
+                      </span>
+                      <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 100, letterSpacing: '0.05em' }}>
+                        {t.contract.total}
+                      </span>
+                    </div>
+
+                    {/* Body rows */}
+                    {services.map((s, idx) => {
+                      const rowTotal = Number(s.sellPrice ?? 0) * (s.quantity ?? 1);
+                      const dateLabel = s.dateFrom && s.dateTo && s.dateFrom !== s.dateTo
+                        ? `${formatDateEU(s.dateFrom)} — ${formatDateEU(s.dateTo)}`
+                        : s.dateFrom
+                          ? formatDateEU(s.dateFrom)
+                          : '—';
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex items-center px-4 py-3"
+                          style={{ borderTop: idx === 0 ? 'none' : '1px solid #E0E0E0' }}
+                        >
+                          <span className="flex-1 font-montserrat text-[13px] text-sett-navy">
+                            {s.serviceName ?? '—'}
+                          </span>
+                          <span className="font-montserrat text-[12px] text-sett-grey text-center" style={{ width: 130 }}>
+                            {dateLabel}
+                          </span>
+                          <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 55 }}>
+                            {s.quantity ?? 1}
+                          </span>
+                          <span className="font-montserrat text-[13px] text-sett-navy text-right" style={{ width: 80 }}>
+                            €{formatPriceEU(s.sellPrice ?? 0)}
+                          </span>
+                          <span className="font-montserrat font-bold text-[13px] text-sett-navy text-right" style={{ width: 100 }}>
+                            €{formatPriceEU(rowTotal)}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Subtotal */}
+                    <div className="flex items-center justify-end px-4 py-3" style={{ borderTop: '1px solid #E0E0E0', background: '#F8F9FA' }}>
+                      <span className="font-montserrat font-semibold text-[12px] uppercase text-sett-grey mr-4" style={{ letterSpacing: '0.05em' }}>
+                        {t.contract.subtotal}
+                      </span>
+                      <span className="font-montserrat font-bold text-[14px] text-sett-navy text-right" style={{ width: 100 }}>
+                        €{formatPriceEU(serviceSubtotal)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ─────────── §6.1 GRAND TOTAL — green bg, navy text, full-width row ─────────── */}
+            <div
+              className="flex items-center justify-between px-8 py-5"
+              style={{ background: '#AAC737', borderBottom: '1px solid #E0E0E0' }}
+            >
+              <span className="font-montserrat font-bold text-[16px] uppercase text-sett-navy" style={{ letterSpacing: '0.08em' }}>
+                {t.contract.grandTotal}
+              </span>
+              <span className="font-montserrat font-bold text-[22px] text-sett-navy">
+                €{formatPriceEU(grandTotal)}
+              </span>
+            </div>
+
+            {/* ─────────── §6.1 PAYMENT DETAILS — bank table + CC CTA ─────────── */}
+            <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+              <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                {t.contract.paymentDetails}
+              </h3>
+
+              {/* Payment-due pill */}
+              <div
+                className="flex items-center gap-2 px-4 py-3 mb-4 rounded-[4px]"
+                style={{ background: '#F5F9E8', border: '1px solid #C8E050' }}
+              >
+                <p className="font-montserrat text-[13px] text-sett-navy">
+                  {t.contract.payPrompt}{' '}
+                  <span className="font-bold">€{formatPriceEU(grandTotal)}</span>{' '}
+                  {t.contract.payBy}{' '}
+                  <span className="font-bold">
+                    {paymentDueDate
+                      ? paymentDueDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : '—'}
+                  </span>.
+                </p>
+              </div>
+
+              {/* Bank-details table */}
+              <div style={{ borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
+                <BankRow label={t.contract.bankName} value="Emirates NBD" />
+                <BankRow label={t.contract.accountHolder} value="S-E-T-T Worldwide Reservation FZE" />
+                <BankRow label={t.contract.iban} value="AE12 0260 0010 1234 5678 901" />
+                <BankRow label={t.contract.swiftBic} value="EBILAEAD" isLast />
+              </div>
+            </div>
+
+            {/* ─────────── CANCELLATION CONDITIONS ─────────── */}
+            {cancellationHtml && (
+              <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+                <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                  {t.contract.cancellationConditions}
+                </h3>
+                <div
+                  className="font-montserrat text-[13px] leading-relaxed text-sett-grey sett-rich-editor"
+                  dangerouslySetInnerHTML={{ __html: cancellationHtml }}
+                />
+              </div>
+            )}
+
+            {/* ─────────── TERMS & CONDITIONS ─────────── */}
+            {termsHtml && (
+              <div className="px-8 py-6">
+                <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                  {t.contract.termsConditions}
+                </h3>
+                <div
+                  className="font-montserrat text-[13px] leading-relaxed text-sett-grey sett-rich-editor"
+                  dangerouslySetInnerHTML={{ __html: termsHtml }}
+                />
+              </div>
+            )}
+
+            {/* §8.2 — thin green line above footer text */}
+            <div aria-hidden style={{ height: 2, background: '#AAC737' }} />
+
+            {/* ─────────── §6.1 FOOTER — green bar with legal + issued by ─────────── */}
+            <div className="flex items-end justify-between px-8 py-5" style={{ background: '#071c42' }}>
+              <p className="font-montserrat text-[10px] leading-relaxed text-white opacity-80 max-w-[520px]">
+                {t.contract.footerLegal}
+              </p>
+              <div className="flex flex-col items-end">
+                <span
+                  className="font-montserrat uppercase"
+                  style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#AAC737' }}
+                >
+                  {t.contract.issuedBy}
+                </span>
+                <span className="font-montserrat text-[13px] font-semibold text-white mt-0.5">
+                  Oliver Riefler
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
+    </ModalOverlay>
+  );
+}
+
+/* ─── Two-line label/value cell used across the metadata grid ─── */
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div
+        className="font-montserrat uppercase"
+        style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', color: '#686868' }}
+      >
+        {label}
+      </div>
+      <div className="font-montserrat text-[13px] font-normal text-sett-navy mt-0.5">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Label/value row inside the bank-details table ─── */
+function BankRow({ label, value, isLast }: { label: string; value: string; isLast?: boolean }) {
+  return (
+    <div
+      className="flex items-center px-4 py-2.5"
+      style={{ borderBottom: isLast ? 'none' : '1px solid #E0E0E0' }}
+    >
+      <span
+        className="font-montserrat uppercase"
+        style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', color: '#686868', width: 180 }}
+      >
+        {label}
+      </span>
+      <span className="font-montserrat text-[13px] font-semibold text-sett-navy flex-1">
+        {value}
+      </span>
     </div>
   );
 }

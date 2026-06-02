@@ -6,9 +6,15 @@ import { ArrowLeft, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { settingsApi } from '@/lib/api/settings';
+import { invalidateDefaultMarkup } from '@/hooks/useDefaultMarkup';
+
+// Common-value shortcuts shown in the preset Select. Keep this list short
+// — the custom input handles every value that isn't worth a dedicated row.
+const MARKUP_PRESETS = ['0', '5', '10', '15', '18', '20', '25', '30', '50', '100'];
 
 export default function GeneralConfigPage() {
   const { t } = useLanguage();
@@ -26,12 +32,31 @@ export default function GeneralConfigPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Normalise the raw input (e.g. "18,5" → "18.5") so float parsing works
+  // regardless of locale, then validate range. Returns the canonical
+  // string we'll send to the BE, or null if the input isn't acceptable.
+  const MARKUP_MAX = 9_999_999_999;
+  const parseMarkup = (raw: string): string | null => {
+    const cleaned = raw.replace(',', '.').trim();
+    if (cleaned === '') return null;
+    const num = parseFloat(cleaned);
+    if (isNaN(num) || num < 0 || num > MARKUP_MAX) return null;
+    // Clamp to 2 decimals — strips trailing zeros so "18.50" → "18.5".
+    return String(Math.round(num * 100) / 100);
+  };
+
+  const canonicalMarkup = parseMarkup(markup);
+  const isInvalid = markup.trim() !== '' && canonicalMarkup === null;
+
   const handleSave = async () => {
-    const num = parseInt(markup, 10);
-    if (isNaN(num) || num < 0 || num > 100) return;
+    if (canonicalMarkup === null) return;
     setSaving(true);
     try {
-      await settingsApi.updateGeneral({ defaultMarkupPercentage: String(num) });
+      await settingsApi.updateGeneral({ defaultMarkupPercentage: canonicalMarkup });
+      // Force every consumer (proposal slider seed, markup-dropdown chip
+      // highlight, etc.) to re-fetch on next mount so the new default
+      // shows up without a hard reload.
+      invalidateDefaultMarkup();
       toast.success(t.toasts.settingsSaved);
     } catch {
       // handled by api client
@@ -80,16 +105,32 @@ export default function GeneralConfigPage() {
                 </div>
               </div>
 
-              {/* Markup Field */}
-              <div className="mb-4">
+              {/* Markup Field — preset Select + free-text Input. Both write
+                  to the same `markup` state, so picking a preset fills the
+                  input and typing in the input deselects the preset (the
+                  Select snaps to "" — its blank/custom row). */}
+              <div className="mb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Select
-                  label={t.generalConfig.defaultMarkup}
+                  label={t.generalConfig.defaultMarkupPreset}
+                  value={MARKUP_PRESETS.includes(canonicalMarkup ?? '') ? (canonicalMarkup ?? '') : ''}
+                  onChange={(e) => setMarkup(e.target.value)}
+                  options={[
+                    { value: '', label: '—' },
+                    ...MARKUP_PRESETS.map((v) => ({ value: v, label: `${v} %` })),
+                  ]}
+                />
+                {/* Shared Input — brand-spec border, focus glow, error
+                    state, label, and the new `suffix` prop for the % glyph
+                    all come from one component. */}
+                <Input
+                  label={t.generalConfig.defaultMarkupCustom}
+                  type="text"
+                  inputMode="decimal"
                   value={markup}
                   onChange={(e) => setMarkup(e.target.value)}
-                  options={Array.from({ length: 101 }, (_, i) => ({
-                    value: String(i),
-                    label: `${i} %`,
-                  }))}
+                  placeholder="e.g. 18.5"
+                  error={isInvalid ? t.generalConfig.defaultMarkupRangeError : undefined}
+                  suffix="%"
                 />
               </div>
 
@@ -110,6 +151,7 @@ export default function GeneralConfigPage() {
                   variant="primary"
                   onClick={handleSave}
                   isLoading={saving}
+                  disabled={canonicalMarkup === null}
                 >
                   {t.generalConfig.save}
                 </Button>

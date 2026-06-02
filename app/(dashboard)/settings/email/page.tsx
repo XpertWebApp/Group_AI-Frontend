@@ -1,32 +1,82 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, AlertTriangle, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { settingsApi, type EmailConfig, type EmailConfigUser } from '@/lib/api/settings';
-import { cn } from '@/lib/utils/cn';
+import {
+  settingsApi,
+  type EmailSettingsResponse,
+  type SenderIdentity,
+  type EmailConnectionStatus,
+} from '@/lib/api/settings';
+
+/* ───────── helpers ─────────
+ * `formatRelativeTime` is duplicated from the Settings index page rather
+ * than extracted to a shared util because both call sites are small and
+ * the wording rules drift with locale tweaks. If a third caller appears,
+ * promote it to `lib/dateFormatter.ts`. */
+function formatRelativeTime(dateStr: string | null, locale: string): string | null {
+  if (!dateStr) return null;
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHrs = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (locale === 'de') {
+    if (diffMins < 1) return 'gerade eben';
+    if (diffMins < 60) return `vor ${diffMins} Min.`;
+    if (diffHrs < 24) return `vor ${diffHrs} Std.`;
+    if (diffDays < 7) return `vor ${diffDays} ${diffDays === 1 ? 'Tag' : 'Tagen'}`;
+    return `vor ${diffWeeks} ${diffWeeks === 1 ? 'Woche' : 'Wochen'}`;
+  }
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  return `${diffWeeks} ${diffWeeks === 1 ? 'week' : 'weeks'} ago`;
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isValidEmail = (val: string) => val === '' || EMAIL_REGEX.test(val);
+
+// The only Brevo-verified sender. If the admin changes `fromEmail` away
+// from this, render a (non-blocking) warning per BE handover §5.4.
+const BREVO_VERIFIED_SENDER = 'groups@s-e-t-t.com';
 
 export default function EmailConfigPage() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [config, setConfig] = useState<EmailConfig | null>(null);
-  const [fromName, setFromName] = useState('');
+
+  const [data, setData] = useState<EmailSettingsResponse | null>(null);
+  const [form, setForm] = useState<SenderIdentity>({
+    fromName: '',
+    fromEmail: '',
+    replyToFallback: '',
+    staffNotificationEmail: '',
+  });
+  const [errors, setErrors] = useState<Partial<Record<keyof SenderIdentity, string>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
-  const [confirmDisconnect, setConfirmDisconnect] = useState<EmailConfigUser | null>(null);
 
-  const fetchConfig = useCallback(async () => {
+  // Test-send card state
+  const [testTo, setTestTo] = useState('');
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testSuccess, setTestSuccess] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await settingsApi.getEmailConfig();
-      setConfig(data);
-      setFromName(data.fromName || '');
+      const res = await settingsApi.getEmailSettings();
+      setData(res);
+      setForm(res.senderIdentity);
     } catch {
       // handled by api client
     } finally {
@@ -34,52 +84,43 @@ export default function EmailConfigPage() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
-  // Handle Google redirect callback
-  useEffect(() => {
-    const googleStatus = searchParams.get('google');
-    if (googleStatus === 'connected') {
-      toast.success(t.emailConfig.googleConnected);
-      window.history.replaceState({}, '', '/settings/email');
-      fetchConfig();
-    } else if (googleStatus === 'denied') {
-      toast.error(t.emailConfig.googleDenied);
-      window.history.replaceState({}, '', '/settings/email');
-    }
-  }, [searchParams, t, fetchConfig]);
+  // Detect unsaved changes — drives the Save button's disabled state.
+  const dirty = useMemo(() => {
+    if (!data) return false;
+    const s = data.senderIdentity;
+    return (
+      form.fromName !== s.fromName
+      || form.fromEmail !== s.fromEmail
+      || form.replyToFallback !== s.replyToFallback
+      || form.staffNotificationEmail !== s.staffNotificationEmail
+    );
+  }, [form, data]);
 
-  const handleDisconnect = async (user: EmailConfigUser) => {
-    setDisconnectingId(user.id);
-    try {
-      await settingsApi.disconnectGoogle(user.id);
-      const name = `${user.firstName} ${user.lastName ?? ''}`.trim();
-      toast.success(t.emailConfig.disconnected.replace('{name}', name));
-      fetchConfig();
-    } catch {
-      // handled by api client
-    } finally {
-      setDisconnectingId(null);
-      setConfirmDisconnect(null);
-    }
-  };
+  // Inline warning per BE §5.4: admin picked a sender that isn't the
+  // Brevo-verified one — Brevo will rewrite the From header anyway, so the
+  // visible inbox sender won't match. Non-blocking; save still works.
+  const showSenderWarning = form.fromEmail !== '' && form.fromEmail !== BREVO_VERIFIED_SENDER;
 
-  const handleConnect = async () => {
-    try {
-      const url = await settingsApi.getGoogleConnectUrl();
-      window.location.href = url;
-    } catch {
-      // handled by api client
-    }
-  };
+  const validate = useCallback((): boolean => {
+    const next: Partial<Record<keyof SenderIdentity, string>> = {};
+    if (!isValidEmail(form.fromEmail)) next.fromEmail = t.emailConfig.invalidEmail;
+    if (!isValidEmail(form.replyToFallback)) next.replyToFallback = t.emailConfig.invalidEmail;
+    if (!isValidEmail(form.staffNotificationEmail)) next.staffNotificationEmail = t.emailConfig.invalidEmail;
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }, [form, t]);
 
-  const handleSaveFromName = async () => {
-    if (!fromName.trim()) return;
+  const handleSave = async () => {
+    if (!validate()) return;
     setSaving(true);
     try {
-      await settingsApi.updateFromName(fromName.trim());
+      const res = await settingsApi.updateSenderIdentity(form);
+      // Reflect any BE-side trimming/normalisation by re-syncing from the
+      // PUT response (no second GET needed).
+      setData(res);
+      setForm(res.senderIdentity);
       toast.success(t.emailConfig.saved);
     } catch {
       // handled by api client
@@ -88,12 +129,47 @@ export default function EmailConfigPage() {
     }
   };
 
+  const handleSendTest = async () => {
+    setTestError(null);
+    setTestSuccess(null);
+    if (!isValidEmail(testTo) || testTo === '') {
+      setTestError(t.emailConfig.invalidEmail);
+      return;
+    }
+    setTesting(true);
+    try {
+      await settingsApi.sendEmailTest(testTo);
+      setTestSuccess(t.emailConfig.sendTestSuccess.replace('{to}', testTo));
+    } catch (err: unknown) {
+      const ax = await import('axios');
+      if (ax.isAxiosError(err)) {
+        const code = err.response?.data?.error as string | undefined;
+        const msg = err.response?.data?.message as string | undefined;
+        if (code === 'RATE_LIMITED' || err.response?.status === 429) {
+          setTestError(t.emailConfig.sendTestRateLimited);
+        } else if (code === 'NOT_CONFIGURED' || err.response?.status === 503) {
+          setTestError(t.emailConfig.sendTestNotConfigured);
+        } else {
+          setTestError(msg ?? 'Failed to send test email');
+        }
+      } else {
+        setTestError('Failed to send test email');
+      }
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const connection = data?.connection;
+  const intercept = data?.intercept;
+  const lastTested = formatRelativeTime(connection?.lastTestedAt ?? null, locale);
+
   return (
     <>
       <Header title={t.settings.title} />
       <div className="p-4 md:p-6">
-        {/* Page heading */}
-        <div className="flex items-center mb-6" style={{ gap: 14 }}>
+        {/* Back + Title */}
+        <div className="flex items-center gap-3.5 mb-6">
           <button
             type="button"
             onClick={() => router.push('/settings')}
@@ -102,204 +178,304 @@ export default function EmailConfigPage() {
             <ArrowLeft className="w-4 h-4" />
             {t.emailConfig.back}
           </button>
-          <span className="text-[#E6EAF0]">|</span>
-          <h2 className="font-montserrat font-medium text-[18px] leading-none text-[#1D1D1D]">
+          <h2 className="font-montserrat text-[22px] font-semibold leading-none text-sett-text-primary">
             {t.emailConfig.title}
           </h2>
         </div>
 
-        <div className="space-y-6">
-          {/* ── Section 1: Google Account Connections ── */}
-          <div className="rounded-[14px] bg-white" style={{ border: '1px solid #E6EAF0' }}>
-            <div className="p-5">
-              <div className="flex items-start mb-5" style={{ gap: 12 }}>
-                <div className="shrink-0" style={{ width: 4, height: 43, borderRadius: 9999, background: '#AAC737' }} />
-                <div className="flex flex-col" style={{ gap: 4 }}>
-                  <h3 className="font-montserrat font-semibold text-[18px] leading-none text-[#1D1D1D]">
-                    {t.emailConfig.googleTitle}
-                  </h3>
-                  <p className="font-montserrat font-normal text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
-                    {t.emailConfig.googleDesc}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Users Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr style={{ borderTop: '1px solid #E6EAF0', borderBottom: '1px solid #E6EAF0' }}>
-                    <th className="text-left px-5 font-montserrat text-[14px] font-semibold leading-none uppercase text-[#A3A3A3]" style={{ height: 57 }}>
-                      {t.emailConfig.name}
-                    </th>
-                    <th className="text-left px-5 font-montserrat text-[14px] font-semibold leading-none uppercase text-[#A3A3A3]" style={{ height: 57 }}>
-                      {t.emailConfig.email}
-                    </th>
-                    <th className="text-left px-5 font-montserrat text-[14px] font-semibold leading-none uppercase text-[#A3A3A3]" style={{ height: 57 }}>
-                      {t.emailConfig.status}
-                    </th>
-                    <th className="text-left px-5 font-montserrat text-[14px] font-semibold leading-none uppercase text-[#A3A3A3]" style={{ height: 57 }}>
-                      {t.emailConfig.actions}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={4} className="text-center py-12">
-                        <span className="inline-block w-5 h-5 border-2 border-sett-primary border-t-transparent rounded-full animate-spin" />
-                      </td>
-                    </tr>
-                  ) : !config?.users?.length ? (
-                    <tr>
-                      <td colSpan={4} className="text-center py-12 font-montserrat text-[14px] text-[#A3A3A3]">
-                        No users found.
-                      </td>
-                    </tr>
-                  ) : (
-                    config.users.map((user) => (
-                      <tr
-                        key={user.id}
-                        className={cn(
-                          'bg-white hover:bg-[#F7F7F7] transition-colors',
-                          !user.isActive && 'opacity-50'
-                        )}
-                        style={{ height: 72, borderBottom: '1px solid #E6EAF0' }}
-                      >
-                        <td className="px-5 font-montserrat text-[14px] font-medium leading-none text-[#1D1D1D]">
-                          {user.firstName} {user.lastName ?? ''}
-                        </td>
-                        <td className="px-5 font-montserrat text-[14px] font-normal leading-none text-[#1D1D1D]">
-                          {user.email}
-                        </td>
-                        <td className="px-5">
-                          {user.googleConnected ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-montserrat text-[12px] font-semibold" style={{ background: '#E8F5E9', color: '#2E7D32' }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#2E7D32' }} />
-                              {t.emailConfig.connected}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-montserrat text-[12px] font-semibold" style={{ background: '#F5F5F5', color: '#A3A3A3' }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#A3A3A3' }} />
-                              {t.emailConfig.notConnected}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5">
-                          {user.googleConnected && (
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDisconnect(user)}
-                              disabled={disconnectingId === user.id}
-                              className="px-3 py-1.5 rounded-[8px] font-montserrat text-[13px] font-semibold text-[#FB2C36] border border-[#FB2C36]/30 hover:bg-[#FEF2F2] transition-colors disabled:opacity-50"
-                            >
-                              {disconnectingId === user.id ? '...' : t.emailConfig.disconnect}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Connect own Google button */}
-            <div className="px-5 py-4" style={{ borderTop: '1px solid #E6EAF0' }}>
-              <button
-                type="button"
-                onClick={handleConnect}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[14px] font-montserrat text-[14px] font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-[3px] active:scale-95"
-                style={{ background: '#AAC737', boxShadow: '4px 4px 5px 0px #FFFFFF40 inset, 0px 8px 20px 0px #00000021' }}
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                </svg>
-                {t.emailConfig.connectGoogle}
-              </button>
-            </div>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <span className="inline-block w-5 h-5 border-2 border-sett-primary border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : (
+          <div className="space-y-6">
+            {/* ─────────── Card 1: Sender Identity ─────────── */}
+            <SectionCard
+              title={t.emailConfig.senderTitle}
+              description={t.emailConfig.senderDesc}
+            >
+              <div className="max-w-[480px] space-y-4">
+                <Field
+                  label={t.emailConfig.fromName}
+                  value={form.fromName}
+                  placeholder={t.emailConfig.fromNamePlaceholder}
+                  onChange={(v) => setForm({ ...form, fromName: v })}
+                />
+                <Field
+                  label={t.emailConfig.fromEmail}
+                  value={form.fromEmail}
+                  placeholder={t.emailConfig.fromEmailPlaceholder}
+                  onChange={(v) => {
+                    setForm({ ...form, fromEmail: v });
+                    if (errors.fromEmail) setErrors({ ...errors, fromEmail: undefined });
+                  }}
+                  error={errors.fromEmail}
+                  warning={showSenderWarning ? t.emailConfig.senderWarning : undefined}
+                />
+                <Field
+                  label={t.emailConfig.replyToFallback}
+                  value={form.replyToFallback}
+                  placeholder={t.emailConfig.replyToFallbackPlaceholder}
+                  onChange={(v) => {
+                    setForm({ ...form, replyToFallback: v });
+                    if (errors.replyToFallback) setErrors({ ...errors, replyToFallback: undefined });
+                  }}
+                  error={errors.replyToFallback}
+                />
+                <Field
+                  label={t.emailConfig.staffNotificationEmail}
+                  value={form.staffNotificationEmail}
+                  placeholder={t.emailConfig.staffNotificationEmailPlaceholder}
+                  onChange={(v) => {
+                    setForm({ ...form, staffNotificationEmail: v });
+                    if (errors.staffNotificationEmail) setErrors({ ...errors, staffNotificationEmail: undefined });
+                  }}
+                  error={errors.staffNotificationEmail}
+                />
 
-          {/* ── Section 2: Sender Information ── */}
-          <div className="rounded-[14px] bg-white" style={{ border: '1px solid #E6EAF0' }}>
-            <div className="p-5">
-              <div className="flex items-start mb-5" style={{ gap: 12 }}>
-                <div className="shrink-0" style={{ width: 4, height: 43, borderRadius: 9999, background: '#AAC737' }} />
-                <div className="flex flex-col" style={{ gap: 4 }}>
-                  <h3 className="font-montserrat font-semibold text-[18px] leading-none text-[#1D1D1D]">
-                    {t.emailConfig.senderTitle}
-                  </h3>
-                  <p className="font-montserrat font-normal text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
-                    {t.emailConfig.senderDesc}
-                  </p>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    isLoading={saving}
+                    disabled={!dirty}
+                  >
+                    {t.emailConfig.save}
+                  </Button>
                 </div>
               </div>
+            </SectionCard>
 
-              <div className="max-w-[400px] space-y-4">
-                <div className="flex flex-col" style={{ gap: 6 }}>
-                  <label className="font-montserrat text-[14px] font-semibold leading-none uppercase text-[#0A0A0A]">
-                    {t.emailConfig.fromName} <span className="text-[#FB2C36]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={fromName}
-                    onChange={(e) => setFromName(e.target.value)}
-                    placeholder={t.emailConfig.fromNamePlaceholder}
-                    className="w-full h-[41px] rounded-[14px] font-montserrat text-[14px] font-normal text-[#1D1D1D] placeholder:text-[#A3A3A3] focus:outline-none focus:border-sett-primary focus:ring-1 focus:ring-sett-primary"
-                    style={{ border: '1px solid #E6EAF0', padding: '12px' }}
+            {/* ─────────── Card 2: Brevo Connection ─────────── */}
+            <SectionCard
+              title={t.emailConfig.connectionTitle}
+              description=""
+              statusDot={
+                connection ? (
+                  <StatusDot
+                    status={connection.configured ? connection.status : 'untested'}
+                    lastTested={connection.configured ? lastTested : null}
+                    error={connection.statusError}
+                    configured={connection.configured}
+                    t={t}
                   />
-                </div>
+                ) : null
+              }
+            >
+              {!connection || !connection.configured ? (
+                <p className="font-montserrat text-[14px] text-sett-text-secondary">
+                  {t.emailConfig.notConfigured}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                    <ReadOnlyRow label={t.emailConfig.provider} value={connection.provider} />
+                    <ReadOnlyRow
+                      label={t.emailConfig.hostPort}
+                      value={`${connection.host} : ${connection.port} (${connection.security})`}
+                    />
+                    <ReadOnlyRow label={t.emailConfig.username} value={connection.usernameMasked ?? '—'} />
+                    <ReadOnlyRow label={t.emailConfig.password} value={connection.passwordMasked ?? '—'} />
+                  </div>
 
-                <Button
-                  variant="primary"
-                  onClick={handleSaveFromName}
-                  isLoading={saving}
-                  disabled={!fromName.trim()}
-                >
-                  {t.emailConfig.save}
-                </Button>
+                  {/* Test-send sub-card */}
+                  <div className="pt-4 border-t border-[#E6EAF0]">
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-2 max-w-[480px]">
+                      <div className="flex-1">
+                        <Input
+                          label={t.emailConfig.sendTestLabel}
+                          type="email"
+                          value={testTo}
+                          onChange={(e) => {
+                            setTestTo(e.target.value);
+                            setTestError(null);
+                            setTestSuccess(null);
+                          }}
+                          placeholder={t.emailConfig.sendTestPlaceholder}
+                          disabled={testing}
+                        />
+                      </div>
+                      <Button
+                        variant="secondary"
+                        onClick={handleSendTest}
+                        isLoading={testing}
+                        disabled={!testTo.trim()}
+                      >
+                        <Send className="w-4 h-4" />
+                        {t.emailConfig.sendTest}
+                      </Button>
+                    </div>
+                    {testSuccess && (
+                      <p className="mt-2 font-montserrat text-[13px] text-[#2E7D32]">
+                        ✓ {testSuccess}
+                      </p>
+                    )}
+                    {testError && (
+                      <p className="mt-2 font-montserrat text-[13px] text-[#FB2C36]">
+                        {testError}
+                      </p>
+                    )}
+                  </div>
+
+                  <p className="font-montserrat text-[12px] text-sett-text-secondary leading-relaxed">
+                    ⓘ {t.emailConfig.credentialsHint}
+                  </p>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* ─────────── Card 3: QA & Safety (only when intercept is active) ─────────── */}
+            {intercept?.active && (
+              <div className="rounded-[14px] bg-[#FFFBEB] border border-[#FCD34D] p-5">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <h3 className="font-montserrat font-bold text-[15px] text-[#92400E] uppercase tracking-[0.05em]">
+                      {t.emailConfig.interceptActive}
+                    </h3>
+                    <p className="font-montserrat text-[14px] text-[#1D1D1D]">
+                      {t.emailConfig.interceptDesc}
+                    </p>
+                    <p className="font-montserrat text-[14px] font-semibold text-sett-navy">
+                      {intercept.target ?? '—'}
+                    </p>
+                    <p className="font-montserrat text-[12px] text-sett-text-secondary leading-relaxed pt-2">
+                      {t.emailConfig.interceptHint}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ─── Reusable card frame matching the Settings → General visual language ─── */
+function SectionCard({
+  title,
+  description,
+  statusDot,
+  children,
+}: {
+  title: string;
+  description: string;
+  statusDot?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[14px] border border-sett-border-light bg-white p-5">
+      <div className="flex items-start gap-3 mb-5">
+        <div className="w-1 h-[43px] rounded-full bg-sett-primary shrink-0" />
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-montserrat text-[18px] font-semibold leading-none text-[#1D1D1D]">
+              {title}
+            </h3>
+            {statusDot}
+          </div>
+          {description && (
+            <p className="font-montserrat text-[14px] font-normal leading-snug text-[#4A4A4A]">
+              {description}
+            </p>
+          )}
         </div>
       </div>
+      {children}
+    </div>
+  );
+}
 
-      {/* ── Disconnect Confirmation Modal ── */}
-      {confirmDisconnect && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="bg-white rounded-[14px] w-full max-w-md mx-4 p-6" style={{ border: '1px solid #E6EAF0' }}>
-            <h3 className="font-montserrat text-[18px] font-semibold text-[#1D1D1D] mb-2">
-              {t.emailConfig.disconnectTitle}
-            </h3>
-            <p className="font-montserrat text-[14px] text-[#4A4A4A] mb-6">
-              {t.emailConfig.disconnectMsg.replace('{name}', `${confirmDisconnect.firstName} ${confirmDisconnect.lastName ?? ''}`.trim())}
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => setConfirmDisconnect(null)}
-                className="px-4 py-2.5 rounded-[14px] font-montserrat text-[14px] font-semibold text-[#4A4A4A] border hover:bg-[#F7F7F7] transition-colors"
-                style={{ border: '1px solid #E6EAF0' }}
-              >
-                {t.common.cancel}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDisconnect(confirmDisconnect)}
-                disabled={disconnectingId === confirmDisconnect.id}
-                className="px-4 py-2.5 rounded-[14px] font-montserrat text-[14px] font-semibold text-white transition-colors disabled:opacity-50"
-                style={{ background: '#FB2C36' }}
-              >
-                {disconnectingId === confirmDisconnect.id ? '...' : t.emailConfig.disconnect}
-              </button>
-            </div>
-          </div>
-        </div>
+/* ─── Field — thin wrapper around the shared Input. Inherits all the
+ *  brand-spec border, focus glow, hover, error styling. Adds an optional
+ *  amber warning line shown when no error is present (used for the
+ *  non-verified-sender hint that doesn't block save). */
+function Field({
+  label,
+  value,
+  placeholder,
+  onChange,
+  error,
+  warning,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+  error?: string;
+  warning?: string;
+}) {
+  return (
+    <div>
+      <Input
+        label={label}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        error={error}
+      />
+      {!error && warning && (
+        <p className="mt-1 font-montserrat text-[12px] text-[#B45309] leading-relaxed">
+          ⚠ {warning}
+        </p>
       )}
-    </>
+    </div>
+  );
+}
+
+/* ─── Read-only label/value row used inside the Brevo Connection card ─── */
+function ReadOnlyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="font-montserrat text-[11px] font-semibold uppercase tracking-[0.05em] text-sett-text-secondary">
+        {label}
+      </div>
+      <div className="font-montserrat text-[14px] text-sett-navy mt-0.5 break-all">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Status dot (green / red / grey) with semantic sub-label ─── */
+function StatusDot({
+  status,
+  lastTested,
+  error,
+  configured,
+  t,
+}: {
+  status: EmailConnectionStatus;
+  lastTested: string | null;
+  error: string | null;
+  configured: boolean;
+  t: { emailConfig: { statusConnected: string; statusError: string; statusUntested: string; lastTested: string; notConfigured: string } };
+}) {
+  if (!configured) {
+    return (
+      <span className="inline-flex items-center gap-2 font-montserrat text-[12px] text-sett-text-secondary">
+        <span className="w-2 h-2 rounded-full bg-[#A3A3A3]" />
+        {t.emailConfig.notConfigured}
+      </span>
+    );
+  }
+  const dotColour =
+    status === 'connected' ? '#2E7D32' :
+    status === 'error' ? '#FB2C36' : '#A3A3A3';
+  const label =
+    status === 'connected' ? (lastTested ? t.emailConfig.lastTested.replace('{when}', lastTested) : t.emailConfig.statusConnected) :
+    status === 'error' ? (error ? `${t.emailConfig.statusError}: ${error}` : t.emailConfig.statusError) :
+    t.emailConfig.statusUntested;
+  return (
+    <span
+      className="inline-flex items-center gap-2 font-montserrat text-[12px] text-sett-text-secondary max-w-[320px]"
+      title={status === 'error' && error ? error : undefined}
+    >
+      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColour }} />
+      <span className="truncate">{label}</span>
+    </span>
   );
 }
