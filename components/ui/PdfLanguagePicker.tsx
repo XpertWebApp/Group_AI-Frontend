@@ -145,9 +145,18 @@ function InfoTooltip({
 
   return (
     <>
+      {/* Wrapper carries focus + the a11y label so the visible icon can
+          stay purely presentational. Putting tabIndex/aria-label on the
+          <svg> while also marking it aria-hidden is a contradiction —
+          assistive tech is told to ignore it, but keyboard focus still
+          lands on it. Chrome's a11y engine logs the warning we saw on
+          group-ai.s-e-t-t.com. */}
       <span
         ref={anchorRef}
-        className="inline-flex items-center"
+        className="inline-flex items-center cursor-help"
+        role="button"
+        tabIndex={0}
+        aria-label={text}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
@@ -158,11 +167,9 @@ function InfoTooltip({
             'shrink-0',
             size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4',
             isDark ? 'text-white/55 hover:text-white/85' : 'text-sett-text-accent hover:text-sett-text-primary',
-            'transition-colors duration-150 cursor-help',
+            'transition-colors duration-150',
           )}
           aria-hidden
-          tabIndex={0}
-          aria-label={text}
         />
       </span>
       {open && pos && typeof document !== 'undefined' && createPortal(

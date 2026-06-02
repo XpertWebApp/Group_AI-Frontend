@@ -690,10 +690,15 @@ function CreateBookingRequestPageInner() {
         <div className="w-full h-px bg-sett-border-light mt-6" />
 
         {/* Bottom Actions
-            `relative z-0` keeps this row beneath any inline-rendered Select dropdown above
-            (whose stacking context is on the step content wrapper at z-10). */}
+            `relative z-0` keeps this row beneath any inline-rendered Select
+            dropdown above (whose stacking context is on the step content
+            wrapper at z-10).
+            `gap-3` on the group + `flex-wrap` make the buttons breathe and
+            wrap cleanly on narrow viewports rather than overflowing the
+            card. On mobile the row stacks (Cancel on top, action group
+            below) so a small touch target never gets clipped. */}
         <div
-          className="relative z-0 flex items-center justify-between pt-6 animate-sidebar-fade-up"
+          className="relative z-0 flex flex-wrap items-center justify-between gap-3 pt-6 animate-sidebar-fade-up"
           style={{ animationDelay: '520ms' }}
         >
           <Button
@@ -703,7 +708,7 @@ function CreateBookingRequestPageInner() {
           >
             {t.common.cancel}
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             {currentStep > 0 && (
               <Button variant="secondary" size="md" onClick={handleBack}>
                 {t.common.back}
