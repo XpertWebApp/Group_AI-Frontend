@@ -36,7 +36,9 @@ export const staffApi = {
   },
 
   blockUnblock: async (id: string, action: 'block' | 'unblock') => {
-    const { data } = await apiClient.patch<{ data: StaffMember }>(`/settings/staff/${id}/status`, { isActive: action === 'unblock' });
+    // BE expects { action: 'block' | 'unblock' } verbatim — sending
+    // { isActive: bool } returns 400 validation_error.
+    const { data } = await apiClient.patch<{ data: StaffMember }>(`/settings/staff/${id}/status`, { action });
     return data.data;
   },
 

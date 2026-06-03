@@ -1177,6 +1177,11 @@ export const translations = {
       cancellationConditions: 'Cancellation Conditions',
       hint: 'These policies are embedded in PDF proposals generated for customers.',
       save: 'Save Changes',
+      editButton: 'Edit Policies',
+      readOnlyHint: 'Read-only. Click Edit Policies to make changes.',
+      editingHint: 'Editing {lang} version — Cancel to discard, Save to apply.',
+      clickToEdit: 'Click to edit',
+      readOnly: 'Read-only',
     },
 
     // ── Supplier Limits ──
@@ -2351,6 +2356,11 @@ export const translations = {
       cancellationConditions: 'Stornierungsbedingungen',
       hint: 'Diese Richtlinien werden in die generierten PDF-Angebote für Kunden eingebettet.',
       save: 'Änderungen speichern',
+      editButton: 'Richtlinien bearbeiten',
+      readOnlyHint: 'Nur lesen. Klicken Sie auf "Richtlinien bearbeiten", um Änderungen vorzunehmen.',
+      editingHint: '{lang}-Version wird bearbeitet — Abbrechen verwirft, Speichern übernimmt.',
+      clickToEdit: 'Zum Bearbeiten klicken',
+      readOnly: 'Nur lesen',
     },
 
     // ── Lieferantenlimits ──

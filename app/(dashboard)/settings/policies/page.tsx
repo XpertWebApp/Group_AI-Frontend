@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, SquarePen } from 'lucide-react';
+import { ArrowLeft, Pencil, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 
@@ -99,31 +99,48 @@ export default function PoliciesPage() {
 
         {/* Main card */}
         <div className="rounded-[14px] bg-white" style={{ border: '1px solid #E6EAF0' }}>
-          {/* Header */}
-          <div className="p-5">
-            <div className="flex items-start" style={{ gap: 12 }}>
-              {/* Green accent line */}
+          {/* Header — title + description on the left, prominent labelled
+              Edit button on the right. Icon-only affordances were too easy
+              to miss; a properly labelled CTA is the standard pattern for
+              "this surface is editable, start here". */}
+          <div className="p-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start min-w-0" style={{ gap: 12 }}>
               <div className="shrink-0" style={{ width: 4, height: 43, borderRadius: 9999, background: '#AAC737' }} />
-              <div className="flex flex-col" style={{ gap: 4 }}>
-                <div className="flex items-center" style={{ gap: 14 }}>
+              <div className="flex flex-col min-w-0" style={{ gap: 4 }}>
+                <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-montserrat font-semibold text-[18px] leading-none text-[#1D1D1D]">
                     {t.policiesPage.title}
                   </h3>
-                  {!editing && (
-                    <button
-                      type="button"
-                      onClick={() => setEditing(true)}
-                      className="text-sett-primary hover:text-sett-primary/70 transition-colors"
-                    >
-                      <SquarePen className="w-4 h-4" />
-                    </button>
+                  {!editing ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sett-fill border border-sett-border font-montserrat text-[10px] font-semibold uppercase tracking-[0.05em] text-sett-text-secondary">
+                      <Lock className="w-3 h-3" />
+                      {t.policiesPage.readOnly}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sett-primary/15 border border-sett-primary/40 font-montserrat text-[10px] font-semibold uppercase tracking-[0.05em] text-sett-green-dark animate-badge-pulse">
+                      <Pencil className="w-3 h-3" />
+                      {t.policiesPage.editButton.replace(/ Policies| Richtlinien/i, '')}
+                    </span>
                   )}
                 </div>
-                <p className="font-montserrat font-normal text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
-                  {t.policiesPage.description}
+                <p className="font-montserrat font-normal text-[14px] leading-snug" style={{ color: '#4A4A4A' }}>
+                  {editing
+                    ? t.policiesPage.editingHint.replace('{lang}', langTab === 'en' ? t.policiesPage.english : t.policiesPage.german)
+                    : t.policiesPage.readOnlyHint}
                 </p>
               </div>
             </div>
+
+            {!editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="shrink-0 inline-flex items-center justify-center gap-2 h-[41px] px-4 rounded-lg bg-sett-primary text-sett-navy hover:bg-sett-green-dark hover:text-white font-montserrat text-[13px] font-bold uppercase tracking-[0.04em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] transition-all duration-200 active:scale-95 whitespace-nowrap"
+              >
+                <Pencil className="w-4 h-4" />
+                {t.policiesPage.editButton}
+              </button>
+            )}
           </div>
 
           {loading ? (
@@ -156,12 +173,7 @@ export default function PoliciesPage() {
                         minHeight="180px"
                       />
                     ) : (
-                      <div
-                        className="w-full min-h-[60px] rounded-[14px] font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed"
-                        style={{ background: '#F7F7F7', padding: 12 }}
-                      >
-                        {stripHtml(form[tcKey])}
-                      </div>
+                      <ReadOnlyField content={stripHtml(form[tcKey])} onEdit={() => setEditing(true)} clickToEditLabel={t.policiesPage.clickToEdit} />
                     )}
                   </div>
 
@@ -177,12 +189,7 @@ export default function PoliciesPage() {
                         minHeight="180px"
                       />
                     ) : (
-                      <div
-                        className="w-full min-h-[60px] rounded-[14px] font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed"
-                        style={{ background: '#F7F7F7', padding: 12 }}
-                      >
-                        {stripHtml(form[cxlKey])}
-                      </div>
+                      <ReadOnlyField content={stripHtml(form[cxlKey])} onEdit={() => setEditing(true)} clickToEditLabel={t.policiesPage.clickToEdit} />
                     )}
                   </div>
 
@@ -215,5 +222,43 @@ export default function PoliciesPage() {
         </div>
       </div>
     </>
+  );
+}
+
+/* ─── ReadOnlyField — hoverable display panel that doubles as a discovery
+ *  affordance for edit mode. On hover, a brand-spec ring + "Click to edit"
+ *  overlay surfaces so even users who missed the top-right Edit button can
+ *  discover the page is editable by interacting with the content itself.
+ *  Designer note: stacked affordances (CTA + helper text + hover hint)
+ *  outperform any single signal — what feels redundant to power users is
+ *  exactly what onboards first-timers. */
+function ReadOnlyField({
+  content,
+  onEdit,
+  clickToEditLabel,
+}: {
+  content: string;
+  onEdit: () => void;
+  clickToEditLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="group relative w-full min-h-[60px] text-left rounded-[14px] bg-[#F7F7F7] border border-transparent hover:border-sett-primary hover:bg-white hover:shadow-input-focus focus:outline-none focus-visible:border-sett-primary focus-visible:bg-white focus-visible:shadow-input-focus transition-all duration-200 cursor-pointer"
+      aria-label={clickToEditLabel}
+    >
+      <span className="block px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed pr-32">
+        {content}
+      </span>
+      {/* Hover overlay — fades in a "Click to edit" pill on the right edge */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sett-primary text-sett-navy font-montserrat text-[11px] font-bold uppercase tracking-[0.05em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0 transition-all duration-200"
+      >
+        <Pencil className="w-3 h-3" />
+        {clickToEditLabel}
+      </span>
+    </button>
   );
 }

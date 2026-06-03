@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Search, MoreVertical, Info, X, Copy, Check,
-  Eye, EyeOff, AlertTriangle, Download, ChevronLeft, ChevronRight,
+  Eye, EyeOff, AlertTriangle, Download,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { staffApi, type StaffMember } from '@/lib/api/staff';
@@ -249,14 +250,16 @@ export default function StaffManagementPage() {
           </h2>
         </div>
 
-        {/* Table Card */}
-        <div className="rounded-[14px] border border-sett-border-light bg-white">
-          {/* Toolbar */}
-          <div className="flex items-center justify-between gap-4 p-5">
-            <div className="relative w-full max-w-[600px]">
+        {/* List card — mirrors the Group Requests page (§5.2) so the two
+            screens share a visual language. `overflow-hidden` clips the
+            navy table header + row hover backgrounds against the wrapper's
+            14px radius; without it the corners read as a faded edge. */}
+        <div className="bg-white rounded-[14px] border border-sett-border overflow-hidden">
+          {/* Toolbar — search left, status filter + Add Staff right */}
+          <div className="relative z-10 p-3 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
+            <div className="relative flex-1 min-w-0 lg:max-w-[600px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sett-text-accent pointer-events-none" />
-              {/* Brand-spec §5.5 styling — same border/focus glow as the
-                  shared Input; left-padding bumped to clear the icon. */}
+              {/* Brand-spec §5.5 input — soft brand-green focus glow. */}
               <input
                 type="text"
                 value={search}
@@ -265,7 +268,7 @@ export default function StaffManagementPage() {
                 className="w-full h-[41px] pl-10 pr-3 rounded-[14px] border border-sett-border bg-white font-montserrat text-[14px] text-sett-text-primary placeholder:text-sett-text-accent focus:outline-none focus:border-sett-primary focus:shadow-input-focus transition-[border-color,box-shadow] duration-150"
               />
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 lg:ml-auto">
               <Select
                 variant="filter"
                 value={statusFilter}
@@ -277,19 +280,27 @@ export default function StaffManagementPage() {
                 ]}
                 className="w-[148px]"
               />
-              <Button variant="primary" size="sm" onClick={() => setAddModalOpen(true)}>
+              {/* Add Staff CTA — matches the Create Request button on the
+                  Group Requests page: green pill, navy text, soft shadow. */}
+              <button
+                type="button"
+                onClick={() => setAddModalOpen(true)}
+                className="shrink-0 inline-flex items-center justify-center gap-2 h-[41px] px-4 rounded-lg bg-sett-primary text-sett-navy hover:bg-sett-green-dark hover:text-white font-montserrat text-[13px] font-bold uppercase tracking-[0.04em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] transition-all duration-200 active:scale-95 whitespace-nowrap"
+              >
                 {t.staffManagement.addStaff}
-              </Button>
+              </button>
             </div>
           </div>
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[900px]">
               <thead>
-                <tr className="border-y border-sett-border-light">
+                {/* §5.2 Header row — navy bg, white uppercase 13px Montserrat,
+                    same wide tracking as Group Requests. */}
+                <tr className="bg-sett-navy">
                   {[t.staffManagement.name, t.staffManagement.email, t.staffManagement.role, t.staffManagement.status, t.staffManagement.lastLogin, t.staffManagement.createdDate, t.staffManagement.actions].map((h) => (
-                    <th key={h} className="text-left px-5 py-4 font-montserrat text-[12px] font-semibold tracking-wider text-sett-text-accent uppercase">{h}</th>
+                    <th key={h} className="text-left font-montserrat text-[13px] font-semibold leading-normal uppercase tracking-wide text-white px-3 2xl:px-5 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -299,22 +310,38 @@ export default function StaffManagementPage() {
                 ) : staff.length === 0 ? (
                   <tr><td colSpan={7} className="text-center py-12 font-montserrat text-[14px] text-sett-text-secondary">{t.staffManagement.noStaff}</td></tr>
                 ) : (
-                  staff.map((member) => {
-                    const showBlock = canBlockUnblock(member);
-                    const showDelete = canDelete(member);
+                  staff.map((member, i) => {
                     return (
-                      <tr key={member.id} className="border-b border-sett-border-light bg-white hover:bg-[#F7F7F7] transition-[background-color] duration-0">
-                        <td className="px-5 py-5 font-montserrat text-[14px] font-medium text-[#1D1D1D]">{member.fullName || member.email}</td>
-                        <td className="px-5 py-5 font-montserrat text-[14px] font-medium text-[#1D1D1D]">{member.email}</td>
-                        <td className="px-5 py-5 font-montserrat text-[14px] font-medium text-[#1D1D1D]">{member.role}</td>
-                        <td className="px-5 py-5 font-montserrat text-[14px] font-medium">
-                          <span className={member.status === 'active' ? 'text-[#667F00]' : 'text-[#FB2C36]'}>
-                            {member.status === 'active' ? t.staffManagement.active : t.staffManagement.blocked}
+                      <tr
+                        key={member.id}
+                        // §5.2 Row pattern — alternating bg, hover swaps to the
+                        // light green tint, sett-out easing, group-scoped so
+                        // the left accent bar and link colour ride along.
+                        className={`group border-b border-sett-border-light last:border-0 transition-colors duration-180 ease-sett-out hover:bg-sett-light-green-bg/60 active:bg-sett-light-green-bg ${
+                          i % 2 === 1 ? 'bg-sett-table-alt-row' : 'bg-white'
+                        }`}
+                      >
+                        <td className="relative px-3 2xl:px-5 py-4 font-montserrat text-[14px] font-medium text-sett-text-primary">
+                          {/* Left accent bar — slides in on row hover, same
+                              as the Group Requests rows. */}
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-sett-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-280 ease-sett-out"
+                          />
+                          <span className="inline-block transition-all duration-180 ease-sett-out group-hover:text-sett-primary group-hover:translate-x-0.5">
+                            {member.fullName || member.email}
                           </span>
                         </td>
-                        <td className="px-5 py-5 font-montserrat text-[14px] font-medium text-[#1D1D1D]">{formatDateTime(member.lastLoginAt)}</td>
-                        <td className="px-5 py-5 font-montserrat text-[14px] font-normal text-[#1D1D1D]">{formatDate(member.createdAt)}</td>
-                        <td className="px-5 py-5">
+                        <td className="px-3 2xl:px-5 py-4 font-montserrat text-[14px] text-sett-text-primary">{member.email}</td>
+                        <td className="px-3 2xl:px-5 py-4 font-montserrat text-[14px] text-sett-text-primary">{member.role}</td>
+                        <td className="px-3 2xl:px-5 py-4">
+                          <Badge variant={member.status === 'active' ? 'completed' : 'declined'}>
+                            {member.status === 'active' ? t.staffManagement.active : t.staffManagement.blocked}
+                          </Badge>
+                        </td>
+                        <td className="px-3 2xl:px-5 py-4 font-montserrat text-[14px] text-sett-text-secondary">{formatDateTime(member.lastLoginAt)}</td>
+                        <td className="px-3 2xl:px-5 py-4 font-montserrat text-[14px] text-sett-text-secondary">{formatDate(member.createdAt)}</td>
+                        <td className="px-3 2xl:px-5 py-4">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -328,6 +355,7 @@ export default function StaffManagementPage() {
                               }
                             }}
                             className="p-1 rounded-md hover:bg-sett-border/50 transition-colors text-sett-text-secondary"
+                            aria-label={t.staffManagement.actions}
                           >
                             <MoreVertical className="w-5 h-5" />
                           </button>
@@ -339,23 +367,68 @@ export default function StaffManagementPage() {
               </tbody>
             </table>
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-5 py-4 border-t border-sett-border-light">
-              <span className="font-montserrat text-[13px] text-sett-text-secondary">{total} {total === 1 ? 'result' : 'results'}</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-md hover:bg-sett-border/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="font-montserrat text-[13px] text-sett-text-primary font-medium">{page} / {totalPages}</span>
-                <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-md hover:bg-sett-border/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Pagination — moved outside the card, numbered chips matching
+            Group Requests. Renders only when there's more than one page. */}
+        {!loading && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mt-6">
+            <p className="text-sm sm:text-body text-sett-text-muted text-center sm:text-left">
+              {total} {total === 1 ? 'result' : 'results'}
+            </p>
+            <div className="flex items-center justify-center gap-1 sm:gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-2 sm:px-2.5 h-8 rounded-lg text-sm sm:text-body font-medium text-sett-text-accent transition-all duration-180 ease-sett-out hover:text-sett-primary active:scale-95 disabled:opacity-40 disabled:hover:text-sett-text-accent"
+              >
+                {t.requests?.prev ?? 'Prev'}
+              </button>
+              {(() => {
+                const pages: (number | string)[] = [];
+                for (let i = 1; i <= totalPages; i++) {
+                  if (i <= 3 || i === totalPages || Math.abs(i - page) <= 1) {
+                    pages.push(i);
+                  } else if (pages[pages.length - 1] !== '...') {
+                    pages.push('...');
+                  }
+                }
+                return pages.map((p, i) =>
+                  p === '...' ? (
+                    <span
+                      key={`ellipsis-${i}`}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPage(p as number)}
+                      className={`w-8 h-8 rounded-lg text-sm sm:text-body transition-all duration-180 ease-sett-out active:scale-90 ${
+                        p === page
+                          ? 'bg-sett-primary text-sett-navy font-bold shadow-[0_2px_6px_0_rgba(170,199,55,0.35)]'
+                          : 'bg-white border border-sett-border text-sett-text-secondary font-medium hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                );
+              })()}
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-2 sm:px-2.5 h-8 rounded-lg border border-sett-border bg-white text-sm sm:text-body font-medium text-sett-text-secondary transition-all duration-180 ease-sett-out hover:bg-sett-light-green-bg/40 hover:border-sett-primary/40 hover:text-sett-primary active:scale-95 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-sett-text-secondary"
+              >
+                {t.requests?.next ?? 'Next'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Fixed Actions Dropdown ── */}

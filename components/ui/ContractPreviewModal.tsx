@@ -130,9 +130,6 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
   const grandTotal = hotelTotal + serviceTotal;
 
   const documentCode = `${request.referenceNumber ?? request.id.slice(0, 8)}/${new Date(request.createdAt).getFullYear()}`;
-  const paymentDueDate = request.checkoutDate
-    ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
-    : null;
 
   return (
     <ModalOverlay open={open} onClose={onClose}>
@@ -471,38 +468,6 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               </span>
             </div>
 
-            {/* ─────────── §6.1 PAYMENT DETAILS — bank table + CC CTA ─────────── */}
-            <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
-              <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
-                {t.contract.paymentDetails}
-              </h3>
-
-              {/* Payment-due pill */}
-              <div
-                className="flex items-center gap-2 px-4 py-3 mb-4 rounded-[4px]"
-                style={{ background: '#F5F9E8', border: '1px solid #C8E050' }}
-              >
-                <p className="font-montserrat text-[13px] text-sett-navy">
-                  {t.contract.payPrompt}{' '}
-                  <span className="font-bold">€{formatPriceEU(grandTotal)}</span>{' '}
-                  {t.contract.payBy}{' '}
-                  <span className="font-bold">
-                    {paymentDueDate
-                      ? paymentDueDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                      : '—'}
-                  </span>.
-                </p>
-              </div>
-
-              {/* Bank-details table */}
-              <div style={{ borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
-                <BankRow label={t.contract.bankName} value="Emirates NBD" />
-                <BankRow label={t.contract.accountHolder} value="S-E-T-T Worldwide Reservation FZE" />
-                <BankRow label={t.contract.iban} value="AE12 0260 0010 1234 5678 901" />
-                <BankRow label={t.contract.swiftBic} value="EBILAEAD" isLast />
-              </div>
-            </div>
-
             {/* ─────────── CANCELLATION CONDITIONS ─────────── */}
             {cancellationHtml && (
               <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
@@ -569,26 +534,6 @@ function MetaRow({ label, value }: { label: string; value: string }) {
       <div className="font-montserrat text-[13px] font-normal text-sett-navy mt-0.5">
         {value}
       </div>
-    </div>
-  );
-}
-
-/* ─── Label/value row inside the bank-details table ─── */
-function BankRow({ label, value, isLast }: { label: string; value: string; isLast?: boolean }) {
-  return (
-    <div
-      className="flex items-center px-4 py-2.5"
-      style={{ borderBottom: isLast ? 'none' : '1px solid #E0E0E0' }}
-    >
-      <span
-        className="font-montserrat uppercase"
-        style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', color: '#686868', width: 180 }}
-      >
-        {label}
-      </span>
-      <span className="font-montserrat text-[13px] font-semibold text-sett-navy flex-1">
-        {value}
-      </span>
     </div>
   );
 }
