@@ -163,7 +163,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               className="inline-flex items-center justify-center gap-2 h-[41px] px-6 rounded-[4px] bg-sett-primary hover:bg-sett-green-dark font-montserrat text-[14px] font-bold leading-none uppercase tracking-[0.08em] text-sett-navy active:scale-[0.98] transition-colors duration-200 disabled:opacity-60"
             >
               <Download className="w-4 h-4" />
-              {downloading ? t.common.loading : t.modals.downloadPdf}
+              {downloading ? t.offer.pdfDownloading : t.modals.downloadPdf}
             </button>
             <button
               type="button"

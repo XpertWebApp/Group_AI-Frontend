@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, SquarePen } from 'lucide-react';
+import { ArrowLeft, Pencil, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Header } from '@/components/layout/Header';
 
@@ -133,6 +133,10 @@ export default function CompanyDetailsPage() {
         : 'bg-[#F7F7F7] border-none'
     );
 
+  /* Render a single field. In view mode the input is wrapped in a
+   * clickable button overlay that surfaces a "Click to edit" pill on
+   * hover/focus — second affordance (after the top-right Edit CTA) so
+   * users discover editability by interacting with the content too. */
   const renderField = (f: { key: keyof CompanySettings; label: string; placeholder: string; type?: string }, fullWidth?: boolean) => {
     // Phone field — use PhoneInput in edit mode, plain input in view mode
     if (f.key === 'phoneNumber') {
@@ -151,24 +155,51 @@ export default function CompanyDetailsPage() {
           </div>
         );
       }
-      // View mode — plain disabled input
+      // View mode — falls through to the disabled-input rendering below
     }
+
+    const inputEl = (
+      <input
+        type={f.type || 'text'}
+        value={form[f.key]}
+        onChange={(e) => update(f.key, e.target.value)}
+        onBlur={() => handleBlur(f.key)}
+        placeholder={f.placeholder}
+        disabled={!editing}
+        className={getInputCls(f.key)}
+        style={{ padding: 12 }}
+        tabIndex={editing ? 0 : -1}
+      />
+    );
 
     return (
       <div key={f.key} className={cn('flex flex-col', !fullWidth && 'flex-1')} style={{ gap: 6 }}>
         <label className="font-montserrat text-[14px] font-medium leading-none uppercase text-[#1D1D1D]">
           {f.label} <span className="text-[#FB2C36]">*</span>
         </label>
-        <input
-          type={f.type || 'text'}
-          value={form[f.key]}
-          onChange={(e) => update(f.key, e.target.value)}
-          onBlur={() => handleBlur(f.key)}
-          placeholder={f.placeholder}
-          disabled={!editing}
-          className={getInputCls(f.key)}
-          style={{ padding: 12 }}
-        />
+        {editing ? (
+          inputEl
+        ) : (
+          // View mode — wrap the disabled input in a clickable shell that
+          // promotes "Click to edit" on hover. Uses a single button so
+          // keyboard users get the same affordance via focus.
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label={t.companyDetails.clickToEdit}
+            className="group relative w-full text-left rounded-[14px] border border-transparent hover:border-sett-primary hover:bg-white hover:shadow-input-focus focus:outline-none focus-visible:border-sett-primary focus-visible:bg-white focus-visible:shadow-input-focus transition-all duration-200 cursor-pointer"
+          >
+            {inputEl}
+            {/* Click-to-edit pill — slides in from the right on hover */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sett-primary text-sett-navy font-montserrat text-[11px] font-bold uppercase tracking-[0.05em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0 transition-all duration-200"
+            >
+              <Pencil className="w-3 h-3" />
+              {t.companyDetails.clickToEdit}
+            </span>
+          </button>
+        )}
         {editing && errors[f.key] && (
           <p className="font-montserrat text-[12px] text-[#FB2C36]">{errors[f.key]}</p>
         )}
@@ -213,30 +244,48 @@ export default function CompanyDetailsPage() {
         </div>
 
         <div className="rounded-[14px] bg-white" style={{ border: '1px solid #E6EAF0' }}>
-          {/* Header */}
-          <div className="p-5">
-            <div className="flex items-start" style={{ gap: 12 }}>
+          {/* Header — mirrors the Policies page: prominent labelled Edit
+              CTA on the right, status chip + helper line on the left.
+              Icon-only edit affordances are hard to discover; a properly
+              labelled button + a read-only chip + a descriptive helper
+              line + a hover-overlay on the fields (stacked affordances)
+              makes the editability obvious to first-time users. */}
+          <div className="p-5 flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start min-w-0" style={{ gap: 12 }}>
               <div className="shrink-0" style={{ width: 4, height: 43, borderRadius: 9999, background: '#AAC737' }} />
-              <div className="flex flex-col" style={{ gap: 4 }}>
-                <div className="flex items-center" style={{ gap: 14 }}>
+              <div className="flex flex-col min-w-0" style={{ gap: 4 }}>
+                <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-montserrat font-semibold text-[18px] leading-none text-[#1D1D1D]">
                     {t.companyDetails.title}
                   </h3>
-                  {!editing && (
-                    <button
-                      type="button"
-                      onClick={() => setEditing(true)}
-                      className="text-sett-primary hover:text-sett-primary/70 transition-colors"
-                    >
-                      <SquarePen className="w-4 h-4" />
-                    </button>
+                  {!editing ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sett-fill border border-sett-border font-montserrat text-[10px] font-semibold uppercase tracking-[0.05em] text-sett-text-secondary">
+                      <Lock className="w-3 h-3" />
+                      {t.companyDetails.readOnly}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sett-primary/15 border border-sett-primary/40 font-montserrat text-[10px] font-semibold uppercase tracking-[0.05em] text-sett-green-dark animate-badge-pulse">
+                      <Pencil className="w-3 h-3" />
+                      Edit
+                    </span>
                   )}
                 </div>
-                <p className="font-montserrat font-normal text-[14px] leading-none" style={{ color: '#4A4A4A' }}>
-                  {t.companyDetails.description}
+                <p className="font-montserrat font-normal text-[14px] leading-snug" style={{ color: '#4A4A4A' }}>
+                  {editing ? t.companyDetails.editingHint : t.companyDetails.readOnlyHint}
                 </p>
               </div>
             </div>
+
+            {!editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="shrink-0 inline-flex items-center justify-center gap-2 h-[41px] px-4 rounded-lg bg-sett-primary text-sett-navy hover:bg-sett-green-dark hover:text-white font-montserrat text-[13px] font-bold uppercase tracking-[0.04em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] transition-all duration-200 active:scale-95 whitespace-nowrap"
+              >
+                <Pencil className="w-4 h-4" />
+                {t.companyDetails.editButton}
+              </button>
+            )}
           </div>
 
           {loading ? (

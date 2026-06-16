@@ -477,6 +477,22 @@ export const translations = {
       scrollToPreview: 'Scroll down to preview results',
       searchProgress: 'Progress',
       queuingNextBatch: 'Queuing next batch…',
+      // Phase-aware progress narrative (per BE handover 2026-06-04).
+      // Step 1 fires while the BE is querying suppliers (no jobs completed yet).
+      // Step 2 fires once supplier prices start streaming in.
+      // The "Step X of 2" anchor calms users by telling them how many phases remain.
+      searchPhaseStep1: 'Step 1 of 2',
+      searchPhaseStep2: 'Step 2 of 2',
+      searchPhaseQuerying: 'Querying hotels in {destination}',
+      searchPhaseValidating: 'Validating supplier prices for {completed} hotels',
+      // Calibrated expectation copy — sits below the progress bar.
+      searchTypicallyTakes: 'Typically takes 2–5 minutes. We\'ll show results as they come in.',
+      // Streaming card placeholder shown until the first result lands.
+      searchAwaitingFirst: 'Waiting for the first result...',
+      // Future: BE-provided ETA. Falls back to searchTypicallyTakes when null.
+      searchEtaRemaining: '~{minutes} minutes remaining',
+      // Future: queue position when multiple users search at once.
+      searchQueuePosition: 'You\'re #{position} in line. Estimated wait: ~{minutes} minutes.',
       translationUnavailable: 'Translation unavailable',
       translationUnavailableTooltip: 'Hotel description is shown in its original language — no translation available for the selected language.',
       youthFriendlyBadge: 'Youth-friendly',
@@ -1164,6 +1180,11 @@ export const translations = {
       addressPlaceholder: 'Enter full postal address',
       hint: 'These details appear on generated PDF proposals sent to customers.',
       save: 'Save Changes',
+      editButton: 'Edit Company Details',
+      readOnlyHint: 'Read-only. Click Edit Company Details to make changes.',
+      editingHint: 'Editing — Cancel to discard, Save to apply.',
+      clickToEdit: 'Click to edit',
+      readOnly: 'Read-only',
     },
 
     // ── Policies ──
@@ -1663,6 +1684,15 @@ export const translations = {
       standardDoubleBed: 'Standarddoppelzimmer',
       twinBed: 'Zweibettzimmer',
       loadingRequest: 'Anfragedetails werden geladen...',
+      // Phasenbewusste Fortschrittsanzeige (siehe BE-Doku 2026-06-04).
+      searchPhaseStep1: 'Schritt 1 von 2',
+      searchPhaseStep2: 'Schritt 2 von 2',
+      searchPhaseQuerying: 'Hotels in {destination} werden abgefragt',
+      searchPhaseValidating: 'Lieferantenpreise für {completed} Hotels werden geprüft',
+      searchTypicallyTakes: 'Dauert in der Regel 2–5 Minuten. Ergebnisse erscheinen, sobald sie eintreffen.',
+      searchAwaitingFirst: 'Warten auf das erste Ergebnis…',
+      searchEtaRemaining: 'Noch ca. {minutes} Minuten',
+      searchQueuePosition: 'Sie sind #{position} in der Warteschlange. Geschätzte Wartezeit: ca. {minutes} Minuten.',
       searchingHotels: 'Hotels werden gesucht...',
       searchingHotelsHint: 'Größere Reiseziele können einige Minuten dauern',
       searchingWiderTitle: 'Weitere Umgebung wird durchsucht…',
@@ -2343,6 +2373,11 @@ export const translations = {
       addressPlaceholder: 'Vollständige Postadresse eingeben',
       hint: 'Diese Daten erscheinen auf den generierten PDF-Angeboten für Kunden.',
       save: 'Änderungen speichern',
+      editButton: 'Unternehmensdaten bearbeiten',
+      readOnlyHint: 'Nur lesen. Klicken Sie auf "Unternehmensdaten bearbeiten", um Änderungen vorzunehmen.',
+      editingHint: 'Bearbeitung läuft — Abbrechen verwirft, Speichern übernimmt.',
+      clickToEdit: 'Zum Bearbeiten klicken',
+      readOnly: 'Nur lesen',
     },
 
     // ── Richtlinien ──

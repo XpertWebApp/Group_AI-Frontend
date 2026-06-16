@@ -370,6 +370,12 @@ export default function AddHotelPage() {
   const [completedResults, setCompletedResults] = useState<HotelSearchResult[]>([]);
   const [searchSummary, setSearchSummary] = useState<{
     total: number;
+    // NOTE: `completed` here is the count of TERMINAL probes (BE's
+    // completed + skipped + failed) — see the stamping logic at the
+    // setSearchSummary call sites. `hotelsFound` is the count of
+    // successfully-returned hotels (BE's completed). The progress bar
+    // uses `completed/total`; the "hotels checked" counter shows the
+    // same; the scroll hint uses `hotelsFound`.
     completed: number;
     hotelsFound: number;
     queued: number;
@@ -1675,128 +1681,164 @@ export default function AddHotelPage() {
 
         {/* Searching / Polling phase */}
         {(phase === 'searching' || phase === 'polling') && (() => {
+          // searchSummary.completed already counts every terminal outcome
+          // (BE completed + skipped + failed) per the stamping at the
+          // setSearchSummary call sites. The bar uses it directly so it
+          // never plateaus on skip-heavy batches.
+          const settled = searchSummary?.completed ?? 0;
           const pct = searchSummary && searchSummary.total > 0
-            ? Math.round((searchSummary.completed / searchSummary.total) * 100)
+            ? Math.min(100, Math.round((settled / searchSummary.total) * 100))
             : 0;
-          // Inter-batch lull: backend is paginating but no jobs are in flight yet.
-          // The numeric % stops being meaningful here (it'll plateau near 100%), so we
-          // switch to an indeterminate "still searching" bar until the next batch enqueues.
+
+          // Inter-batch lull: BE is paginating but no jobs in flight yet.
+          // % becomes meaningless here (plateaus near 100%) — switch to an
+          // indeterminate "still searching" bar until the next batch enqueues.
           const isBetweenBatches = !!searchSummary
             && (searchSummary.phase === 'in_progress' || searchSummary.phase === null)
             && searchSummary.queued === 0
             && searchSummary.running === 0
             && searchSummary.total > 0;
+
+          // Phase derivation per BE handover §Phase 1:
+          //  - "Querying" while no validated hotels have come back yet (BE
+          //    still asking suppliers which hotels exist + have rooms).
+          //    `hotelsFound` is the count of successfully-returned hotels.
+          //  - "Validating" once supplier prices start streaming in.
+          //  - The settled phase is handled by the outer condition — panel
+          //    disappears entirely once `phase === 'done'`.
+          const isQuerying = !searchSummary
+            || (searchSummary.hotelsFound === 0 && searchSummary.running === 0 && !isBetweenBatches);
+
+          const stepLabel = isQuerying ? t.addHotel.searchPhaseStep1 : t.addHotel.searchPhaseStep2;
+          const destinationName = request?.destinationName ?? '—';
+          const phaseTitle = isQuerying
+            ? t.addHotel.searchPhaseQuerying.replace('{destination}', destinationName)
+            : isBetweenBatches
+              ? t.addHotel.searchingWiderTitle
+              : t.addHotel.searchPhaseValidating.replace('{completed}', String(searchSummary?.hotelsFound ?? 0));
+
           return (
             <div
-              className="bg-white rounded-[14px] border border-sett-border-light px-5 py-4 relative overflow-hidden animate-card-rise-in"
+              className="relative bg-white rounded-[14px] border border-sett-border overflow-hidden animate-card-rise-in"
               style={{ animationDelay: '120ms' }}
             >
-              {/* Subtle left-side glow */}
+              {/* §6.1 — 3px green accent stripe along the top, same brand
+                  signature as the PDF preview header and the policies card. */}
+              <div aria-hidden className="h-[3px] w-full bg-sett-primary" />
+
+              {/* Soft radial glow on the left so the panel reads as "alive"
+                  without the indeterminate band stealing the show. */}
               <div
-                className="absolute inset-y-0 left-0 w-32 pointer-events-none"
-                style={{ background: 'radial-gradient(ellipse 100% 80% at 0% 50%, rgba(170,199,55,0.07) 0%, transparent 100%)' }}
+                aria-hidden
+                className="absolute inset-y-0 left-0 w-40 pointer-events-none"
+                style={{ background: 'radial-gradient(ellipse 100% 80% at 0% 50%, rgba(170,199,55,0.08) 0%, transparent 100%)' }}
               />
 
-              {/* ── Main horizontal layout ── */}
-              <div className="flex items-center gap-5">
+              <div className="relative px-5 sm:px-6 py-5 flex flex-col gap-4">
+                {/* ── Tier 1: Phase chip + title ── */}
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="flex items-start gap-3 min-w-0">
+                    {/* Brand-spec animated icon — concentric ping rings on
+                        the sett-primary brand colour. Decorative; SR users
+                        get the textual phase title below. */}
+                    <div aria-hidden className="relative inline-flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="absolute w-12 h-12 rounded-full border border-sett-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
+                      <span className="absolute rounded-full border border-sett-primary/30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s', width: 40, height: 40 }} />
+                      <div className="relative z-10 w-9 h-9 rounded-full bg-sett-primary/10 border border-sett-primary/25 flex items-center justify-center">
+                        <Hotel className="text-sett-primary" style={{ width: 18, height: 18 }} />
+                      </div>
+                    </div>
 
-                {/* Left: icon + title */}
-                <div className="flex items-center gap-3 shrink-0">
-                  {/* Animated icon */}
-                  <div className="relative inline-flex items-center justify-center shrink-0">
-                    <span className="absolute w-12 h-12 rounded-full border border-sett-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
-                    <span className="absolute rounded-full border border-sett-primary/30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s', width: 40, height: 40 }} />
-                    <div className="relative z-10 w-9 h-9 rounded-full bg-sett-primary/10 border border-sett-primary/25 flex items-center justify-center">
-                      <Hotel className="w-4.5 h-4.5 text-sett-primary" style={{ width: 18, height: 18 }} />
+                    <div className="min-w-0">
+                      {/* Phase chip — anchors the user in the journey:
+                          "Step 1 of 2" / "Step 2 of 2" reads as a calming
+                          progress signal independent of the % bar. */}
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sett-primary/12 border border-sett-primary/30 font-montserrat text-[10px] font-bold uppercase tracking-[0.08em] text-sett-green-dark">
+                        <span className={cn(
+                          'w-1.5 h-1.5 rounded-full bg-sett-primary',
+                          isQuerying && 'animate-pulse',
+                        )} />
+                        {stepLabel}
+                      </span>
+                      <p className="font-montserrat text-[15px] sm:text-[16px] font-bold leading-tight text-sett-text-primary mt-1.5">
+                        {phaseTitle}
+                      </p>
                     </div>
                   </div>
-                  <div>
-                    <p className="font-montserrat text-[16px] font-bold text-sett-text-primary leading-tight">
-                      {t.addHotel.searchingHotels}
-                    </p>
-                    {!searchSummary && (
-                      <>
-                        <p className="font-montserrat text-[12px] text-sett-text-accent leading-tight mt-0.5">
-                          {t.addHotel.searchingHotelsHint}
-                        </p>
-                        <div className="flex items-center gap-1 mt-1">
-                          {[0, 1, 2].map((i) => (
-                            <span key={i} className="w-1.5 h-1.5 rounded-full bg-sett-primary/50 animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
-                          ))}
-                        </div>
-                      </>
-                    )}
-                    {searchSummary && (
-                      <p className="font-montserrat text-[13px] text-sett-text-accent leading-tight mt-0.5">
-                        {isBetweenBatches
-                          ? t.addHotel.searchingWiderTitle
-                          : t.addHotel.hotelsChecked
-                            .replace('{completed}', String(searchSummary.completed))
-                            .replace('{total}', String(searchSummary.total))}
-                      </p>
-                    )}
-                  </div>
+
+                  {/* Scroll hint on the right — only when results have
+                      started landing. Same affordance as before. */}
+                  {searchSummary && searchSummary.hotelsFound > 0 && (
+                    <div className="hidden md:flex items-center gap-1 text-sett-primary shrink-0 mt-1">
+                      <ChevronDown className="w-4 h-4 animate-bounce" />
+                      <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Divider */}
-                <div className="hidden sm:block w-px self-stretch bg-sett-border-light shrink-0" />
-
-                {/* Centre: progress bar — switches to indeterminate between batches */}
-                {searchSummary && (
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-montserrat text-[13px] text-sett-text-accent">{t.addHotel.searchProgress}</span>
-                      {isBetweenBatches ? (
+                {/* ── Tier 2: Progress bar + counter ── */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    {searchSummary ? (
+                      <span className="font-montserrat text-[13px] font-medium text-sett-text-secondary tabular-nums">
+                        {t.addHotel.hotelsChecked
+                          .replace('{completed}', String(settled))
+                          .replace('{total}', String(searchSummary.total))}
+                      </span>
+                    ) : (
+                      <span className="font-montserrat text-[13px] font-medium text-sett-text-secondary">
+                        {t.addHotel.searchingHotelsHint}
+                      </span>
+                    )}
+                    {searchSummary && (
+                      isBetweenBatches ? (
                         <span className="font-montserrat text-[13px] font-semibold text-sett-primary">
                           {t.addHotel.queuingNextBatch}
                         </span>
                       ) : (
                         <span className="font-montserrat text-[14px] font-bold text-sett-primary tabular-nums">{pct}%</span>
-                      )}
-                    </div>
-                    <div className="relative w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'rgba(170,199,55,0.15)' }}>
-                      {isBetweenBatches ? (
-                        // Indeterminate band — sliding 30%-wide bar that loops left→right
-                        <div
-                          aria-hidden
-                          className="absolute top-0 left-0 h-2 w-[30%] rounded-full animate-indeterminate-slide"
-                          style={{
-                            background: 'linear-gradient(90deg, transparent 0%, #AAC737 50%, transparent 100%)',
-                            boxShadow: '0 0 6px rgba(170,199,55,0.5)',
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className="h-2 rounded-full transition-all duration-700 ease-out"
-                          style={{
-                            width: `${pct}%`,
-                            background: 'linear-gradient(90deg, #8FA82B 0%, #AAC737 100%)',
-                            boxShadow: '0 0 6px rgba(170,199,55,0.5)',
-                          }}
-                        />
-                      )}
-                    </div>
+                      )
+                    )}
                   </div>
-                )}
+                  <div className="relative w-full rounded-full h-2.5 overflow-hidden" style={{ background: 'rgba(170,199,55,0.15)' }}>
+                    {!searchSummary || isBetweenBatches ? (
+                      <div
+                        aria-hidden
+                        className="absolute top-0 left-0 h-2 w-[30%] rounded-full animate-indeterminate-slide"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent 0%, #AAC737 50%, transparent 100%)',
+                          boxShadow: '0 0 6px rgba(170,199,55,0.5)',
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="h-2 rounded-full transition-all duration-700 ease-out"
+                        style={{
+                          width: `${pct}%`,
+                          background: 'linear-gradient(90deg, #8FA82B 0%, #AAC737 100%)',
+                          boxShadow: '0 0 6px rgba(170,199,55,0.5)',
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
 
-                {/* Right: scroll hint (Remaining pill removed — the number
-                    was misleading because the backend's total grows as the
-                    ring widens, so "Remaining" would shift mid-search). */}
+                {/* ── Tier 3: Calibrated time + "results stream in" copy ──
+                    Sets a realistic expectation (2–5 min) and reassures the
+                    user that results will appear progressively. Reads as
+                    advisory body text, not a loud notice. */}
+                <p className="font-montserrat text-[12px] sm:text-[13px] italic leading-relaxed text-sett-text-secondary">
+                  {t.addHotel.searchTypicallyTakes}
+                </p>
+
+                {/* Mobile scroll hint — same logic, stacks below on small screens */}
                 {searchSummary && searchSummary.hotelsFound > 0 && (
-                  <div className="hidden md:flex items-center gap-1 text-sett-primary shrink-0">
+                  <div className="flex md:hidden items-center justify-center gap-1 text-sett-primary">
                     <ChevronDown className="w-4 h-4 animate-bounce" />
-                    <span className="font-montserrat text-[13px] font-medium whitespace-nowrap">{t.addHotel.scrollToPreview}</span>
+                    <span className="font-montserrat text-[13px] font-medium">{t.addHotel.scrollToPreview}</span>
                   </div>
                 )}
               </div>
-
-              {/* Mobile: scroll hint below on small screens */}
-              {searchSummary && searchSummary.hotelsFound > 0 && (
-                <div className="flex md:hidden items-center justify-center gap-1 mt-3 text-sett-primary">
-                  <ChevronDown className="w-4 h-4 animate-bounce" />
-                  <span className="font-montserrat text-[13px] font-medium">{t.addHotel.scrollToPreview}</span>
-                </div>
-              )}
             </div>
           );
         })()}
@@ -1859,54 +1901,30 @@ export default function AddHotelPage() {
               </div>
             </div>
 
-            {/* Right hotel cards skeleton */}
-            <div className="flex-1 min-w-0 xl-wide:overflow-y-auto xl-wide:pr-1 space-y-4">
-              {[1, 2, 3].map((n) => (
-                <div key={n} className="bg-white rounded-[14px] border border-sett-border-light overflow-hidden animate-pulse">
-                  <div className="flex flex-col sm:flex-row">
-                    {/* Image placeholder */}
-                    <div className="sm:w-[220px] sm:shrink-0 h-[160px] sm:h-auto bg-sett-border" />
-
-                    {/* Content */}
-                    <div className="flex-1 p-5 flex flex-col gap-3">
-                      {/* Hotel name + stars */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-2 flex-1">
-                          <div className="h-5 w-2/3 rounded bg-sett-border" />
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((s) => (
-                              <div key={s} className="w-3.5 h-3.5 rounded bg-sett-border" />
-                            ))}
-                          </div>
-                        </div>
-                        <div className="h-6 w-16 rounded-full bg-sett-border shrink-0" />
-                      </div>
-
-                      {/* Location */}
-                      <div className="flex items-center gap-2">
-                        <div className="w-3.5 h-3.5 rounded bg-sett-border shrink-0" />
-                        <div className="h-3.5 w-1/3 rounded bg-sett-border" />
-                      </div>
-
-                      {/* Description lines */}
-                      <div className="space-y-1.5">
-                        <div className="h-3 w-full rounded bg-sett-border" />
-                        <div className="h-3 w-5/6 rounded bg-sett-border" />
-                        <div className="h-3 w-3/4 rounded bg-sett-border" />
-                      </div>
-
-                      {/* Price + button row */}
-                      <div className="flex items-center justify-between mt-auto pt-2 border-t border-sett-border-light">
-                        <div className="space-y-1">
-                          <div className="h-3 w-16 rounded bg-sett-border" />
-                          <div className="h-6 w-24 rounded bg-sett-border" />
-                        </div>
-                        <div className="h-9 w-28 rounded-[10px] bg-sett-border" />
-                      </div>
-                    </div>
+            {/* Right side — single "awaiting first result" placeholder
+                instead of the old 3-card shimmer. The progress panel
+                above already tells the story (phase + counter + bar);
+                three shimmering cards on top of that read as redundant
+                noise during a 1–5 min wait.
+                One quiet placeholder + a narrative line that explains
+                exactly what's happening keeps the column from looking
+                empty without competing with the progress panel for
+                attention. */}
+            <div className="flex-1 min-w-0 xl-wide:overflow-y-auto xl-wide:pr-1">
+              <div className="bg-white rounded-[14px] border border-dashed border-sett-border-light p-6 flex flex-col items-center justify-center gap-3 text-center min-h-[200px]">
+                <div aria-hidden className="relative inline-flex items-center justify-center">
+                  <span className="absolute w-10 h-10 rounded-full border border-sett-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
+                  <div className="relative z-10 w-8 h-8 rounded-full bg-sett-primary/10 border border-sett-primary/25 flex items-center justify-center">
+                    <Hotel className="text-sett-primary" style={{ width: 16, height: 16 }} />
                   </div>
                 </div>
-              ))}
+                <p className="font-montserrat text-[14px] font-medium text-sett-text-primary">
+                  {t.addHotel.searchAwaitingFirst}
+                </p>
+                <p className="font-montserrat text-[12px] italic text-sett-text-secondary max-w-[360px] leading-relaxed">
+                  {t.addHotel.searchTypicallyTakes}
+                </p>
+              </div>
             </div>
           </div>
         )}
