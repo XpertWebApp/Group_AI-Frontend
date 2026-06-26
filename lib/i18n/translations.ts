@@ -648,6 +648,11 @@ export const translations = {
       capacityConfirmed: 'Available',
       capacityLimited: 'Limited Capacity',
       capacityInsufficient: 'Not enough rooms',
+      // ── Limited-Capacity detail block (per BE handover staff-margin-toggle.md follow-up)
+      // {x} = roomsAllocated, {y} = total rooms requested.
+      capacityXofY: '{x} of {y} rooms available across our suppliers.',
+      capacityConfirmPrompt: 'Confirm remaining capacity with the hotel before booking.',
+      capacityOverlapWarning: 'Some supplier inventory may overlap — actual availability could be lower.',
       // ── Backend warning banners (hotel.note) ──
       // Templated strings: {placeholders} get filled in by the FE localizer
       // which pattern-matches the English BE string and pulls the
@@ -985,9 +990,17 @@ export const translations = {
       destination: 'Destination',
       checkIn: 'Check-in',
       checkOut: 'Check-out',
-      checkInOut: 'Check In/Out',
+      checkInOut: 'CHECKIN/OUT',
       guests: 'Guests',
       hotelDetails: 'Hotel Details',
+      // Hotel-card chrome — matches the BE PDF layout per
+      // public/hotecards.txt. Free-cancellation pill, address line,
+      // facility chips, and the SETTHub deep-link tooltip on the
+      // hotel-name link.
+      freeCancellation: 'Free Cancellation',
+      cancelBefore: 'Cancel before',
+      facilities: 'Facilities',
+      viewOnSettHub: 'View on SETTHub',
       roomType: 'Room Type',
       net: 'Net',
       sell: 'Sell',
@@ -1203,6 +1216,101 @@ export const translations = {
       editingHint: 'Editing {lang} version — Cancel to discard, Save to apply.',
       clickToEdit: 'Click to edit',
       readOnly: 'Read-only',
+    },
+
+    // ── Cancellation Override (per-hotel override modal) ──
+    cancellationOverride: {
+      editTitle: 'Edit cancellation deadline',
+      modalTitle: 'Edit cancellation deadline',
+      supplierLabel: 'Supplier:',
+      overrideTo: 'Override to',
+      constraintHint: 'Must be earlier than the supplier deadline. Staff can promise an earlier cancellation date than the supplier, never later.',
+      datePickerLabel: 'New cancellation date',
+      save: 'Save',
+      cancel: 'Cancel',
+      clearOverride: 'Clear override',
+      saving: 'Saving…',
+      // Error messages keyed off the BE errorCode field
+      errorTooLate: 'This is later than the supplier\'s deadline. Pick a date before {supplierDate}.',
+      errorInPast: 'Date cannot be in the past.',
+      errorNotModifiable: 'This proposal can no longer be edited. The cancellation deadline can only be changed while the proposal is in draft.',
+      errorLocked: 'Another user is editing this proposal. Try again in a moment.',
+      errorNotFound: 'Hotel not found on this proposal — refresh and try again.',
+      errorGeneric: 'Could not update the cancellation deadline. Please try again.',
+      // Audit-line copy
+      overrideActiveSince: 'override since',
+      toastOverrideSaved: 'Cancellation deadline updated',
+      toastOverrideCleared: 'Cancellation deadline reset to supplier date',
+    },
+
+    // ── Payment Deadline (proposal-level, required pre-send) ──
+    paymentDeadline: {
+      // Pill in the Hotels section header
+      pillLabel: 'Payment due',
+      pillNotSet: 'Payment deadline not set',
+      pillNotSetHint: 'Required before sending',
+      editTitle: 'Set payment deadline',
+      // Modal
+      modalTitle: 'Set payment deadline',
+      modalSubtitle: 'This is the date the customer must pay by. It appears in the offer PDF and customer email.',
+      earliestCxlLabel: 'Earliest cancellation deadline on this proposal:',
+      pickerLabel: 'Payment due by',
+      constraintHint: 'Must be earlier than the earliest cancellation deadline so the customer pays before any hotel\'s free-cancellation window closes.',
+      noHotelsHint: 'Add at least one hotel before setting the payment deadline.',
+      save: 'Save',
+      cancel: 'Cancel',
+      clearDeadline: 'Clear deadline',
+      // BE error mapping
+      errorAfterCxl: 'This is on or after the earliest cancellation deadline ({earliestCxl}). Pick an earlier date.',
+      errorInPast: 'Date cannot be in the past.',
+      errorNotModifiable: 'This proposal can no longer be edited. The payment deadline can only be changed while the proposal is in draft.',
+      errorLocked: 'Another user is editing this proposal. Try again in a moment.',
+      errorNotFound: 'Proposal not found — refresh and try again.',
+      errorGeneric: 'Could not update the payment deadline. Please try again.',
+      // Audit + toasts
+      lastUpdated: 'Last updated {when}',
+      toastSaved: 'Payment deadline updated',
+      toastCleared: 'Payment deadline cleared',
+      // Send-Offer gate tooltip (when paymentDeadline is null on a post-cutover proposal)
+      sendBlockedTooltip: 'Set a payment deadline before sending the offer.',
+      // Reactive 400 PAYMENT_DEADLINE_REQUIRED toast
+      sendBlockedToast: 'Set a payment deadline on this proposal before sending. The customer-facing PDF and email both display "Payment due by …" and cannot be sent without it.',
+    },
+
+    // ── Nationality (Create / Edit Request) ──
+    nationality: {
+      label: 'Nationality',
+      placeholder: 'Select nationality…',
+      searchPlaceholder: 'Search by name or code…',
+      loading: 'Loading nationalities…',
+      unavailable: 'Nationality list unavailable',
+      unavailableHint: 'Could not load the nationality list. Please refresh and try again.',
+      noResults: 'No matching nationalities.',
+      clear: 'Clear selection',
+      required: 'Please pick a nationality before submitting.',
+      legacyNote: 'This request was created before the nationality field was required. Pick a nationality so future searches use the correct WBE rate card.',
+      // 400 NATIONALITY_REQUIRED from hotel search
+      searchBlockedTitle: 'Nationality required',
+      searchBlockedAction: 'Edit Request',
+    },
+
+    // ── Margin Toggle (staff-only price breakdown on hotel cards) ──
+    marginToggle: {
+      show: 'View margin',
+      hide: 'Hide margin',
+      staffBanner: 'Staff view — not shown to customer',
+      netRate: 'Net rate per room/night',
+      markup: 'Markup applied',
+      sellRate: 'Sell rate per room/night',
+      marginPerNight: 'Margin per room/night',
+      totalMargin: 'Total margin',
+      // Tooltip on the "Margin applied" line — Neha's mock shows
+      // "(configurable in Settings)" as a small hint.
+      markupHint: 'configurable in Settings',
+      // Edge-case warning (sell < net — shouldn't be possible)
+      negativeMarginWarning: 'Margin is negative — flag to BE',
+      // Sub-line for total margin showing the multipliers
+      totalMarginBreakdown: '{rooms} rooms × {nights} nights',
     },
 
     // ── Supplier Limits ──
@@ -1856,6 +1964,10 @@ export const translations = {
       capacityConfirmed: 'Verfügbar',
       capacityLimited: 'Begrenzte Kapazität',
       capacityInsufficient: 'Nicht genügend Zimmer',
+      // ── Detail-Block für Begrenzte Kapazität
+      capacityXofY: '{x} von {y} Zimmern bei unseren Lieferanten verfügbar.',
+      capacityConfirmPrompt: 'Bitte vor der Buchung die verbleibende Kapazität beim Hotel bestätigen.',
+      capacityOverlapWarning: 'Manche Lieferantenbestände könnten sich überschneiden — die tatsächliche Verfügbarkeit kann niedriger sein.',
       // ── Backend-Warnbanner (hotel.note) ──
       noteInventoryOverlapDetected: 'Bestandsüberschneidung festgestellt — Lieferantenangaben ({totalSupplierClaim}) übersteigen die verifizierte Hotelkapazität ({dbTotalRooms}). Effektive Kapazität auf {effectiveCapacity} begrenzt.',
       noteMultipleSuppliers: 'Mehrere Lieferanten gefunden ({uniqueSuppliersCount}) — Zuteilung um {percent}% reduziert, um mögliche Bestandsüberschneidungen zwischen Kanälen zu berücksichtigen. Gesamtkapazität bitte direkt beim Hotel prüfen.',
@@ -2178,9 +2290,14 @@ export const translations = {
       destination: 'Reiseziel',
       checkIn: 'Check-in',
       checkOut: 'Check-out',
-      checkInOut: 'Check-in/out',
+      checkInOut: 'CHECK-IN/OUT',
       guests: 'Gäste',
       hotelDetails: 'Hoteldetails',
+      // Hotelkarten-Chrom — entspricht dem BE-PDF-Layout.
+      freeCancellation: 'Kostenlose Stornierung',
+      cancelBefore: 'Stornierung bis',
+      facilities: 'Ausstattung',
+      viewOnSettHub: 'Im SETTHub anzeigen',
       roomType: 'Zimmertyp',
       net: 'Netto',
       sell: 'Verkauf',
@@ -2396,6 +2513,88 @@ export const translations = {
       editingHint: '{lang}-Version wird bearbeitet — Abbrechen verwirft, Speichern übernimmt.',
       clickToEdit: 'Zum Bearbeiten klicken',
       readOnly: 'Nur lesen',
+    },
+
+    // ── Stornierungs-Override (Modal pro Hotel) ──
+    cancellationOverride: {
+      editTitle: 'Stornofrist bearbeiten',
+      modalTitle: 'Stornofrist bearbeiten',
+      supplierLabel: 'Lieferant:',
+      overrideTo: 'Override auf',
+      constraintHint: 'Muss vor der Lieferanten-Frist liegen. Mitarbeiter können dem Kunden eine frühere Stornierung als der Lieferant zusichern, niemals eine spätere.',
+      datePickerLabel: 'Neues Stornierungsdatum',
+      save: 'Speichern',
+      cancel: 'Abbrechen',
+      clearOverride: 'Override entfernen',
+      saving: 'Wird gespeichert…',
+      errorTooLate: 'Dies liegt nach der Lieferanten-Frist. Bitte vor dem {supplierDate} wählen.',
+      errorInPast: 'Das Datum darf nicht in der Vergangenheit liegen.',
+      errorNotModifiable: 'Dieses Angebot kann nicht mehr bearbeitet werden. Die Stornofrist kann nur im Entwurfsstatus geändert werden.',
+      errorLocked: 'Ein anderer Nutzer bearbeitet dieses Angebot gerade. Bitte kurz warten.',
+      errorNotFound: 'Hotel wurde im Angebot nicht gefunden — bitte neu laden.',
+      errorGeneric: 'Stornofrist konnte nicht aktualisiert werden. Bitte erneut versuchen.',
+      overrideActiveSince: 'Override seit',
+      toastOverrideSaved: 'Stornofrist aktualisiert',
+      toastOverrideCleared: 'Stornofrist auf Lieferantendatum zurückgesetzt',
+    },
+
+    // ── Zahlungsfrist (auf Angebotsebene, vor dem Versand erforderlich) ──
+    paymentDeadline: {
+      pillLabel: 'Zahlungsfrist',
+      pillNotSet: 'Zahlungsfrist nicht festgelegt',
+      pillNotSetHint: 'Vor dem Versand erforderlich',
+      editTitle: 'Zahlungsfrist festlegen',
+      modalTitle: 'Zahlungsfrist festlegen',
+      modalSubtitle: 'Bis zu diesem Datum muss der Kunde bezahlen. Es erscheint im Angebot-PDF und in der Kunden-E-Mail.',
+      earliestCxlLabel: 'Früheste Stornofrist auf diesem Angebot:',
+      pickerLabel: 'Fällig am',
+      constraintHint: 'Muss vor der frühesten Stornofrist liegen, damit der Kunde zahlt, bevor das kostenlose Stornofenster eines Hotels schließt.',
+      noHotelsHint: 'Bitte mindestens ein Hotel hinzufügen, bevor die Zahlungsfrist festgelegt wird.',
+      save: 'Speichern',
+      cancel: 'Abbrechen',
+      clearDeadline: 'Frist entfernen',
+      errorAfterCxl: 'Dies liegt am oder nach der frühesten Stornofrist ({earliestCxl}). Bitte ein früheres Datum wählen.',
+      errorInPast: 'Das Datum darf nicht in der Vergangenheit liegen.',
+      errorNotModifiable: 'Dieses Angebot kann nicht mehr bearbeitet werden. Die Zahlungsfrist kann nur im Entwurfsstatus geändert werden.',
+      errorLocked: 'Ein anderer Nutzer bearbeitet dieses Angebot gerade. Bitte kurz warten.',
+      errorNotFound: 'Angebot nicht gefunden — bitte neu laden.',
+      errorGeneric: 'Zahlungsfrist konnte nicht aktualisiert werden. Bitte erneut versuchen.',
+      lastUpdated: 'Zuletzt aktualisiert {when}',
+      toastSaved: 'Zahlungsfrist aktualisiert',
+      toastCleared: 'Zahlungsfrist entfernt',
+      sendBlockedTooltip: 'Bitte eine Zahlungsfrist festlegen, bevor das Angebot versendet wird.',
+      sendBlockedToast: 'Bitte eine Zahlungsfrist auf diesem Angebot festlegen, bevor es versendet wird. Das Kunden-PDF und die E-Mail zeigen jeweils "Fällig am …" und können ohne dieses Datum nicht versendet werden.',
+    },
+
+    // ── Nationalität (Anfrage erstellen / bearbeiten) ──
+    nationality: {
+      label: 'Nationalität',
+      placeholder: 'Nationalität auswählen…',
+      searchPlaceholder: 'Nach Name oder Code suchen…',
+      loading: 'Nationalitäten werden geladen…',
+      unavailable: 'Nationalitätsliste nicht verfügbar',
+      unavailableHint: 'Nationalitätsliste konnte nicht geladen werden. Bitte aktualisieren und erneut versuchen.',
+      noResults: 'Keine passenden Nationalitäten.',
+      clear: 'Auswahl löschen',
+      required: 'Bitte vor dem Absenden eine Nationalität auswählen.',
+      legacyNote: 'Diese Anfrage wurde erstellt, bevor das Nationalitätsfeld erforderlich war. Bitte eine Nationalität auswählen, damit zukünftige Suchen die richtige WBE-Tarifkarte verwenden.',
+      searchBlockedTitle: 'Nationalität erforderlich',
+      searchBlockedAction: 'Anfrage bearbeiten',
+    },
+
+    // ── Margen-Umschalter (mitarbeiterinterne Preisaufschlüsselung) ──
+    marginToggle: {
+      show: 'Marge anzeigen',
+      hide: 'Marge ausblenden',
+      staffBanner: 'Mitarbeiteransicht — wird dem Kunden nicht gezeigt',
+      netRate: 'Nettorate pro Zimmer/Nacht',
+      markup: 'Angewendeter Aufschlag',
+      sellRate: 'Verkaufsrate pro Zimmer/Nacht',
+      marginPerNight: 'Marge pro Zimmer/Nacht',
+      totalMargin: 'Gesamtmarge',
+      markupHint: 'konfigurierbar in den Einstellungen',
+      negativeMarginWarning: 'Marge ist negativ — bitte BE melden',
+      totalMarginBreakdown: '{rooms} Zimmer × {nights} Nächte',
     },
 
     // ── Lieferantenlimits ──

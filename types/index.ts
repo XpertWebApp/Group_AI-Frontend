@@ -164,6 +164,17 @@ export interface Proposal {
   updatedAt?: string | null;
   hotels?: ProposalHotel[];
   services?: ProposalService[];
+  /** Customer-facing payment deadline (ISO end-of-day). Required for
+   *  proposals created on/after 2026-06-26 — Send Offer is blocked
+   *  until set. Renders into the PDF "Payment Details" block and the
+   *  customer email body. Null for legacy proposals and for drafts
+   *  where staff hasn't picked yet. Per BE handover
+   *  public/payment-deadline.md §2.1. */
+  paymentDeadline?: string | null;
+  /** User UUID of the staff member who last set the deadline. */
+  paymentDeadlineSetBy?: string | null;
+  /** ISO timestamp of the last update. */
+  paymentDeadlineSetAt?: string | null;
 }
 
 export interface ProposalHotel {
@@ -176,7 +187,22 @@ export interface ProposalHotel {
   totalPrice: number;
   currency: string;
   freeCancellation?: boolean;
+  /** Supplier's cancellation deadline (ISO). Source of truth — never edited by staff. */
   cancelDeadline?: string | null;
+  /** Staff-set override (ISO or null). Must be strictly earlier than
+   *  `cancelDeadline`. Use the PATCH /proposals/:pid/hotels/:hid/cancellation
+   *  endpoint via [[proposalsApi-updateHotelCancellation]] to mutate. */
+  cancelDeadlineOverride?: string | null;
+  /** User UUID of the staff member who set the override (null when no
+   *  override active). Resolve to display name via the staff cache —
+   *  for now we don't render the name. */
+  cancelDeadlineOverriddenBy?: string | null;
+  /** ISO timestamp when the override was last set. */
+  cancelDeadlineOverriddenAt?: string | null;
+  /** BE-derived field: the override if present, otherwise the supplier
+   *  date. Every display surface (PDF, badges, emails) reads THIS field
+   *  — never the raw `cancelDeadline` directly. */
+  effectiveCancelDeadline?: string | null;
   supplierCode?: string | null;
   rooms?: Record<string, { net: number; sell: number; qty: number; nights: number }> | null;
   latitude?: number | null;
@@ -192,6 +218,13 @@ export interface ProposalHotel {
   sethubDetailsUrl?: string | null;
   createdAt: string;
   includedInTotal?: boolean;
+  /** PDF-card enrichment shipped by BE proposal endpoint
+   *  (`proposals/:id` response, post-2026-06 deploy). All three fields
+   *  are optional so the FE preview renders correctly before / after the
+   *  BE enrichment lands — every consumer must `?? null`-guard. */
+  imageUrl?: string | null;
+  description?: string | null;
+  facilities?: string[] | null;
 }
 
 export interface ProposalService {
@@ -284,6 +317,12 @@ export interface HotelSearchResult {
   highestMidRangePrice: number;
   roomsAllocated: number;
   capacityStatus?: 'CONFIRMED' | 'LIMITED' | 'INSUFFICIENT';
+  /** True when supplier inventory feeds may overlap (so the rooms shown
+   *  across suppliers could be the same physical rooms double-counted).
+   *  Drives the extra muted "Some supplier inventory may overlap…" line
+   *  on the Limited Capacity badge per public/staff-margin-toggle.md
+   *  follow-up. */
+  inventoryOverlapFlag?: boolean | null;
   cxlDeadline?: string | null;
   latitude?: number | null;
   longitude?: number | null;

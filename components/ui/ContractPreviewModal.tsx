@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Download } from 'lucide-react';
+import { X, Download, MapPin } from 'lucide-react';
 import { ModalOverlay } from './ModalOverlay';
 import { proposalsApi } from '@/lib/api/proposals';
 import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
@@ -96,6 +96,26 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
     return () => { cancelled = true; };
   }, [open]);
 
+  // Language-aware hotel descriptions. The parent loaded the proposal in
+  // whatever language was active at mount; toggling the picker mid-modal
+  // needs a re-fetch with ?language= so the BE returns the right GIATA
+  // description text. Image URLs, names, and facility lists don't depend
+  // on locale, so they're the same on every fetch — we only swap the
+  // proposal reference for the description-aware view.
+  const [localisedProposal, setLocalisedProposal] = useState<Proposal | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    proposalsApi.get(proposal.id, previewLang)
+      .then((data) => { if (!cancelled && data) setLocalisedProposal(data); })
+      .catch(() => { /* silent — fall back to the parent's proposal */ });
+    return () => { cancelled = true; };
+  }, [open, proposal.id, previewLang]);
+
+  // Prefer the locale-aware copy when it's loaded for the active language.
+  // Falls back to the parent-supplied proposal during the in-flight window.
+  const activeProposal = localisedProposal ?? proposal;
+
   const termsHtml =
     (previewLang === 'de' ? policies?.termsConditionsDe : policies?.termsConditionsEn)
     ?? request.termsAndConditions
@@ -104,8 +124,8 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
     (previewLang === 'de' ? policies?.cancellationConditionsDe : policies?.cancellationConditionsEn)
     ?? request.cancellationConditions
     ?? '';
-  const hotels = (proposal.hotels ?? []).filter((h) => h.includedInTotal !== false);
-  const services = (proposal.services ?? []).filter((sv) => sv.includedInTotal !== false);
+  const hotels = (activeProposal.hotels ?? []).filter((h) => h.includedInTotal !== false);
+  const services = (activeProposal.services ?? []).filter((sv) => sv.includedInTotal !== false);
   // rooms not directly referenced — guest count comes from request.groupSize.
   void (request.rooms as RoomsConfig | null | undefined);
   const contactName = [request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—';
@@ -130,6 +150,11 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
   const grandTotal = hotelTotal + serviceTotal;
 
   const documentCode = `${request.referenceNumber ?? request.id.slice(0, 8)}/${new Date(request.createdAt).getFullYear()}`;
+
+  // Payment-due date — 30 days before checkout, matching the BE PDF.
+  const paymentDueDate = request.checkoutDate
+    ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
+    : null;
 
   return (
     <ModalOverlay open={open} onClose={onClose}>
@@ -191,7 +216,23 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               className="flex items-center justify-between px-8 py-6"
               style={{ background: '#071c42' }}
             >
-              <img src="/icons/sett_logo.svg" alt="SETT" style={{ height: 36 }} />
+              {/* Header logo — "24 H GROUP OFFER" badge per BE PDF.
+                  Falls back to the standard SETT wordmark while the
+                  badge asset is being delivered (see public/icons/
+                  README — drop the dedicated SVG and it auto-upgrades). */}
+              <img
+                src="/icons/24h-group-offer.svg"
+                alt="24 H Group Offer"
+                style={{ height: 56 }}
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  if (el.dataset.fallback !== 'true') {
+                    el.dataset.fallback = 'true';
+                    el.src = '/icons/sett_logo.svg';
+                    el.style.height = '36px';
+                  }
+                }}
+              />
               <div className="flex flex-col items-end" style={{ gap: 4 }}>
                 <span
                   className="font-montserrat uppercase"
@@ -276,103 +317,25 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               </div>
             </div>
 
-            {/* ─────────── §6.1 HOTEL DETAILS TABLE — navy header, clean body ─────────── */}
+            {/* ─────────── HOTEL DETAILS — full BE-PDF card layout
+                Per public/hotecards.txt: image (160×120), star rating,
+                full address with map-pin, 3-line description, facility
+                chips, free-cancellation pill (top-right), reservation
+                reference in card footer. Card has a green left-accent
+                border, 1px outline, and rounded corners. ─────────── */}
             {hotels.length > 0 && (
               <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
                 <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
                   {t.contract.hotelDetails}
                 </h3>
 
-                {hotels.map((hotel) => {
-                  const roomEntries = hotel.rooms
-                    ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
-                    : [];
-                  const subtotal = roomEntries.reduce(
-                    (sum, [, d]) => sum + Number(d.sell ?? 0) * (d.qty ?? 1) * (d.nights ?? 1),
-                    0,
-                  );
-                  return (
-                    <div key={hotel.id} className="mb-5 last:mb-0">
-                      {/* Hotel name + Reference */}
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-montserrat font-bold text-[14px] text-sett-navy">
-                          {hotel.hotelName ?? hotel.hotelCode}
-                        </span>
-                        {(hotel.hotelRef || hotel.tid) && (
-                          <span className="font-montserrat text-[12px] text-sett-grey">
-                            <span className="font-semibold">{t.contract.reservationRef}</span>{' '}
-                            <span>{hotel.hotelRef ?? hotel.tid ?? `#${hotel.id.slice(0, 8)}`}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      {roomEntries.length > 0 ? (
-                        <div style={{ borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
-                          {/* Navy header row */}
-                          <div className="flex items-center px-4 py-3" style={{ background: '#071c42' }}>
-                            <span className="flex-1 font-montserrat font-bold text-[11px] uppercase text-white" style={{ letterSpacing: '0.05em' }}>
-                              {t.contract.roomType}
-                            </span>
-                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 80, letterSpacing: '0.05em' }}>
-                              {t.contract.sell}
-                            </span>
-                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 55, letterSpacing: '0.05em' }}>
-                              {t.contract.qty}
-                            </span>
-                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 65, letterSpacing: '0.05em' }}>
-                              {t.contract.nights}
-                            </span>
-                            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 100, letterSpacing: '0.05em' }}>
-                              {t.contract.total}
-                            </span>
-                          </div>
-
-                          {/* Body rows */}
-                          {roomEntries.map(([type, detail], idx) => {
-                            const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
-                            return (
-                              <div
-                                key={type}
-                                className="flex items-center px-4 py-3"
-                                style={{ borderTop: idx === 0 ? 'none' : '1px solid #E0E0E0' }}
-                              >
-                                <span className="flex-1 font-montserrat text-[13px] text-sett-navy">
-                                  {getRoomLabel(type, detail, t.addHotel)}
-                                </span>
-                                <span className="font-montserrat text-[13px] text-sett-navy text-right" style={{ width: 80 }}>
-                                  €{formatPriceEU(detail.sell ?? 0)}
-                                </span>
-                                <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 55 }}>
-                                  {detail.qty ?? 1}
-                                </span>
-                                <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 65 }}>
-                                  {detail.nights ?? 1}
-                                </span>
-                                <span className="font-montserrat font-bold text-[13px] text-sett-navy text-right" style={{ width: 100 }}>
-                                  €{formatPriceEU(rowTotal)}
-                                </span>
-                              </div>
-                            );
-                          })}
-
-                          {/* Subtotal */}
-                          <div className="flex items-center justify-end px-4 py-3" style={{ borderTop: '1px solid #E0E0E0', background: '#F8F9FA' }}>
-                            <span className="font-montserrat font-semibold text-[12px] uppercase text-sett-grey mr-4" style={{ letterSpacing: '0.05em' }}>
-                              {t.contract.subtotal}
-                            </span>
-                            <span className="font-montserrat font-bold text-[14px] text-sett-navy text-right" style={{ width: 100 }}>
-                              €{formatPriceEU(subtotal)}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="font-montserrat text-[13px] text-sett-grey">
-                          {t.contract.total}: {formatCurrencyEU(hotel.totalPrice, hotel.currency)}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                {hotels.map((hotel) => (
+                  <HotelCard
+                    key={hotel.id}
+                    hotel={hotel}
+                    t={t}
+                  />
+                ))}
               </div>
             )}
 
@@ -468,6 +431,43 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               </span>
             </div>
 
+            {/* ─────────── PAYMENT DETAILS — matches BE PDF
+                Payment-due pill (green-bg, green border) on top, bank-
+                details table beneath. Re-added 2026-06-04 so the FE
+                preview matches the downloadable BE PDF byte-for-byte;
+                an earlier removal made the preview disagree with what
+                the customer ultimately receives. ─────────── */}
+            <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+              <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                {t.contract.paymentDetails}
+              </h3>
+
+              {/* Payment-due pill */}
+              <div
+                className="px-4 py-3 mb-4 rounded-[4px]"
+                style={{ background: '#F5F9E8', border: '1px solid #C8E050' }}
+              >
+                <p className="font-montserrat text-[13px] text-sett-navy">
+                  {t.contract.payPrompt}{' '}
+                  <span className="font-bold">€{formatPriceEU(grandTotal)}</span>{' '}
+                  {t.contract.payBy}{' '}
+                  <span className="font-bold">
+                    {paymentDueDate
+                      ? paymentDueDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : '—'}
+                  </span>.
+                </p>
+              </div>
+
+              {/* Bank-details table */}
+              <div style={{ borderRadius: 4, border: '1px solid #E0E0E0', overflow: 'hidden' }}>
+                <BankRow label={t.contract.bankName} value="Emirates NBD" />
+                <BankRow label={t.contract.accountHolder} value="S-E-T-T Worldwide Reservation FZE" />
+                <BankRow label={t.contract.iban} value="AE12 0260 0010 1234 5678 901" />
+                <BankRow label={t.contract.swiftBic} value="EBILAEAD" isLast />
+              </div>
+            </div>
+
             {/* ─────────── CANCELLATION CONDITIONS ─────────── */}
             {cancellationHtml && (
               <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
@@ -497,12 +497,30 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
             {/* §8.2 — thin green line above footer text */}
             <div aria-hidden style={{ height: 2, background: '#AAC737' }} />
 
-            {/* ─────────── §6.1 FOOTER — green bar with legal + issued by ─────────── */}
-            <div className="flex items-end justify-between px-8 py-5" style={{ background: '#071c42' }}>
-              <p className="font-montserrat text-[10px] leading-relaxed text-white opacity-80 max-w-[520px]">
-                {t.contract.footerLegal}
-              </p>
-              <div className="flex flex-col items-end">
+            {/* ─────────── FOOTER — navy band with SETT logo, legal copy,
+                and "Issued By" panel per the BE PDF. ─────────── */}
+            <div className="flex items-start justify-between px-8 py-5 gap-6" style={{ background: '#071c42' }}>
+              <div className="flex-1 min-w-0">
+                {/* SETT footer wordmark — same fallback pattern as the
+                    header. Drop public/icons/sett-footer-logo.svg (green
+                    SETT wordmark on transparent) and it auto-upgrades. */}
+                <img
+                  src="/icons/sett-footer-logo.svg"
+                  alt="SETT"
+                  style={{ height: 28, marginBottom: 10 }}
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    if (el.dataset.fallback !== 'true') {
+                      el.dataset.fallback = 'true';
+                      el.src = '/icons/sett_logo.svg';
+                    }
+                  }}
+                />
+                <p className="font-montserrat text-[10px] leading-relaxed text-white opacity-80 max-w-[520px]">
+                  {t.contract.footerLegal}
+                </p>
+              </div>
+              <div className="flex flex-col items-end shrink-0">
                 <span
                   className="font-montserrat uppercase"
                   style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: '#AAC737' }}
@@ -534,6 +552,325 @@ function MetaRow({ label, value }: { label: string; value: string }) {
       <div className="font-montserrat text-[13px] font-normal text-sett-navy mt-0.5">
         {value}
       </div>
+    </div>
+  );
+}
+
+/* ─── Label/value row inside the bank-details table ─── */
+function BankRow({ label, value, isLast }: { label: string; value: string; isLast?: boolean }) {
+  return (
+    <div
+      className="flex items-center px-4 py-2.5"
+      style={{ borderBottom: isLast ? 'none' : '1px solid #E0E0E0' }}
+    >
+      <span
+        className="font-montserrat uppercase"
+        style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', color: '#686868', width: 180 }}
+      >
+        {label}
+      </span>
+      <span className="font-montserrat text-[13px] font-semibold text-sett-navy flex-1">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/* ─── Star rating row — ★★★☆☆ pattern. Renders 5 stars; first
+ *  `rating` are filled green, rest are empty grey. Null/0 → nothing. */
+function StarRating({ rating }: { rating: number | null | undefined }) {
+  if (!rating || rating < 1) return null;
+  const filled = Math.min(5, Math.max(0, Math.round(rating)));
+  return (
+    <div aria-label={`${filled} of 5 stars`} className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className="font-montserrat text-[14px] leading-none"
+          style={{ color: i < filled ? '#AAC737' : '#D0D0D0' }}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Hotel image slot — 160×120 box with three states:
+ *
+ *  1. No URL provided  → dashed-border placeholder + tooltip explaining
+ *     the BE enrichment block hasn't shipped yet (or `imageUrl` is null
+ *     for this hotel). Same look as the BE PDF's "no image" state.
+ *  2. URL provided, loading  → solid-border box, light grey fill.
+ *  3. URL provided, load failed (404, CSP block, CORS, etc.) → falls
+ *     back to state 1 with a different tooltip so it's diagnosable at
+ *     a glance: hover the box and you see what went wrong.
+ *
+ *  Designer note: a blank box is information too. The tooltip + dashed
+ *  border tell staff "this isn't a bug, the image just isn't available
+ *  yet" without polluting the preview with intrusive copy. */
+function HotelImage({ src, alt }: { src: string | null; alt: string }) {
+  const [errored, setErrored] = useState(false);
+  const showImage = !!src && !errored;
+
+  const tooltip = !src
+    ? 'No image available for this hotel yet'
+    : errored
+      ? `Image failed to load: ${src}`
+      : '';
+
+  return (
+    <div
+      className="shrink-0 overflow-hidden bg-[#F8F9FA]"
+      title={tooltip || undefined}
+      style={{
+        width: 160,
+        height: 120,
+        borderRadius: 4,
+        border: showImage ? '1px solid #E0E0E0' : '1px dashed #C0C0C0',
+      }}
+    >
+      {showImage && src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/* ─── Hotel card — full BE-PDF spec.
+ *  Left-column: 160×120 image (dashed placeholder if no image yet — the
+ *  imageUrl field lands in a BE deploy per public/hotecards.txt).
+ *  Right-column: name (clickable to SETTHub), stars, address with map-
+ *  pin, description (3-line clamped), facility chips. Free-cancellation
+ *  pill anchored top-right. Room table beneath. Reservation Ref. in the
+ *  card footer. The card has a green left-accent border + soft outline. */
+function HotelCard({
+  hotel,
+  t,
+}: {
+  hotel: import('@/types').ProposalHotel;
+  t: ReturnType<typeof useLanguage>['t'];
+}) {
+  const roomEntries = hotel.rooms
+    ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
+    : [];
+  const subtotal = roomEntries.reduce(
+    (sum, [, d]) => sum + Number(d.sell ?? 0) * (d.qty ?? 1) * (d.nights ?? 1),
+    0,
+  );
+
+  const addressLine = [hotel.address, hotel.addressCity, hotel.addressCountry]
+    .filter((s): s is string => !!s && s.trim().length > 0)
+    .join(', ');
+
+  // Free-cancellation deadline — BE sends ISO; render dd.mm.yyyy.
+  // Use the BE-derived effectiveCancelDeadline so the badge ALWAYS
+  // reflects what the customer will see — override when staff has set
+  // one, supplier date otherwise. Fall back to the raw supplier field
+  // for older proposal payloads that pre-date the cancellation override
+  // BE deploy (public/cancellation-override-fe-handover.md §2.1).
+  const cancelDate = hotel.effectiveCancelDeadline
+    ? formatDateEU(hotel.effectiveCancelDeadline)
+    : hotel.cancelDeadline
+      ? formatDateEU(hotel.cancelDeadline)
+      : null;
+
+  // Facilities — top-3 in BE's brand-priority order (already sorted upstream).
+  // BE already caps facilities at 3 in brand-priority order per Neha's
+  // deploy spec — slice is defensive belt-and-braces (in case any older
+  // legacy proposals ever come back with longer lists).
+  const facilities = (hotel.facilities ?? []).slice(0, 3);
+
+  // Hotel name — clickable when SETTHub URL is present. Link opens in
+  // a new tab; never embed external nav inline.
+  const hotelName = hotel.hotelName ?? hotel.hotelCode;
+  const nameEl = hotel.sethubDetailsUrl ? (
+    <a
+      href={hotel.sethubDetailsUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={t.contract.viewOnSettHub}
+      className="font-montserrat font-bold text-[16px] text-sett-navy hover:text-sett-green-dark hover:underline transition-colors"
+    >
+      {hotelName}
+    </a>
+  ) : (
+    <span className="font-montserrat font-bold text-[16px] text-sett-navy">
+      {hotelName}
+    </span>
+  );
+
+  return (
+    <div
+      className="mb-5 last:mb-0 bg-white"
+      style={{
+        borderRadius: 4,
+        border: '1px solid #E0E0E0',
+        borderLeft: '3px solid #071c42',
+        overflow: 'hidden',
+      }}
+    >
+      {/* ── Top section: image + meta + free-cancel pill ── */}
+      <div className="flex gap-4 p-4 relative">
+        <HotelImage src={hotel.imageUrl ?? null} alt={hotelName} />
+
+        {/* Right column — name, stars, address, description, chips */}
+        <div className="flex-1 min-w-0 pr-[160px]">
+          {/* Name + stars */}
+          <div className="flex flex-col gap-1">
+            {nameEl}
+            <StarRating rating={hotel.starRating ?? null} />
+          </div>
+
+          {/* Address — pin icon + comma-joined line */}
+          {addressLine && (
+            <div className="flex items-start gap-1.5 mt-2">
+              <MapPin className="w-3.5 h-3.5 text-sett-primary shrink-0 mt-0.5" aria-hidden />
+              <span className="font-montserrat text-[13px] text-sett-navy leading-snug">
+                {addressLine}
+              </span>
+            </div>
+          )}
+
+          {/* Description — 3-line clamp via webkit; comes from BE
+              enrichment (master.HotelGiataText). Conditional. */}
+          {hotel.description && (
+            <p
+              className="font-montserrat text-[12px] text-sett-grey leading-relaxed mt-2"
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {hotel.description}
+            </p>
+          )}
+
+          {/* Facility chips — pill row, max 4 in BE's priority order */}
+          {facilities.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {facilities.map((f) => (
+                <span
+                  key={f}
+                  className="inline-flex items-center px-3 py-1 rounded-full font-montserrat text-[11px] font-semibold text-sett-navy border border-sett-primary"
+                  style={{ background: 'rgba(170,199,55,0.08)' }}
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Free-cancellation pill — anchored top-right of the card top
+            section, matching the BE PDF placement. */}
+        {hotel.freeCancellation && (
+          <div
+            className="absolute top-4 right-4 inline-flex flex-col items-end px-3 py-1.5 rounded-[6px]"
+            style={{
+              background: 'rgba(170,199,55,0.10)',
+              border: '1px solid #AAC737',
+            }}
+          >
+            <span className="font-montserrat font-bold text-[12px] text-sett-green-dark whitespace-nowrap">
+              ✓ {t.contract.freeCancellation}
+            </span>
+            {cancelDate && (
+              <span className="font-montserrat text-[11px] text-sett-navy whitespace-nowrap mt-0.5">
+                {t.contract.cancelBefore} {cancelDate}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Room table (or fallback) ── */}
+      {roomEntries.length > 0 ? (
+        <div style={{ borderTop: '1px solid #E0E0E0' }}>
+          {/* Navy header row */}
+          <div className="flex items-center px-4 py-3" style={{ background: '#071c42' }}>
+            <span className="flex-1 font-montserrat font-bold text-[11px] uppercase text-white" style={{ letterSpacing: '0.05em' }}>
+              {t.contract.roomType}
+            </span>
+            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 80, letterSpacing: '0.05em' }}>
+              {t.contract.sell}
+            </span>
+            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 55, letterSpacing: '0.05em' }}>
+              {t.contract.qty}
+            </span>
+            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-center" style={{ width: 65, letterSpacing: '0.05em' }}>
+              {t.contract.nights}
+            </span>
+            <span className="font-montserrat font-bold text-[11px] uppercase text-white text-right" style={{ width: 100, letterSpacing: '0.05em' }}>
+              {t.contract.total}
+            </span>
+          </div>
+
+          {/* Body rows */}
+          {roomEntries.map(([type, detail], idx) => {
+            const rowTotal = Number(detail.sell ?? 0) * (detail.qty ?? 1) * (detail.nights ?? 1);
+            return (
+              <div
+                key={type}
+                className="flex items-center px-4 py-3"
+                style={{ borderTop: idx === 0 ? 'none' : '1px solid #E0E0E0' }}
+              >
+                <span className="flex-1 font-montserrat text-[13px] text-sett-navy">
+                  {getRoomLabel(type, detail, t.addHotel)}
+                </span>
+                <span className="font-montserrat text-[13px] text-sett-navy text-right" style={{ width: 80 }}>
+                  €{formatPriceEU(detail.sell ?? 0)}
+                </span>
+                <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 55 }}>
+                  {detail.qty ?? 1}
+                </span>
+                <span className="font-montserrat text-[13px] text-sett-navy text-center" style={{ width: 65 }}>
+                  {detail.nights ?? 1}
+                </span>
+                <span className="font-montserrat font-bold text-[13px] text-sett-navy text-right" style={{ width: 100 }}>
+                  €{formatPriceEU(rowTotal)}
+                </span>
+              </div>
+            );
+          })}
+
+          {/* Subtotal */}
+          <div className="flex items-center justify-end px-4 py-3" style={{ borderTop: '1px solid #E0E0E0', background: '#F8F9FA' }}>
+            <span className="font-montserrat font-semibold text-[12px] uppercase text-sett-grey mr-4" style={{ letterSpacing: '0.05em' }}>
+              {t.contract.subtotal}
+            </span>
+            <span className="font-montserrat font-bold text-[14px] text-sett-navy text-right" style={{ width: 100 }}>
+              €{formatPriceEU(subtotal)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className="px-4 py-3 font-montserrat text-[13px] text-sett-grey" style={{ borderTop: '1px solid #E0E0E0' }}>
+          {t.contract.total}: {formatCurrencyEU(hotel.totalPrice, hotel.currency)}
+        </p>
+      )}
+
+      {/* ── Card footer: Reservation Ref. — bottom-right per BE PDF ── */}
+      {(hotel.hotelRef || hotel.tid) && (
+        <div
+          className="flex items-center justify-end px-4 py-2"
+          style={{ background: '#F8F9FA' }}
+        >
+          <span className="font-montserrat text-[12px] text-sett-grey">
+            <span className="font-bold text-sett-navy">{t.contract.reservationRef}</span>{' '}
+            <span>{hotel.hotelRef ?? hotel.tid ?? `#${hotel.id.slice(0, 8)}`}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

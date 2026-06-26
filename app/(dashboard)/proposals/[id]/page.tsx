@@ -13,6 +13,8 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { proposalsApi } from '@/lib/api/proposals';
 import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
 import { SendOfferDualPreviewModal, type SendOfferResult } from '@/components/ui/SendOfferDualPreviewModal';
+import { EditPaymentDeadlineModal } from '@/components/ui/EditPaymentDeadlineModal';
+import { isPaymentDeadlineRequired, isPaymentDeadlineRequiredError } from '@/lib/utils/paymentDeadlineGate';
 import { useDefaultMarkup } from '@/hooks/useDefaultMarkup';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { formatDateEU } from '@/lib/dateFormatter';
@@ -35,6 +37,11 @@ export default function ProposalPage() {
   const [addHotelOpen, setAddHotelOpen] = useState(false);
   const [addServiceOpen, setAddServiceOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  /** Per BE handover public/payment-deadline.md — opens the payment
+   *  deadline editor pre-emptively when Send is clicked while the gate
+   *  is active. Also accessible directly from the Hotels section pill
+   *  on the booking-request detail page. */
+  const [paymentEditOpen, setPaymentEditOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ type: 'hotel' | 'service'; id: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   // Odoo gate (§2.3) — opened reactively when the BE returns 400 ODOO_CONTACT_REQUIRED.
@@ -399,13 +406,34 @@ export default function ProposalPage() {
         >
           Lock
         </Button>
-        <Button
-          variant="primary"
-          onClick={() => setSendOpen(true)}
-          disabled={actionLoading || isLocked}
-        >
-          Send
-        </Button>
+        {(() => {
+          // Same payment-deadline gate as the booking-request detail
+          // page. Clicking when blocked opens the payment editor as a
+          // pre-emptive guide; tooltip explains why the button is
+          // disabled while the gate is active.
+          const sendBlockedByPayment = isPaymentDeadlineRequired(proposal);
+          const handleClick = () => {
+            if (sendBlockedByPayment) {
+              setPaymentEditOpen(true);
+              return;
+            }
+            setSendOpen(true);
+          };
+          return (
+            <span
+              title={sendBlockedByPayment ? t.paymentDeadline.sendBlockedTooltip : undefined}
+              className="contents"
+            >
+              <Button
+                variant="primary"
+                onClick={handleClick}
+                disabled={actionLoading || isLocked || sendBlockedByPayment}
+              >
+                Send
+              </Button>
+            </span>
+          );
+        })()}
       </div>
 
       <AddHotelModal
@@ -446,6 +474,19 @@ export default function ProposalPage() {
           initialRecipients={[]}
           onSent={handleAfterSend}
           onClose={() => setSendOpen(false)}
+        />
+      )}
+      {/* Payment-deadline editor — merge BE response onto local proposal
+          so the Send-button gate flips off the moment a deadline lands. */}
+      {proposal && (
+        <EditPaymentDeadlineModal
+          open={paymentEditOpen}
+          onClose={() => setPaymentEditOpen(false)}
+          proposal={proposal}
+          onSaved={(updatedProposal) => {
+            setProposal((p) => p ? { ...p, ...updatedProposal } : updatedProposal);
+            setPaymentEditOpen(false);
+          }}
         />
       )}
     </div>

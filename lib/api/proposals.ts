@@ -17,8 +17,20 @@ export const proposalsApi = {
     return data.data;
   },
 
-  async get(id: string): Promise<Proposal | null> {
-    const { data } = await apiClient.get<ApiResponse<Proposal>>(`/proposals/${id}`);
+  /**
+   * Fetch a proposal by id.
+   *
+   * Optional `language` toggles the BE's GIATA hotel-description language
+   * on `proposal.hotels[i].description` (defaults to `en`). Pass `'de'`
+   * when the staff member is previewing the German PDF so the inline
+   * preview matches the downloadable PDF byte-for-byte.
+   *
+   * Image URLs, facility lists, hotel names — none of those depend on
+   * language. Only the description text is locale-aware.
+   */
+  async get(id: string, language?: 'en' | 'de'): Promise<Proposal | null> {
+    const url = language ? `/proposals/${id}?language=${language}` : `/proposals/${id}`;
+    const { data } = await apiClient.get<ApiResponse<Proposal>>(url);
     if (!data.success || !data.data) return null;
     return data.data;
   },
@@ -60,6 +72,65 @@ export const proposalsApi = {
       { includedInTotal }
     );
     if (!data.success || !data.data) throw new Error(data.message || 'Failed to update hotel inclusion');
+    return data.data;
+  },
+
+  /**
+   * Set or clear the staff cancellation-deadline override for a hotel
+   * on a proposal. Pass `null` to clear (revert to supplier's date).
+   * Per BE handover (public/cancellation-override-fe-handover.md):
+   *   - Override MUST be strictly earlier than the supplier's date
+   *     (BE rejects later overrides with 400 CXL_OVERRIDE_TOO_LATE)
+   *   - Override cannot be in the past (400 CXL_OVERRIDE_IN_PAST)
+   *   - Proposal must be in draft (409 PROPOSAL_NOT_MODIFIABLE otherwise)
+   *
+   * Returns the updated ProposalHotel row with refreshed
+   * effectiveCancelDeadline so the caller can patch local state without
+   * a follow-up GET.
+   */
+  async updateHotelCancellation(
+    proposalId: string,
+    hotelId: string,
+    cancelDeadlineOverride: string | null,
+  ): Promise<ProposalHotel> {
+    const { data } = await apiClient.patch<ApiResponse<ProposalHotel>>(
+      `/proposals/${proposalId}/hotels/${hotelId}/cancellation`,
+      { cancelDeadlineOverride },
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to update cancellation deadline');
+    }
+    return data.data;
+  },
+
+  /**
+   * Set or clear the customer-facing payment deadline on a proposal.
+   * Pass `null` to clear (Send Offer becomes blocked again on
+   * post-cutover proposals).
+   *
+   * Per BE handover (public/payment-deadline.md):
+   *   - Must be strictly earlier than the earliest cancellation deadline
+   *     across all hotels (400 PAYMENT_DEADLINE_AFTER_CANCELLATION)
+   *   - Cannot be in the past (400 PAYMENT_DEADLINE_IN_PAST)
+   *   - Proposal must be in draft (409 PROPOSAL_NOT_MODIFIABLE otherwise)
+   *
+   * Returns the updated Proposal row so the caller can patch local
+   * state without a follow-up GET. Note: BE response may be a partial
+   * (handover §2.2 says "...rest of the Proposal row" but doesn't
+   * guarantee every field) — callers should merge onto the existing
+   * proposal, matching the cancellation-override pattern.
+   */
+  async updatePaymentDeadline(
+    proposalId: string,
+    paymentDeadline: string | null,
+  ): Promise<Proposal> {
+    const { data } = await apiClient.patch<ApiResponse<Proposal>>(
+      `/proposals/${proposalId}/payment-deadline`,
+      { paymentDeadline },
+    );
+    if (!data.success || !data.data) {
+      throw new Error(data.message || 'Failed to update payment deadline');
+    }
     return data.data;
   },
 

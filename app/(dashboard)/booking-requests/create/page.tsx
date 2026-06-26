@@ -15,6 +15,7 @@ import { RoomCounter } from '@/components/ui/RoomCounter';
 import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
 import { Spinner } from '@/components/ui/Loader';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { NationalityPicker } from '@/components/ui/NationalityPicker';
 import { cn } from '@/lib/utils/cn';
 import { destinationsApi, getCountryName } from '@/lib/api/destinations';
 import type { Destination } from '@/lib/api/destinations';
@@ -44,6 +45,9 @@ interface FormData {
   groupType: string;
   groupSize: string;
   averageAge: number | '';
+  /** WBE ISO-like nationality code (e.g. 'DE'). Required by the BE per
+   *  public/nationality-change-fe.md to stop the silent 'HU' default. */
+  nationalityCode: string | null;
   // Step 2: Room & Accommodations
   singleRooms: number;
   doubleRooms: number;
@@ -82,6 +86,7 @@ const defaultFormData: FormData = {
   groupType: '',
   groupSize: '',
   averageAge: '',
+  nationalityCode: null,
   singleRooms: 0,
   doubleRooms: 0,
   standardDoubleBeds: 0,
@@ -265,6 +270,9 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
       } else if (Number(data.averageAge) < AVERAGE_AGE_MIN || Number(data.averageAge) > AVERAGE_AGE_MAX) {
         errors.averageAge = t.createForm.averageAgeInvalid;
       }
+    }
+    if (!data.nationalityCode) {
+      errors.nationalityCode = t.nationality.required;
     }
   }
 
@@ -567,6 +575,9 @@ function CreateBookingRequestPageInner() {
           ? Number(formData.averageAge)
           : undefined,
         currencyCode: 'EUR',
+        // BE now requires nationality (no more silent 'HU' default).
+        // The form blocks Submit when this is null, so the cast is safe.
+        nationalityCode: formData.nationalityCode!,
         // Step 2: Room & Accommodations
         rooms: {
           single: formData.singleRooms,
@@ -1299,6 +1310,27 @@ function TripDetailsStep({ formData, updateField, errors }: StepProps) {
             </div>
           </div>
         )}
+
+        {/* Nationality — required per BE handover
+            (public/nationality-change-fe.md). Stops the silent WBE
+            default-to-Hungarian rate-card bug. Pinned to the bottom of
+            Step 1 so it sits with other trip-shaping fields rather than
+            with customer data. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 mt-1">
+          <div className="animate-field-fade-in" style={{ animationDelay: '120ms' }}>
+            <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+              {t.nationality.label} <span className="text-sett-destructive">*</span>
+            </label>
+            <NationalityPicker
+              value={formData.nationalityCode}
+              onChange={(code) => updateField('nationalityCode', code)}
+              hasError={!!errors.nationalityCode}
+            />
+            {errors.nationalityCode && (
+              <p className="mt-1 text-caption text-red-500">{errors.nationalityCode}</p>
+            )}
+          </div>
+        </div>
       </div>
     </>
   );

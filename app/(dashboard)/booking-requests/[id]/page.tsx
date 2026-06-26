@@ -27,6 +27,7 @@ import {
   History,
   Inbox,
   Sparkles,
+  Pencil,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
@@ -38,8 +39,12 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SuccessModal } from '@/components/ui/SuccessModal';
 import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { ContractPreviewModal } from '@/components/ui/ContractPreviewModal';
+import { EditCancellationDeadlineModal } from '@/components/ui/EditCancellationDeadlineModal';
+import { EditPaymentDeadlineModal } from '@/components/ui/EditPaymentDeadlineModal';
+import { MarginToggle } from '@/components/ui/MarginToggle';
 import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
 import { isOdooLinkRequired, isOdooContactRequiredError } from '@/lib/utils/odooGate';
+import { isPaymentDeadlineRequired, isPaymentDeadlineRequiredError } from '@/lib/utils/paymentDeadlineGate';
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -200,6 +205,9 @@ export default function RequestDetailPage() {
   // post-cutover offer without linking an Odoo company (§2.3).
   const [odooGateOpen, setOdooGateOpen] = useState(false);
   const [odooGateMessage, setOdooGateMessage] = useState<string | undefined>(undefined);
+  // Proposal-level payment-deadline editor — opens from the pill in the
+  // Hotels section header. Per BE handover public/payment-deadline.md.
+  const [paymentEditOpen, setPaymentEditOpen] = useState(false);
   const [selectedHotelsForBreakdown, setSelectedHotelsForBreakdown] = useState<Set<string>>(new Set());
 
   const toggleHotelBreakdownSelection = (hotelId: string) => {
@@ -1209,10 +1217,73 @@ export default function RequestDetailPage() {
               {/* Hotels */}
               <div>
                 <div
-                  className="flex items-center justify-between mb-4 animate-sidebar-fade-up"
+                  className="flex items-center justify-between gap-3 mb-4 animate-sidebar-fade-up flex-wrap"
                   style={{ animationDelay: '320ms' }}
                 >
-                  <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.offer.hotels}</h3>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">{t.offer.hotels}</h3>
+                    {/* Payment Deadline pill — proposal-level, surfaces
+                        next to the Hotels heading per UX call. Hidden
+                        when no hotels (per BE handover §3.3 + user
+                        decision to suppress until first hotel is added).
+                        Two states:
+                          1. paymentDeadline set → green pill with date
+                          2. paymentDeadline null → amber pill with
+                             "Required before sending"
+                        Edit pencil opens the modal in both states; gated
+                        on proposalStatus === 'draft' (matches the cancel
+                        modifiability rule the BE enforces). */}
+                    {proposal && hotels.length > 0 && (() => {
+                      const status = (proposal.status ?? request.status).toLowerCase();
+                      const canEdit = status === 'draft';
+                      const hasDeadline = !!proposal.paymentDeadline;
+                      return (
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-2 px-3 py-1 rounded-full border',
+                            hasDeadline
+                              ? 'bg-sett-primary/10 border-sett-primary/40'
+                              : 'bg-amber-50 border-amber-300',
+                          )}
+                        >
+                          <span className={cn(
+                            'font-montserrat text-[11px] font-semibold uppercase tracking-[0.05em]',
+                            hasDeadline ? 'text-sett-green-dark' : 'text-amber-700',
+                          )}>
+                            {t.paymentDeadline.pillLabel}:
+                          </span>
+                          <span className={cn(
+                            'font-montserrat text-[12px] font-medium',
+                            hasDeadline ? 'text-sett-navy' : 'text-amber-800',
+                          )}>
+                            {hasDeadline
+                              ? new Date(proposal.paymentDeadline!).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })
+                              : t.paymentDeadline.pillNotSetHint}
+                          </span>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => setPaymentEditOpen(true)}
+                              className={cn(
+                                'inline-flex items-center justify-center w-5 h-5 rounded-full transition-colors',
+                                hasDeadline
+                                  ? 'text-sett-green-dark hover:bg-sett-primary hover:text-sett-navy'
+                                  : 'text-amber-700 hover:bg-amber-200',
+                              )}
+                              title={t.paymentDeadline.editTitle}
+                              aria-label={t.paymentDeadline.editTitle}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
                   <Button
                     variant="primary"
                     size="sm"
@@ -1745,11 +1816,19 @@ export default function RequestDetailPage() {
                          mark a definitive version regardless of history. */}
                   {(() => {
                     const sendBlockedByOdoo = isOdooLinkRequired(request);
+                    const sendBlockedByPayment = isPaymentDeadlineRequired(proposal);
                     const statusBlocked = ['declined', 'cancelled', 'completed'].includes((proposal?.status ?? request.status).toLowerCase());
                     const openSendModal = () => {
                       if (sendBlockedByOdoo) {
                         setOdooGateMessage(undefined);
                         setOdooGateOpen(true);
+                        return;
+                      }
+                      if (sendBlockedByPayment) {
+                        // Pre-emptive — clicking a payment-deadline-blocked
+                        // Send opens the payment editor instead of throwing
+                        // the user a toast. Once set, retrying enables Send.
+                        setPaymentEditOpen(true);
                         return;
                       }
                       const status = (proposal?.status ?? request.status).toLowerCase();
@@ -1759,16 +1838,25 @@ export default function RequestDetailPage() {
                       }
                       setSendOpen(true);
                     };
+                    // Tooltip precedence: Odoo (existing) > Payment (new).
+                    // Both gates render the disabled-state tooltip; the
+                    // status-blocked case doesn't need one (the proposal
+                    // is terminal — no action to recover with).
+                    const tooltip = sendBlockedByOdoo
+                      ? t.odooPicker.sendBlockedTooltip
+                      : sendBlockedByPayment
+                        ? t.paymentDeadline.sendBlockedTooltip
+                        : undefined;
                     return (
                       <span
-                        title={sendBlockedByOdoo ? t.odooPicker.sendBlockedTooltip : undefined}
+                        title={tooltip}
                         className={cn('contents')}
                       >
                         <Button
                           variant="primary"
                           size="sm"
                           onClick={openSendModal}
-                          disabled={statusBlocked || sendBlockedByOdoo}
+                          disabled={statusBlocked || sendBlockedByOdoo || sendBlockedByPayment}
                         >
                           <Send className="w-4 h-4" />
                           {offerHistory.length === 0
@@ -1779,7 +1867,7 @@ export default function RequestDetailPage() {
                           variant="primary"
                           size="sm"
                           onClick={openSendModal}
-                          disabled={statusBlocked || sendBlockedByOdoo}
+                          disabled={statusBlocked || sendBlockedByOdoo || sendBlockedByPayment}
                         >
                           <Send className="w-4 h-4" />
                           {t.offer.sendFinalOffer}
@@ -1893,6 +1981,22 @@ export default function RequestDetailPage() {
             onOpenRequest={() => setEditRequestOpen(true)}
             bodyOverride={odooGateMessage}
           />
+
+          {/* Payment-deadline editor — proposal-level. Merge the BE
+              response onto the existing proposal so any fields the
+              partial response omits aren't lost (same pattern as the
+              cancellation-override save). */}
+          {proposal && (
+            <EditPaymentDeadlineModal
+              open={paymentEditOpen}
+              onClose={() => setPaymentEditOpen(false)}
+              proposal={proposal}
+              onSaved={(updatedProposal) => {
+                setProposal((p) => p ? { ...p, ...updatedProposal } : updatedProposal);
+                setPaymentEditOpen(false);
+              }}
+            />
+          )}
 
           <ConfirmModal
             open={declineOpen}
@@ -2180,6 +2284,10 @@ function HotelCard({
   const [saving, setSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRoomsRef = useRef<RoomData>((hotel.rooms as RoomData) ?? {});
+  // Per-hotel state for the cancellation-deadline override modal.
+  // Local to each HotelCard so opening one card's modal doesn't disturb
+  // the others rendered in the same list.
+  const [cancelEditOpen, setCancelEditOpen] = useState(false);
 
   // Sync local rooms only when the hotel identity changes (not on every price update)
   const hotelIdRef = useRef(hotel.id);
@@ -2408,13 +2516,87 @@ function HotelCard({
       {roomEntries.length > 0 ? (
         <>
           {/* Location bar — sits above the table column headers (desktop)
-              and above the first room card (mobile) */}
-          {locationLine && (
-            <div className="bg-[#F7F7F7] h-[33px] px-5 flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-[#767676] shrink-0" aria-hidden />
-              <span className="font-montserrat text-[14px] font-normal leading-none text-[#767676] truncate">
-                {locationLine}
-              </span>
+              and above the first room card (mobile).
+              §UX: pairs the address (where the hotel is) with the
+              free-cancellation chip (when you can cancel) on the same
+              line — both are hotel-level metadata, so visually they
+              belong together. The cancellation chip used to live below
+              the price table; surfacing it here shortens the card and
+              cleans up the post-table area so totals read uninterrupted.
+              The bar can grow vertically when the override audit subline
+              appears, hence min-h instead of fixed h. */}
+          {(locationLine || (hotel.freeCancellation && (hotel.effectiveCancelDeadline || hotel.cancelDeadline))) && (
+            <div className="bg-[#F7F7F7] min-h-[33px] px-5 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              {/* Left — address */}
+              {locationLine ? (
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <MapPin className="w-3.5 h-3.5 text-[#767676] shrink-0" aria-hidden />
+                  <span className="font-montserrat text-[14px] font-normal leading-none text-[#767676] truncate">
+                    {locationLine}
+                  </span>
+                </div>
+              ) : <span />}
+
+              {/* Right — free-cancellation chip + audit subline when override active */}
+              {hotel.freeCancellation && (hotel.effectiveCancelDeadline || hotel.cancelDeadline) && (
+                <div className="flex flex-col items-end shrink-0">
+                  {/* Chip — soft green tint pill, pencil sits inside the
+                      chip so its hit area reads as 'edit this thing'. */}
+                  <div
+                    className="inline-flex items-center gap-1.5 rounded-full pl-2.5 pr-1 py-0.5 border"
+                    style={{
+                      background: 'rgba(170,199,55,0.10)',
+                      borderColor: 'rgba(170,199,55,0.55)',
+                    }}
+                  >
+                    <span className="font-montserrat text-[12px] font-semibold leading-none text-sett-green-dark whitespace-nowrap">
+                      {t.offer.freeCancellation}{' '}
+                      {new Date(
+                        hotel.effectiveCancelDeadline ?? hotel.cancelDeadline!,
+                      ).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    {['draft'].includes(proposalStatus.toLowerCase()) && hotel.cancelDeadline && (
+                      <button
+                        type="button"
+                        onClick={() => setCancelEditOpen(true)}
+                        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-sett-green-dark hover:bg-sett-primary hover:text-sett-navy transition-colors"
+                        title={t.cancellationOverride.editTitle}
+                        aria-label={t.cancellationOverride.editTitle}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Audit subline — appears only when override is set.
+                      Right-aligned to track the chip above it. Same content
+                      as the prior post-table audit line; reading order
+                      unchanged so screen readers stay coherent. */}
+                  {hotel.cancelDeadlineOverride && hotel.cancelDeadline && (
+                    <p className="text-[10px] text-sett-text-accent mt-0.5 whitespace-nowrap">
+                      {t.cancellationOverride.supplierLabel}{' '}
+                      {new Date(hotel.cancelDeadline).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                      {hotel.cancelDeadlineOverriddenAt && (
+                        <>
+                          {' · '}
+                          {t.cancellationOverride.overrideActiveSince}{' '}
+                          {new Date(hotel.cancelDeadlineOverriddenAt).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                          })}
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <div className="hidden md:block overflow-x-auto">
@@ -2551,19 +2733,9 @@ function HotelCard({
         </div>
       )}
 
-      {/* Cancellation info */}
-      {hotel.freeCancellation && hotel.cancelDeadline && (
-        <div className="px-4 py-2 border-t border-sett-border/50">
-          <p className="text-caption text-sett-primary font-medium">
-            {t.offer.freeCancellation}{' '}
-            {new Date(hotel.cancelDeadline).toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </p>
-        </div>
-      )}
+      {/* Cancellation badge moved into the location bar above —
+          §UX: pairs hotel-level metadata (address + cancellation) on a
+          single line, frees the post-table area for clean totals. */}
 
       {/* Hotel Breakdown — Total Sell */}
       <div className="px-4 py-3 border-t border-sett-border/50 bg-[#F9FAFB]">
@@ -2576,7 +2748,80 @@ function HotelCard({
             )
           )}</span>
         </div>
+        {/* Staff margin toggle — aggregate net/sell across all room
+            types into per-night averages so the toggle stays a single
+            block per hotel card (per BE handover §3.2 mock). The card
+            already exposes per-type markup via the inline MarkupDropdown
+            on each room row, so this surfaces the rolled-up picture
+            staff need for the Hub price comparison. */}
+        {(() => {
+          const roomEntries = Object.values(
+            hotel.rooms as Record<string, { net: number; sell: number; qty: number; nights: number }> || {},
+          );
+          if (roomEntries.length === 0) return null;
+          const totalRoomsNights = roomEntries.reduce(
+            (sum, d) => sum + (Number(d.qty) || 0) * (Number(d.nights) || 0),
+            0,
+          );
+          if (totalRoomsNights <= 0) return null;
+          const totalNet = roomEntries.reduce(
+            (sum, d) => sum + Number(d.net ?? 0) * (Number(d.qty) || 0) * (Number(d.nights) || 0),
+            0,
+          );
+          const totalSell = roomEntries.reduce(
+            (sum, d) => sum + Number(d.sell ?? 0) * (Number(d.qty) || 0) * (Number(d.nights) || 0),
+            0,
+          );
+          // Convert weighted totals into per-room/per-night values so the
+          // toggle's existing UI (which expects single numbers) renders
+          // correctly. The Margin Toggle re-multiplies by rooms × nights
+          // to surface the same totalSell - totalNet figure.
+          const avgNetPerNight = totalNet / totalRoomsNights;
+          const avgSellPerNight = totalSell / totalRoomsNights;
+          const totalRooms = roomEntries.reduce((sum, d) => sum + (Number(d.qty) || 0), 0);
+          // Use the modal nights (first entry's nights, since trip nights
+          // are uniform per-card). Safe fallback to 1.
+          const tripNights = roomEntries[0]?.nights ?? 1;
+          return (
+            <div className="mt-2">
+              <MarginToggle
+                sellPrice={avgSellPerNight}
+                netPrice={avgNetPerNight}
+                roomsAllocated={totalRooms || 1}
+                nights={tripNights}
+                currency={hotel.currency}
+              />
+            </div>
+          );
+        })()}
       </div>
+      {/* Cancellation-override modal — mounted at the card level so each
+          HotelCard owns its own modal instance. Saves PATCH and pipes the
+          updated row back through onPricingUpdate so totals + audit info
+          refresh without a parent re-fetch. */}
+      <EditCancellationDeadlineModal
+        open={cancelEditOpen}
+        onClose={() => setCancelEditOpen(false)}
+        proposalId={proposalId}
+        hotel={hotel}
+        onSaved={(updatedHotel) => {
+          // Two-step state patch:
+          //   1. Merge the BE patch onto the existing row so we don't lose
+          //      fields the PATCH response omits (rooms, hotelName, etc.).
+          //   2. Re-derive `effectiveCancelDeadline` client-side because
+          //      the BE PATCH endpoint doesn't include it in the response
+          //      shape (only the GET endpoint does). Rule mirrors BE:
+          //      override if set, supplier otherwise. Without this, the
+          //      stale `effectiveCancelDeadline` from before-the-save
+          //      survives the merge and the badge keeps showing the old
+          //      date until a full refresh forces a GET.
+          const merged: ProposalHotel = { ...hotel, ...updatedHotel };
+          merged.effectiveCancelDeadline =
+            merged.cancelDeadlineOverride ?? merged.cancelDeadline ?? null;
+          onPricingUpdate(hotel.id, merged);
+          setCancelEditOpen(false);
+        }}
+      />
     </div>
   );
 }

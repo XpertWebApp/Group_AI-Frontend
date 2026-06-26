@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { proposalsApi } from '@/lib/api/proposals';
 import { isOdooContactRequiredError } from '@/lib/utils/odooGate';
+import { isPaymentDeadlineRequiredError } from '@/lib/utils/paymentDeadlineGate';
 
 /**
  * Side-by-side Send Offer modal — bilingual preview + send.
@@ -290,6 +291,14 @@ export function SendOfferDualPreviewModal({
           // mounts the blocking dialog independently.
           const msg = (err.response?.data as { message?: string })?.message
             ?? 'Link the Odoo customer first.';
+          setSendError(msg);
+        } else if (isPaymentDeadlineRequiredError(err)) {
+          // Payment-deadline gate fired reactively — show the BE message
+          // verbatim plus the i18n action prompt. Pre-emptive blocking
+          // on the Send button should normally catch this before we get
+          // here, but the modal can race a stale proposal payload.
+          const msg = (err.response?.data as { message?: string })?.message
+            ?? t.paymentDeadline.sendBlockedToast;
           setSendError(msg);
         } else {
           const msg =

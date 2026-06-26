@@ -22,6 +22,7 @@ import { StarRating } from '@/components/ui/StarRating';
 import { HotelDetailModal } from '@/components/ui/HotelDetailModal';
 import { HotelName } from '@/components/ui/HotelName';
 import { ImageLightbox } from '@/components/ui/ImageLightbox';
+import { MarginToggle } from '@/components/ui/MarginToggle';
 import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -383,6 +384,10 @@ export default function AddHotelPage() {
     phase: HotelSearchPhase | null;
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  /** Set by the catch block when the BE returns `NATIONALITY_REQUIRED`.
+   *  Drives a dedicated error banner with an "Edit Request" CTA instead
+   *  of the generic retry button. Per BE handover §2.4. */
+  const [nationalityRequired, setNationalityRequired] = useState(false);
   const [addedHotels, setAddedHotels] = useState<Set<string>>(new Set());
   const [addingHotel, setAddingHotel] = useState<string | null>(null);
   const [relaxation, setRelaxation] = useState<HotelSearchInitResponse['relaxation']>(null);
@@ -939,6 +944,19 @@ export default function AddHotelPage() {
       startPollingFallback(requestId);
     } catch (err: unknown) {
       if (!mountedRef.current) return;
+      // Special-case the BE's NATIONALITY_REQUIRED 400 so the empty-state
+      // banner can offer a "Go to Request" CTA that points staff at the
+      // Edit Request modal where they can pick a nationality.
+      // Per BE handover §2.4: thrown when nationalityCode is null AND the
+      // request was created on/after 2026-06-26.
+      const axiosErr = err as { response?: { status?: number; data?: { code?: string; message?: string; errorCode?: string } } };
+      const code = axiosErr.response?.data?.code ?? axiosErr.response?.data?.errorCode;
+      if (code === 'NATIONALITY_REQUIRED') {
+        setNationalityRequired(true);
+        setErrorMsg(axiosErr.response?.data?.message ?? '');
+        setPhase('error');
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Hotel search failed';
       setErrorMsg(msg);
       setPhase('error');
@@ -954,6 +972,7 @@ export default function AddHotelPage() {
 
     setPhase('searching');
     setErrorMsg('');
+    setNationalityRequired(false);
     setCompletedResults([]);
     setSearchSummary(null);
     setCanSearchMore(false);
@@ -1515,6 +1534,25 @@ export default function AddHotelPage() {
   // sent by backend but isn't meaningful, so we don't render the badge.
   const isYouthOrSchoolGroup = groupTypeRequiresAge(request?.groupType);
 
+  // Total rooms requested (Y in the "X of Y rooms available" line on
+  // the Limited Capacity badge). Sums every numeric field on the
+  // RoomsConfig. Falls back to undefined when rooms aren't loaded yet
+  // so the badge detail block knows to skip the count line.
+  const totalRequestedRooms = (() => {
+    const r = request?.rooms;
+    if (!r) return undefined;
+    const sum =
+      (r.single ?? 0) +
+      (r.double ?? 0) +
+      (r.twin ?? 0) +
+      (r.triple ?? 0) +
+      (r.quadruple ?? 0) +
+      (r.suites ?? 0) +
+      (r.standardDoubleBeds ?? 0) +
+      (r.twinBeds ?? 0);
+    return sum > 0 ? sum : undefined;
+  })();
+
   // Sort by descending arrival order so newly-streamed hotels appear at the
   // top of each section. Cards that arrived together (same poll tick) tie-break
   // on their relative order within `completedResults`, which keeps groups stable.
@@ -1933,11 +1971,22 @@ export default function AddHotelPage() {
         {phase === 'error' && (
           <div className="bg-white rounded-[14px] border border-sett-border-light p-8 text-center animate-card-rise-in">
             <AlertTriangle className="w-10 h-10 text-sett-destructive mx-auto mb-3" />
-            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">{t.addHotel.searchFailed}</h3>
+            <h3 className="font-montserrat text-[18px] font-semibold text-sett-text-primary mb-2">
+              {nationalityRequired ? t.nationality.searchBlockedTitle : t.addHotel.searchFailed}
+            </h3>
             <p className="font-montserrat text-[14px] text-sett-text-accent mb-4">{errorMsg}</p>
-            <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
-              {t.addHotel.retrySearch}
-            </Button>
+            {nationalityRequired ? (
+              // Take staff back to the request detail page where the
+              // Edit Request modal lives. They can pick a nationality
+              // there, then re-launch the hotel search.
+              <Button variant="primary" onClick={() => router.push(`/booking-requests/${requestId}`)}>
+                {t.nationality.searchBlockedAction}
+              </Button>
+            ) : (
+              <Button variant="primary" onClick={() => runSearch(request?.destinationId)}>
+                {t.addHotel.retrySearch}
+              </Button>
+            )}
           </div>
         )}
 
@@ -2670,6 +2719,8 @@ export default function AddHotelPage() {
                             onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                             onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
                             showYouthFriendlyBadge={isYouthOrSchoolGroup}
+                            nights={request?.nights ?? 1}
+                            totalRequestedRooms={totalRequestedRooms}
                           />
                         </div>
                       ))}
@@ -2732,6 +2783,8 @@ export default function AddHotelPage() {
                               onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                               onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
                               showYouthFriendlyBadge={isYouthOrSchoolGroup}
+                              nights={request?.nights ?? 1}
+                              totalRequestedRooms={totalRequestedRooms}
                             />
                           </div>
                         ))}
@@ -2840,6 +2893,8 @@ export default function AddHotelPage() {
                                     onViewDetails={() => setDetailHotel({ hotelCode: hotel.hotelCode, hotelName: hotel.hotelName, sethubDetailsUrl: hotel.sethubDetailsUrl })}
                                     onImageClick={() => setLightboxImage({ srcs: getHotelImageChain(hotel), alt: hotel.hotelName })}
                                     showYouthFriendlyBadge={isYouthOrSchoolGroup}
+                                    nights={request?.nights ?? 1}
+                                    totalRequestedRooms={totalRequestedRooms}
                                   />
                                 </div>
                               ))}
@@ -3099,6 +3154,8 @@ function HotelResultCard({
   alternativeReason,
   onImageClick,
   showYouthFriendlyBadge = false,
+  nights,
+  totalRequestedRooms,
 }: {
   hotel: HotelSearchResult;
   isAdded: boolean;
@@ -3110,6 +3167,13 @@ function HotelResultCard({
   /** When true (i.e. the parent request is a youth/school group), render the
    *  "Youth-friendly" badge on cards where `hotel.youthFriendly === true`. */
   showYouthFriendlyBadge?: boolean;
+  /** Trip length in nights — multiplies into total margin in the staff
+   *  margin toggle. Falls back to 1 if absent. */
+  nights?: number;
+  /** Total rooms requested on the BookingRequest. Used to render the
+   *  "X of Y rooms available" line on the Limited Capacity badge per
+   *  public/staff-margin-toggle.md follow-up. */
+  totalRequestedRooms?: number;
 }) {
   const { t, locale } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
@@ -3241,7 +3305,13 @@ function HotelResultCard({
               >
                 <StarRating rating={Number(hotel.starRating)} size={18} />
                 {showCapacityBadge && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0">
+                  // §UX: tooltip surfaces the BE-supplied note verbatim
+                  // for power users; the X-of-Y count and action prompt
+                  // sit below the badge row for visibility without hover.
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0 cursor-help"
+                    title={hotel.note ?? undefined}
+                  >
                     <AlertTriangle className="w-3 h-3" />
                     {localizeCapacityStatus(hotel.capacityStatus, t.addHotel)}
                   </span>
@@ -3261,6 +3331,38 @@ function HotelResultCard({
                   </span>
                 )}
               </div>
+              {/* Limited Capacity detail block — per BE handover follow-up
+                  on staff-margin-toggle.md.
+                  Fires only for `LIMITED` (not `INSUFFICIENT`, where the
+                  card isn't bookable and the chip alone reads correctly).
+                  Three lines:
+                    1. "X of Y rooms available across our suppliers."
+                    2. "Confirm remaining capacity with the hotel..."
+                    3. (conditional) overlap warning when BE flagged it.
+                  All three muted, small, sit between the badge row and
+                  the Location block so they read as detail FOR the
+                  warning above them. */}
+              {isLimited && totalRequestedRooms && totalRequestedRooms > 0 && (
+                <div
+                  className="flex flex-col gap-0.5 mt-0.5 animate-sidebar-fade-up"
+                  style={{ animationDelay: '130ms' }}
+                >
+                  <p className="font-montserrat text-[12px] leading-snug text-sett-text-secondary">
+                    {t.addHotel.capacityXofY
+                      .replace('{x}', String(hotel.roomsAllocated ?? 0))
+                      .replace('{y}', String(totalRequestedRooms))}
+                  </p>
+                  <p className="font-montserrat text-[12px] leading-snug text-sett-text-secondary">
+                    {t.addHotel.capacityConfirmPrompt}
+                  </p>
+                  {hotel.inventoryOverlapFlag && (
+                    <p className="flex items-start gap-1 font-montserrat text-[11px] leading-snug text-sett-text-accent mt-0.5">
+                      <Info className="w-3 h-3 shrink-0 mt-0.5" aria-hidden />
+                      <span>{t.addHotel.capacityOverlapWarning}</span>
+                    </p>
+                  )}
+                </div>
+              )}
               {/* Location */}
               {(hotel.address || hotel.addressCity || hotel.addressCountry) && (
                 <div
@@ -3546,15 +3648,27 @@ function HotelResultCard({
             </div>
           )}
 
-          {/* ── Footer: View Details ── */}
+          {/* ── Footer: Margin toggle (left, staff-only) + View Details (right) ──
+              Margin toggle hidden on INSUFFICIENT cards — they aren't
+              bookable, so margin isn't actionable per BE handover §3.4. */}
           <div
-            className="flex items-center justify-end pt-3 mt-1 border-t border-sett-border-light animate-sidebar-fade-up"
+            className="flex items-start justify-between gap-3 pt-3 mt-1 border-t border-sett-border-light animate-sidebar-fade-up"
             style={{ animationDelay: '420ms' }}
           >
+            <div className="flex-1 min-w-0">
+              <MarginToggle
+                sellPrice={hotel.sellingPricePerRoomPerNight}
+                netPrice={hotel.highestMidRangePrice}
+                roomsAllocated={hotel.roomsAllocated || 1}
+                nights={nights ?? 1}
+                currency={hotel.currency}
+                disabled={isInsufficient}
+              />
+            </div>
             <button
               type="button"
               onClick={onViewDetails}
-              className="flex items-center gap-1.5 font-montserrat text-[13px] font-semibold text-sett-primary hover:underline transition-colors group"
+              className="shrink-0 flex items-center gap-1.5 font-montserrat text-[13px] font-semibold text-sett-primary hover:underline transition-colors group"
             >
               <Info className="w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-110" />
               {t.addHotel.viewDetails}

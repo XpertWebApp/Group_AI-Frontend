@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, forwardRef } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X, Info } from 'lucide-react';
 import { ModalOverlay } from '@/components/ui/ModalOverlay';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -25,6 +25,7 @@ import {
 import { selectedStars } from '@/lib/utils/starRatings';
 import { FreeCancellationDateBanner } from '@/components/ui/FreeCancellationDateBanner';
 import { OdooCompanyPicker } from '@/components/forms/OdooCompanyPicker';
+import { NationalityPicker } from '@/components/ui/NationalityPicker';
 import { Spinner } from '@/components/ui/Loader';
 import { cn } from '@/lib/utils/cn';
 import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
@@ -50,6 +51,9 @@ interface FormState {
   groupType: string;
   groupSize: string;
   averageAge: number | '';
+  /** WBE nationality code. Optional on the modal so legacy null rows
+   *  can be opened without forcing a save — the info note prompts. */
+  nationalityCode: string | null;
   single: number;
   double: number;
   triple: number;
@@ -202,6 +206,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     groupType: '',
     groupSize: '',
     averageAge: '',
+    nationalityCode: null,
     single: 0,
     double: 0,
     triple: 0,
@@ -305,6 +310,10 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         groupType: request.groupType ?? '',
         groupSize: request.groupSize?.toString() ?? '',
         averageAge: request.averageAge ?? '',
+        // Legacy null = the row was created before nationality was
+        // required. The picker handles the null case (placeholder shown,
+        // info note rendered) per BE handover §3.3.
+        nationalityCode: request.nationalityCode ?? null,
         single: r?.single ?? 0,
         // Backend often stores double:0 when standard/twin beds are used; derive total
         double: (r?.standardDoubleBeds || r?.twinBeds)
@@ -527,6 +536,9 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
         averageAge: groupTypeRequiresAge(form.groupType) && form.averageAge !== ''
           ? Number(form.averageAge)
           : undefined,
+        // Send only when the user actually picked one — keeps legacy
+        // null rows null until staff explicitly fixes them.
+        nationalityCode: form.nationalityCode ?? undefined,
         rooms: {
           single: form.single,
           double: 0,
@@ -953,6 +965,28 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 </div>
               </div>
             )}
+
+            {/* Nationality — required field for new requests. Legacy
+                rows opened with `null` show the info note explaining why
+                this matters (silent 'HU' default → wrong WBE rate card).
+                Per BE handover §3.3. */}
+            <div>
+              <label className={labelCls}>
+                {t.nationality.label} <span className="text-[#CC3333]">*</span>
+              </label>
+              <NationalityPicker
+                value={form.nationalityCode}
+                onChange={(code) => setField('nationalityCode', code)}
+              />
+              {request.nationalityCode == null && form.nationalityCode == null && (
+                <div className="mt-2 flex items-start gap-2 px-3 py-2 rounded-[8px] bg-[#E9EEFC] border border-[#ADBEF2]">
+                  <Info className="w-4 h-4 text-[#1D4ED8] shrink-0 mt-0.5" aria-hidden />
+                  <p className="font-montserrat text-[12px] text-[#1D4ED8] leading-snug">
+                    {t.nationality.legacyNote}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Room & Accommodations ── */}
