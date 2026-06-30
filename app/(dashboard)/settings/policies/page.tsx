@@ -8,12 +8,44 @@ import { Header } from '@/components/layout/Header';
 
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { translations } from '@/lib/i18n/translations';
 import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
 import { cn } from '@/lib/utils/cn';
 
 const EMPTY: PoliciesSettings = {
   termsConditionsEn: '', termsConditionsDe: '', cancellationConditionsEn: '', cancellationConditionsDe: '',
 };
+
+// Same i18n defaults the Create Request page uses to seed its inline
+// policies block. Pulled out as a module-level constant so fetchData
+// can replace empty BE values with these — that way the Policies page
+// reflects what the user actually sees applied in offers / requests,
+// instead of showing "—" while Create Request shows full bullet lists.
+// Without this, QA reported that clicking Edit Policies opened editors
+// with no previous text — when in reality those policies (the defaults)
+// were live everywhere else.
+const DEFAULT_POLICIES: PoliciesSettings = {
+  termsConditionsEn: translations.en.createForm.defaultTermsHtml,
+  termsConditionsDe: translations.de.createForm.defaultTermsHtml,
+  cancellationConditionsEn: translations.en.createForm.defaultCancellationHtml,
+  cancellationConditionsDe: translations.de.createForm.defaultCancellationHtml,
+};
+
+/**
+ * Replaces empty/whitespace-only fields in the BE response with the
+ * locale-matched default. Saved BE values always win — defaults only
+ * fill the gaps. Keeps each field independent so a user who has
+ * customised only EN doesn't get their DE customisation overwritten.
+ */
+function withDefaults(data: PoliciesSettings): PoliciesSettings {
+  const fill = (v: string, fallback: string) => (v && v.trim() ? v : fallback);
+  return {
+    termsConditionsEn: fill(data.termsConditionsEn, DEFAULT_POLICIES.termsConditionsEn),
+    termsConditionsDe: fill(data.termsConditionsDe, DEFAULT_POLICIES.termsConditionsDe),
+    cancellationConditionsEn: fill(data.cancellationConditionsEn, DEFAULT_POLICIES.cancellationConditionsEn),
+    cancellationConditionsDe: fill(data.cancellationConditionsDe, DEFAULT_POLICIES.cancellationConditionsDe),
+  };
+}
 
 type LangTab = 'en' | 'de';
 
@@ -31,8 +63,12 @@ export default function PoliciesPage() {
     setLoading(true);
     try {
       const data = await settingsApi.getPolicies();
-      setForm(data);
-      setOriginalForm(data);
+      // Backfill any empty fields with the same i18n defaults that the
+      // Create Request page falls back to. The user expects "the
+      // policies they see in offers" to be what they're editing here.
+      const filled = withDefaults(data);
+      setForm(filled);
+      setOriginalForm(filled);
     } catch {
       // handled by api client
     } finally {
@@ -241,6 +277,14 @@ function ReadOnlyField({
   onEdit: () => void;
   clickToEditLabel: string;
 }) {
+  // QA flagged the stacked-affordance pattern (top-right EDIT POLICIES +
+  // a per-field "CLICK TO EDIT" pill) as visually duplicated — three
+  // identical CTAs on one screen made the user wonder which one was
+  // the canonical action. Resolution: keep the field clickable (still
+  // editable via direct interaction for discoverability), keep the
+  // hover/focus border so the affordance is obvious, but drop the
+  // floating pill that duplicated the top-right button's job. The
+  // aria-label still gives screen-reader users the action verb.
   return (
     <button
       type="button"
@@ -248,16 +292,8 @@ function ReadOnlyField({
       className="group relative w-full min-h-[60px] text-left rounded-[14px] bg-[#F7F7F7] border border-transparent hover:border-sett-primary hover:bg-white hover:shadow-input-focus focus:outline-none focus-visible:border-sett-primary focus-visible:bg-white focus-visible:shadow-input-focus transition-all duration-200 cursor-pointer"
       aria-label={clickToEditLabel}
     >
-      <span className="block px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed pr-32">
+      <span className="block px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed">
         {content}
-      </span>
-      {/* Hover overlay — fades in a "Click to edit" pill on the right edge */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sett-primary text-sett-navy font-montserrat text-[11px] font-bold uppercase tracking-[0.05em] shadow-[0_2px_8px_0_rgba(170,199,55,0.25)] opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0 transition-all duration-200"
-      >
-        <Pencil className="w-3 h-3" />
-        {clickToEditLabel}
       </span>
     </button>
   );

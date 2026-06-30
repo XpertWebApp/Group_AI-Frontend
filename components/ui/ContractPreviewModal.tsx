@@ -217,21 +217,17 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               style={{ background: '#071c42' }}
             >
               {/* Header logo — "24 H GROUP OFFER" badge per BE PDF.
-                  Falls back to the standard SETT wordmark while the
-                  badge asset is being delivered (see public/icons/
-                  README — drop the dedicated SVG and it auto-upgrades). */}
+                  Uses the transparent-bg PNG designed for navy header
+                  bands. Earlier we pointed at /icons/24h-group-offer.svg
+                  which doesn't exist on disk, so the onError fallback
+                  served sett_logo.svg — a multi-colour version where
+                  the "Sport & Events Tours & Travel" sub-line is navy
+                  on navy, effectively invisible. The transparent PNG
+                  variant is the correct asset for this surface. */}
               <img
-                src="/icons/24h-group-offer.svg"
+                src="/Logos/group-offer-header-transparent.png"
                 alt="24 H Group Offer"
                 style={{ height: 56 }}
-                onError={(e) => {
-                  const el = e.currentTarget;
-                  if (el.dataset.fallback !== 'true') {
-                    el.dataset.fallback = 'true';
-                    el.src = '/icons/sett_logo.svg';
-                    el.style.height = '36px';
-                  }
-                }}
               />
               <div className="flex flex-col items-end" style={{ gap: 4 }}>
                 <span
@@ -501,20 +497,16 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
                 and "Issued By" panel per the BE PDF. ─────────── */}
             <div className="flex items-start justify-between px-8 py-5 gap-6" style={{ background: '#071c42' }}>
               <div className="flex-1 min-w-0">
-                {/* SETT footer wordmark — same fallback pattern as the
-                    header. Drop public/icons/sett-footer-logo.svg (green
-                    SETT wordmark on transparent) and it auto-upgrades. */}
+                {/* SETT footer wordmark — same root-cause swap as the
+                    header. The original src pointed at a non-existent
+                    /icons/sett-footer-logo.svg, falling back to the
+                    multi-colour sett_logo.svg whose navy sub-line
+                    disappeared on the navy footer band. Transparent
+                    umbrella PNG is the right asset for this surface. */}
                 <img
-                  src="/icons/sett-footer-logo.svg"
+                  src="/Logos/sett-umbrella-logo-transparent.png"
                   alt="SETT"
-                  style={{ height: 28, marginBottom: 10 }}
-                  onError={(e) => {
-                    const el = e.currentTarget;
-                    if (el.dataset.fallback !== 'true') {
-                      el.dataset.fallback = 'true';
-                      el.src = '/icons/sett_logo.svg';
-                    }
-                  }}
+                  style={{ height: 36, marginBottom: 10 }}
                 />
                 <p className="font-montserrat text-[10px] leading-relaxed text-white opacity-80 max-w-[520px]">
                   {t.contract.footerLegal}

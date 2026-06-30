@@ -165,10 +165,17 @@ export function OdooCompanyPicker({
   );
 
   const handleClearLink = useCallback(() => {
-    onChange({ companyName: value.companyName, odooContactId: null });
+    // Clear BOTH the Odoo link AND the company name. Earlier behaviour
+    // only nulled the contact id but kept the name — the input then
+    // re-rendered the unlinked name as a stale "search query" (the
+    // useEffect at L90 syncs `value.companyName` → `query` once linked
+    // flips), so QA reported the cross button didn't actually clear
+    // the field. A real clear nulls both and resets the local query.
+    onChange({ companyName: '', odooContactId: null });
+    setQuery('');
     // Re-focus the input so staff can immediately type a new search.
     setTimeout(() => inputRef.current?.focus(), 0);
-  }, [onChange, value.companyName]);
+  }, [onChange]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {

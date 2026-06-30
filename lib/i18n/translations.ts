@@ -1118,6 +1118,11 @@ export const translations = {
       defaultMarkupCustom: 'OR ENTER A CUSTOM VALUE',
       defaultMarkupHint: 'This markup will be applied to all new offers by default. Decimals (e.g. 18.5) are supported.',
       defaultMarkupRangeError: 'Markup must be 0 or greater.',
+      // Case-specific markup errors — replace the generic message above
+      // so the user sees exactly what's wrong with their input.
+      defaultMarkupNotNumber: 'Please enter a number (e.g. 18 or 18.5).',
+      defaultMarkupNegative: 'Markup can\'t be negative — enter 0 or a positive number.',
+      defaultMarkupTooLarge: 'Markup is too large. Please enter a smaller value.',
       save: 'Save Settings',
     },
 
@@ -2290,7 +2295,10 @@ export const translations = {
       destination: 'Reiseziel',
       checkIn: 'Check-in',
       checkOut: 'Check-out',
-      checkInOut: 'CHECK-IN/OUT',
+      // QA flagged "CHECK-IN/OUT" rendering in the DE preview — that
+      // was just the English string with hyphens. Use the proper
+      // German term so the label matches the rest of the column.
+      checkInOut: 'ANREISE/ABREISE',
       guests: 'Gäste',
       hotelDetails: 'Hoteldetails',
       // Hotelkarten-Chrom — entspricht dem BE-PDF-Layout.
@@ -2415,6 +2423,9 @@ export const translations = {
       defaultMarkupCustom: 'ODER EIGENEN WERT EINGEBEN',
       defaultMarkupHint: 'Dieser Aufschlag wird standardmäßig auf alle neuen Angebote angewendet. Dezimalstellen (z.B. 18,5) werden unterstützt.',
       defaultMarkupRangeError: 'Der Aufschlag muss 0 oder größer sein.',
+      defaultMarkupNotNumber: 'Bitte eine Zahl eingeben (z.B. 18 oder 18,5).',
+      defaultMarkupNegative: 'Der Aufschlag darf nicht negativ sein — bitte 0 oder eine positive Zahl eingeben.',
+      defaultMarkupTooLarge: 'Der Aufschlag ist zu groß. Bitte einen kleineren Wert eingeben.',
       save: 'Einstellungen speichern',
     },
 

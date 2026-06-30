@@ -195,12 +195,22 @@ export function SendOfferDualPreviewModal({
   }, []);
 
   // ── Recipient helpers ──────────────────────────────────────────
+  // 20 chip max — matches the legacy chip-input on the booking-request
+  // detail page. Anything above is almost certainly a paste/mistake AND
+  // the BE has its own ceiling we don't want to test against. QA flagged
+  // that the dual-preview modal silently accepted 21+ chips because the
+  // cap was never implemented here.
+  const MAX_RECIPIENTS = 20;
   const addRecipient = useCallback(
     (raw: string) => {
       const val = raw.trim();
       if (!val) return;
       if (!EMAIL_RE.test(val)) {
         setRecipientError(t.offer.sendOfferInvalidEmail);
+        return;
+      }
+      if (recipients.length >= MAX_RECIPIENTS) {
+        setRecipientError(t.offer.emailsMaxLimit);
         return;
       }
       const lower = val.toLowerCase();

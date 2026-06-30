@@ -1486,11 +1486,34 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
   const { t } = useLanguage();
   const [emailTouched, setEmailTouched] = useState(false);
 
+  // Autofill provenance — remembers whether email / phone were populated
+  // by the OdooCompanyPicker (vs typed by the user). When the picker is
+  // later cleared or switched to a different company, we wipe ONLY the
+  // fields that came from autofill — manually typed values stay.
+  //
+  // Refs (not state) because:
+  //   1. No re-render needed when the flag flips
+  //   2. The picker's onChange/onPicked callbacks can read/write without
+  //      becoming reactive dependencies that re-run the effect
+  const emailAutofilledRef = useRef(false);
+  const phoneAutofilledRef = useRef(false);
+
+  // Email validation precedence:
+  //  - Field untouched → fall back to parent `errors.email` (set by the
+  //    parent's validateStep on Submit attempts) so prior failed submits
+  //    still surface their error.
+  //  - Field touched + currently invalid → show the live client-side
+  //    error message (empty / bad format).
+  //  - Field touched + currently VALID → return undefined so any stale
+  //    parent `errors.email` from a previous validateStep pass is
+  //    cleared on screen. Without this, an autofilled or freshly-typed
+  //    valid email kept showing "Enter a valid email address" because
+  //    the function fell through to `errors.email`.
   const getEmailError = () => {
     if (!emailTouched) return errors.email;
     if (!formData.email.trim()) return t.createForm.emailRequired;
     if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email)) return t.createForm.invalidEmail;
-    return errors.email;
+    return undefined;
   };
   const emailError = getEmailError();
   return (
@@ -1511,12 +1534,44 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
             onChange={(next) => {
               updateField('companyName', next.companyName);
               updateField('odooContactId', next.odooContactId);
+              // When the picker is cleared (companyName === ''), wipe
+              // any dependent fields that were autofilled by a prior
+              // pick — but leave manually-typed values alone. Same
+              // applies when the picker is reset to a different name
+              // mid-search (odooContactId nulls but the user hasn't
+              // re-picked yet).
+              const isClearedOrUnlinked = !next.companyName.trim() || next.odooContactId == null;
+              if (isClearedOrUnlinked) {
+                if (emailAutofilledRef.current) {
+                  updateField('email', '');
+                  emailAutofilledRef.current = false;
+                }
+                if (phoneAutofilledRef.current) {
+                  updateField('phone', '');
+                  // Country code is presentational — keep whatever the
+                  // user had set. Only the number portion was autofilled.
+                  phoneAutofilledRef.current = false;
+                }
+              }
             }}
             onPicked={(row) => {
-              if (!formData.email.trim() && row.email) {
+              // On a fresh pick, ALWAYS overwrite previously-autofilled
+              // values. If the field has data that wasn't autofilled
+              // (manual entry), respect it — the original "only when
+              // empty" rule still applies for that case.
+              const canOverwriteEmail =
+                emailAutofilledRef.current || !formData.email.trim();
+              if (canOverwriteEmail && row.email) {
                 updateField('email', row.email);
+                emailAutofilledRef.current = true;
+                // Mark the field touched so the live validator runs
+                // (and clears any stale "Enter a valid email address"
+                // surfaced by a prior Submit attempt).
+                setEmailTouched(true);
               }
-              if (!formData.phone.trim() && row.phone) {
+              const canOverwritePhone =
+                phoneAutofilledRef.current || !formData.phone.trim();
+              if (canOverwritePhone && row.phone) {
                 const split = detectCountryCode(row.phone);
                 if (split) {
                   updateField('phoneCountryCode', split.code);
@@ -1524,6 +1579,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
                 } else {
                   updateField('phone', row.phone);
                 }
+                phoneAutofilledRef.current = true;
               }
             }}
             label={t.createForm.companyName}

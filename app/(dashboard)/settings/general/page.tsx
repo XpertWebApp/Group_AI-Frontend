@@ -33,20 +33,47 @@ export default function GeneralConfigPage() {
   }, []);
 
   // Normalise the raw input (e.g. "18,5" → "18.5") so float parsing works
-  // regardless of locale, then validate range. Returns the canonical
-  // string we'll send to the BE, or null if the input isn't acceptable.
+  // regardless of locale, then validate range. Returns a discriminated
+  // result so the UI can render the right error per failure case —
+  // generic "Markup must be 0 or greater" misled users who typed huge
+  // numbers (they got that message even though their value WAS ≥ 0;
+  // the real failure was the upper bound).
   const MARKUP_MAX = 9_999_999_999;
-  const parseMarkup = (raw: string): string | null => {
+  type MarkupResult =
+    | { kind: 'empty' }
+    | { kind: 'nan' }
+    | { kind: 'negative' }
+    | { kind: 'too-large' }
+    | { kind: 'ok'; canonical: string };
+
+  const parseMarkup = (raw: string): MarkupResult => {
     const cleaned = raw.replace(',', '.').trim();
-    if (cleaned === '') return null;
+    if (cleaned === '') return { kind: 'empty' };
     const num = parseFloat(cleaned);
-    if (isNaN(num) || num < 0 || num > MARKUP_MAX) return null;
+    if (isNaN(num)) return { kind: 'nan' };
+    if (num < 0) return { kind: 'negative' };
+    if (num > MARKUP_MAX) return { kind: 'too-large' };
     // Clamp to 2 decimals — strips trailing zeros so "18.50" → "18.5".
-    return String(Math.round(num * 100) / 100);
+    return { kind: 'ok', canonical: String(Math.round(num * 100) / 100) };
   };
 
-  const canonicalMarkup = parseMarkup(markup);
-  const isInvalid = markup.trim() !== '' && canonicalMarkup === null;
+  const parsed = parseMarkup(markup);
+  const canonicalMarkup = parsed.kind === 'ok' ? parsed.canonical : null;
+  // Surface an inline error message only after the user has actually
+  // typed something — empty just disables Save without shouting at them.
+  const errorMessage = (() => {
+    switch (parsed.kind) {
+      case 'ok':
+      case 'empty':
+        return undefined;
+      case 'nan':
+        return t.generalConfig.defaultMarkupNotNumber;
+      case 'negative':
+        return t.generalConfig.defaultMarkupNegative;
+      case 'too-large':
+        return t.generalConfig.defaultMarkupTooLarge;
+    }
+  })();
 
   const handleSave = async () => {
     if (canonicalMarkup === null) return;
@@ -129,7 +156,7 @@ export default function GeneralConfigPage() {
                   value={markup}
                   onChange={(e) => setMarkup(e.target.value)}
                   placeholder="e.g. 18.5"
-                  error={isInvalid ? t.generalConfig.defaultMarkupRangeError : undefined}
+                  error={errorMessage}
                   suffix="%"
                 />
               </div>
