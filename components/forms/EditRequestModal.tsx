@@ -477,7 +477,10 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
     }
     if (!form.contactEmail?.trim()) {
       errors.contactEmail = t.createForm.emailRequired || 'Email is required';
-    } else if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(form.contactEmail)) {
+      // Include `+` in the local-part char class so plus-addressed emails
+      // like `alice+work@example.com` validate. The prior class omitted
+      // `+` and blocked legitimate addresses at Save time.
+    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(form.contactEmail)) {
       errors.contactEmail = t.createForm.invalidEmail || 'Please enter a valid email address';
     }
 

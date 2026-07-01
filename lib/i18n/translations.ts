@@ -1258,9 +1258,14 @@ export const translations = {
       // Modal
       modalTitle: 'Set payment deadline',
       modalSubtitle: 'This is the date the customer must pay by. It appears in the offer PDF and customer email.',
-      earliestCxlLabel: 'Earliest cancellation deadline on this proposal:',
+      // Renamed from earliestCxlLabel — the box shows the LATEST allowed
+      // payment date (earliest hotel cancellation cutoff minus one day),
+      // reframed in payment vocabulary so the modal stays focused on the
+      // one concept it's about. QA flagged the prior "cancellation"
+      // wording as confusing on a payment-deadline modal.
+      latestPaymentDateLabel: 'Latest allowed payment date:',
       pickerLabel: 'Payment due by',
-      constraintHint: 'Must be earlier than the earliest cancellation deadline so the customer pays before any hotel\'s free-cancellation window closes.',
+      constraintHint: 'Payment must be collected before any hotel\'s free-cancellation window ends. This limits how late the deadline can be.',
       noHotelsHint: 'Add at least one hotel before setting the payment deadline.',
       save: 'Save',
       cancel: 'Cancel',
@@ -2557,9 +2562,9 @@ export const translations = {
       editTitle: 'Zahlungsfrist festlegen',
       modalTitle: 'Zahlungsfrist festlegen',
       modalSubtitle: 'Bis zu diesem Datum muss der Kunde bezahlen. Es erscheint im Angebot-PDF und in der Kunden-E-Mail.',
-      earliestCxlLabel: 'Früheste Stornofrist auf diesem Angebot:',
+      latestPaymentDateLabel: 'Spätestmöglicher Zahlungstermin:',
       pickerLabel: 'Fällig am',
-      constraintHint: 'Muss vor der frühesten Stornofrist liegen, damit der Kunde zahlt, bevor das kostenlose Stornofenster eines Hotels schließt.',
+      constraintHint: 'Die Zahlung muss eingehen, bevor die kostenlose Stornofrist eines Hotels endet. Das begrenzt, wie spät die Frist gesetzt werden darf.',
       noHotelsHint: 'Bitte mindestens ein Hotel hinzufügen, bevor die Zahlungsfrist festgelegt wird.',
       save: 'Speichern',
       cancel: 'Abbrechen',

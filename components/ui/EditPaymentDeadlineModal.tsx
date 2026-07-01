@@ -243,14 +243,20 @@ export function EditPaymentDeadlineModal({
 
         {/* Body */}
         <div className="px-5 py-5 space-y-4">
-          {/* Earliest cancellation deadline — read-only context */}
+          {/* Latest allowed payment date — read-only context. Shows
+              `maxDate` (= earliestCxl - 1 day) instead of the raw
+              cancellation date so the user sees the number that
+              actually bounds the picker below. QA flagged the prior
+              "earliest cancellation deadline" label as jarring on a
+              payment-deadline modal; reframing the same information
+              in payment vocabulary keeps the modal focused. */}
           {hasHotels && (
             <div>
               <label className="block font-montserrat text-[12px] font-semibold uppercase tracking-[0.05em] text-sett-text-secondary mb-1.5">
-                {t.paymentDeadline.earliestCxlLabel}
+                {t.paymentDeadline.latestPaymentDateLabel}
               </label>
               <div className="w-full h-[44px] px-3 flex items-center rounded-[8px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] font-medium text-sett-navy">
-                {earliestCxl ? formatDateEU(earliestCxl.toISOString()) : '—'}
+                {maxDate ? formatDateEU(maxDate.toISOString()) : '—'}
               </div>
             </div>
           )}

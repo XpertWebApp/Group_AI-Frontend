@@ -160,6 +160,14 @@ function RadioOption({
 
 type FieldErrors = Record<string, string>;
 
+// Email regex — local part must accept the RFC 5322 sub-delimiters that
+// real users actually put in their addresses. Prior version omitted `+`
+// and rejected plus-addressed emails like `claude+h3-gamma@s-e-t-t.com`,
+// which is the mainstream "tag your address per-service" pattern. Kept
+// aligned with the permissive validator in SendOfferDualPreviewModal so
+// an address accepted at Send time also passes here at Create time.
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 /**
  * Computes 0–1 completion of the current step based on the same required fields
  * used by validateStep. Kept in lockstep with validateStep so the visual progress
@@ -214,7 +222,7 @@ function getStepProgress(step: number, data: FormData): number {
     checks.push(!!data.lastName.trim());
     checks.push(
       !!data.email.trim() &&
-      /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(data.email)
+      EMAIL_RE.test(data.email)
     );
     checks.push(!!data.phone.trim() && data.phone.length >= 7 && data.phone.length <= 15);
   }
@@ -300,7 +308,7 @@ function validateStep(step: number, data: FormData, t: ReturnType<typeof useLang
     if (!data.lastName.trim()) errors.lastName = t.createForm.lastNameRequired;
     if (!data.email.trim()) {
       errors.email = t.createForm.emailRequired;
-    } else if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(data.email)) {
+    } else if (!EMAIL_RE.test(data.email)) {
       errors.email = t.createForm.invalidEmail;
     }
     if (!data.phone.trim()) {
@@ -1512,7 +1520,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
   const getEmailError = () => {
     if (!emailTouched) return errors.email;
     if (!formData.email.trim()) return t.createForm.emailRequired;
-    if (!/^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(formData.email)) return t.createForm.invalidEmail;
+    if (!EMAIL_RE.test(formData.email)) return t.createForm.invalidEmail;
     return undefined;
   };
   const emailError = getEmailError();
