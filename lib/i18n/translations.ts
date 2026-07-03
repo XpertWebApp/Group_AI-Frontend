@@ -300,6 +300,12 @@ export const translations = {
       policies: 'Policies',
       termsConditions: 'Terms & Conditions',
       cancellationConditions: 'Cancellation Conditions',
+      // Added Hotels card subline — closes the parity gap Oliver
+      // flagged (Point 3): staff couldn't quote the customer-facing
+      // reservation ref, and the WBE supplier badge disappeared after
+      // add-to-offer. Both now render under the hotel name.
+      reservationRefLabel: 'Ref:',
+      supplierTooltip: 'Supplier providing this rate',
       hotels: 'Hotels',
       addHotel: '+ Add Hotel',
       noHotels: 'No hotels added yet. Click "+ Add Hotel" to search and add hotels.',
@@ -653,6 +659,13 @@ export const translations = {
       capacityXofY: '{x} of {y} rooms available across our suppliers.',
       capacityConfirmPrompt: 'Confirm remaining capacity with the hotel before booking.',
       capacityOverlapWarning: 'Some supplier inventory may overlap — actual availability could be lower.',
+      // ── INSUFFICIENT (BE `omit`) — hotel shown in alternatives only.
+      // Doc §3.1 State 4 + §4 table row 3 in room-availability-remove-badge-handover.md.
+      // {x} = roomsAllocated, {y} = totalRoomsRequested.
+      capacityOnlyXofY: 'Only {x} of {y} rooms available.',
+      capacityNotBookable: 'This hotel is shown for reference; not bookable at requested size.',
+      // Fallback tooltip when the BE `note` field is null on a flag/omit row (doc §5).
+      capacityFallbackTooltip: 'Availability is limited — confirm with the hotel before booking.',
       // ── Backend warning banners (hotel.note) ──
       // Templated strings: {placeholders} get filled in by the FE localizer
       // which pattern-matches the English BE string and pulls the
@@ -1014,6 +1027,12 @@ export const translations = {
       grandTotal: 'Grand Total',
       cancellationConditions: 'Cancellation Conditions',
       termsConditions: 'Terms & Conditions',
+      // Payment Deadline section — mirrors the BE-rendered customer
+      // PDF layout (Neha's Point 3 follow-up). Header, green-pill
+      // label, and the explanatory hint below the pill.
+      paymentDeadline: 'Payment Deadline',
+      paymentDueBy: 'Payment due by',
+      paymentDeadlineHint: 'Payment must be received by this date. Booking may be released if payment is not confirmed in time.',
       taxId: 'Ontario Corporation Number',
       supplier: 'Supplier',
       customer: 'Customer',
@@ -1635,6 +1654,8 @@ export const translations = {
       policies: 'Richtlinien',
       termsConditions: 'Allgemeine Geschäftsbedingungen',
       cancellationConditions: 'Stornierungsbedingungen',
+      reservationRefLabel: 'Ref.:',
+      supplierTooltip: 'Lieferant dieses Tarifs',
       hotels: 'Hotels',
       addHotel: '+ Hotel hinzufügen',
       noHotels: 'Noch keine Hotels hinzugefügt. Klicken Sie auf "+ Hotel hinzufügen", um Hotels zu suchen.',
@@ -1978,6 +1999,9 @@ export const translations = {
       capacityXofY: '{x} von {y} Zimmern bei unseren Lieferanten verfügbar.',
       capacityConfirmPrompt: 'Bitte vor der Buchung die verbleibende Kapazität beim Hotel bestätigen.',
       capacityOverlapWarning: 'Manche Lieferantenbestände könnten sich überschneiden — die tatsächliche Verfügbarkeit kann niedriger sein.',
+      capacityOnlyXofY: 'Nur {x} von {y} Zimmern verfügbar.',
+      capacityNotBookable: 'Dieses Hotel dient nur zur Referenz und ist in der angefragten Gruppengröße nicht buchbar.',
+      capacityFallbackTooltip: 'Verfügbarkeit ist begrenzt — bitte vor der Buchung mit dem Hotel bestätigen.',
       // ── Backend-Warnbanner (hotel.note) ──
       noteInventoryOverlapDetected: 'Bestandsüberschneidung festgestellt — Lieferantenangaben ({totalSupplierClaim}) übersteigen die verifizierte Hotelkapazität ({dbTotalRooms}). Effektive Kapazität auf {effectiveCapacity} begrenzt.',
       noteMultipleSuppliers: 'Mehrere Lieferanten gefunden ({uniqueSuppliersCount}) — Zuteilung um {percent}% reduziert, um mögliche Bestandsüberschneidungen zwischen Kanälen zu berücksichtigen. Gesamtkapazität bitte direkt beim Hotel prüfen.',
@@ -2324,6 +2348,9 @@ export const translations = {
       grandTotal: 'Gesamtbetrag',
       cancellationConditions: 'Stornierungsbedingungen',
       termsConditions: 'Allgemeine Geschäftsbedingungen',
+      paymentDeadline: 'Zahlungsfrist',
+      paymentDueBy: 'Zahlung fällig bis',
+      paymentDeadlineHint: 'Die Zahlung muss bis zu diesem Datum eingehen. Andernfalls kann die Buchung freigegeben werden.',
       taxId: 'Ontario Corporation Number',
       supplier: 'Lieferant',
       customer: 'Kunde',

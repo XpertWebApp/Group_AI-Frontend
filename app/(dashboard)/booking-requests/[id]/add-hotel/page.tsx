@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
+import { useState, useEffect, useCallback, useRef, forwardRef, Fragment, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import DatePicker from 'react-datepicker';
@@ -3145,6 +3145,24 @@ function HotelImageWithFallback({
 }
 
 
+/**
+ * Renders a capacity-count template (e.g. "{x} of {y} rooms available…")
+ * with the numeric placeholders wrapped in <strong>. Per the BE handover
+ * `room-availability-remove-badge-handover.md` §4: the count should be
+ * bold so staff can scan the card and grasp availability in one glance.
+ *
+ * Locale-agnostic: both EN and DE templates use `{x}` / `{y}` markers, so
+ * the same tokenizer works across languages regardless of word order.
+ */
+function renderCapacityTemplate(template: string, x: number, y: number): ReactNode {
+  const parts = template.split(/(\{[xy]\})/g);
+  return parts.map((part, idx) => {
+    if (part === '{x}') return <strong key={idx} className="font-semibold text-sett-text-primary">{x}</strong>;
+    if (part === '{y}') return <strong key={idx} className="font-semibold text-sett-text-primary">{y}</strong>;
+    return <Fragment key={idx}>{part}</Fragment>;
+  });
+}
+
 function HotelResultCard({
   hotel,
   isAdded,
@@ -3178,12 +3196,38 @@ function HotelResultCard({
   const { t, locale } = useLanguage();
   const sellPrice = hotel.sellingPricePerRoomPerNight;
   const hasCancellation = !!hotel.cxlDeadline;
-  const isLimited = hotel.capacityStatus === 'LIMITED';
-  const isInsufficient = hotel.capacityStatus === 'INSUFFICIENT';
-  // Only show a badge for non-CONFIRMED states — CONFIRMED is the default
-  // happy path and doesn't need a callout (the green "Add to Offer" CTA
-  // already signals availability).
-  const showCapacityBadge = isLimited || isInsufficient;
+  // Doc `room-availability-remove-badge-handover.md` §2 authorises reading
+  // the BE `status` field as the source of truth. `capacityStatus` and the
+  // lowercase `status` are the same concept — either may be populated
+  // depending on which response variant we're consuming. Prefer whichever
+  // the payload provides so the badge state stays correct across the
+  // main search, alternatives, and additional-candidates endpoints.
+  const rawIsLimited =
+    hotel.capacityStatus === 'LIMITED' || hotel.status === 'flag';
+  const rawIsInsufficient =
+    hotel.capacityStatus === 'INSUFFICIENT' || hotel.status === 'omit';
+  // Doc §5 edge case: `roomsAllocated === 0` on a `flag` row should be
+  // rendered as `omit` visually. BE occasionally emits zero-alloc flags
+  // for edge cases; showing "0 of 24 available" as amber understates
+  // the problem — surface it as the red critical badge instead.
+  const zeroAllocOnFlag = rawIsLimited && (hotel.roomsAllocated ?? 0) === 0;
+  const isLimited = rawIsLimited && !zeroAllocOnFlag;
+  const isInsufficient = rawIsInsufficient || zeroAllocOnFlag;
+  // Doc §5 edge case: `totalRoomsRequested === 0` should never happen
+  // (staff can't request zero rooms). If it does, warn and hide the
+  // badge instead of rendering "X of 0" nonsense.
+  const invalidRequestSize =
+    totalRequestedRooms === undefined || totalRequestedRooms <= 0;
+  if (invalidRequestSize && (rawIsLimited || rawIsInsufficient)) {
+    // eslint-disable-next-line no-console
+    console.warn('[HotelResultCard] Capacity badge suppressed — totalRequestedRooms is invalid:', totalRequestedRooms, 'for', hotel.hotelCode);
+  }
+  const showCapacityBadge = (isLimited || isInsufficient) && !invalidRequestSize;
+  // Doc §5 edge case: `note` may be null on a flag/omit row. Fall back
+  // to a canned tooltip so hovering the icon still yields information
+  // rather than an empty title attribute.
+  const capacityTooltip = hotel.note
+    ?? (showCapacityBadge ? t.addHotel.capacityFallbackTooltip : undefined);
   // Pick the description for the active locale from the multi-language payload.
   // Fallback order: descriptions[locale] → descriptions[other lang] → legacy single
   // `description` field (for older cached results before backend started shipping
@@ -3305,15 +3349,26 @@ function HotelResultCard({
               >
                 <StarRating rating={Number(hotel.starRating)} size={18} />
                 {showCapacityBadge && (
-                  // §UX: tooltip surfaces the BE-supplied note verbatim
-                  // for power users; the X-of-Y count and action prompt
-                  // sit below the badge row for visibility without hover.
+                  // §UX: tooltip surfaces the BE-supplied `note` verbatim
+                  // for power users (doc §3.2). Falls back to a canned
+                  // string when the BE omits the note (doc §5 edge
+                  // case). The X-of-Y count and action prompt sit
+                  // below the badge row for visibility without hover.
+                  //
+                  // When we've promoted a zero-alloc LIMITED to
+                  // INSUFFICIENT visually (`zeroAllocOnFlag`), pass
+                  // 'INSUFFICIENT' to the localizer so the chip label
+                  // reflects the promoted state rather than the raw BE
+                  // capacityStatus.
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0 cursor-help"
-                    title={hotel.note ?? undefined}
+                    title={capacityTooltip}
                   >
                     <AlertTriangle className="w-3 h-3" />
-                    {localizeCapacityStatus(hotel.capacityStatus, t.addHotel)}
+                    {localizeCapacityStatus(
+                      isInsufficient ? 'INSUFFICIENT' : 'LIMITED',
+                      t.addHotel,
+                    )}
                   </span>
                 )}
                 {showYouthFriendlyBadge && hotel.youthFriendly && (
@@ -3331,26 +3386,31 @@ function HotelResultCard({
                   </span>
                 )}
               </div>
-              {/* Limited Capacity detail block — per BE handover follow-up
-                  on staff-margin-toggle.md.
-                  Fires only for `LIMITED` (not `INSUFFICIENT`, where the
-                  card isn't bookable and the chip alone reads correctly).
+              {/* Limited Capacity detail block — per BE handover
+                  `room-availability-remove-badge-handover.md` §3.1 State 2.
                   Three lines:
-                    1. "X of Y rooms available across our suppliers."
-                    2. "Confirm remaining capacity with the hotel..."
+                    1. "X of Y rooms available across our suppliers." (numbers bold per §4)
+                    2. "Confirm remaining capacity with the hotel before booking."
                     3. (conditional) overlap warning when BE flagged it.
-                  All three muted, small, sit between the badge row and
-                  the Location block so they read as detail FOR the
-                  warning above them. */}
+                  All muted, small, sit between the badge row and the
+                  Location block so they read as detail FOR the warning
+                  above them.
+                  X and Y are rendered as separate <strong> nodes because
+                  the doc explicitly asks the numbers to be bold ("so
+                  staff can scan the card and get the availability read
+                  in one glance") — the template split lets EN + DE
+                  translations keep their natural word order. */}
               {isLimited && totalRequestedRooms && totalRequestedRooms > 0 && (
                 <div
                   className="flex flex-col gap-0.5 mt-0.5 animate-sidebar-fade-up"
                   style={{ animationDelay: '130ms' }}
                 >
                   <p className="font-montserrat text-[12px] leading-snug text-sett-text-secondary">
-                    {t.addHotel.capacityXofY
-                      .replace('{x}', String(hotel.roomsAllocated ?? 0))
-                      .replace('{y}', String(totalRequestedRooms))}
+                    {renderCapacityTemplate(
+                      t.addHotel.capacityXofY,
+                      hotel.roomsAllocated ?? 0,
+                      totalRequestedRooms,
+                    )}
                   </p>
                   <p className="font-montserrat text-[12px] leading-snug text-sett-text-secondary">
                     {t.addHotel.capacityConfirmPrompt}
@@ -3361,6 +3421,35 @@ function HotelResultCard({
                       <span>{t.addHotel.capacityOverlapWarning}</span>
                     </p>
                   )}
+                </div>
+              )}
+              {/* INSUFFICIENT (BE `omit`) detail block — per doc §3.1
+                  State 4. Fires for cards the BE says cannot fulfil the
+                  group. Only rendered when we actually have both
+                  numbers to show (totalRequestedRooms present); guarded
+                  the same way as the LIMITED block above. Two lines:
+                    1. "Only X of Y rooms available." (numbers bold)
+                    2. "This hotel is shown for reference; not bookable
+                       at requested size."
+                  Uses the same muted secondary text as the LIMITED
+                  block; the red chip above already carries the
+                  critical-tone signal, so the detail lines stay
+                  visually calm. */}
+              {isInsufficient && totalRequestedRooms && totalRequestedRooms > 0 && (
+                <div
+                  className="flex flex-col gap-0.5 mt-0.5 animate-sidebar-fade-up"
+                  style={{ animationDelay: '130ms' }}
+                >
+                  <p className="font-montserrat text-[12px] leading-snug text-sett-text-secondary">
+                    {renderCapacityTemplate(
+                      t.addHotel.capacityOnlyXofY,
+                      hotel.roomsAllocated ?? 0,
+                      totalRequestedRooms,
+                    )}
+                  </p>
+                  <p className="font-montserrat text-[12px] leading-snug text-sett-text-secondary">
+                    {t.addHotel.capacityNotBookable}
+                  </p>
                 </div>
               )}
               {/* Location */}

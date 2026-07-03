@@ -2397,48 +2397,88 @@ function HotelCard({
           flex-wrap lets the controls cluster drop below the title at narrow
           widths instead of crushing the name into one-letter-per-line. */}
       <div className="bg-[#1B2B44] rounded-t-[16px] px-3 sm:px-4 py-3 flex items-center gap-3 flex-wrap">
-        {/* Identity: hotel name + stars.
+        {/* Identity: hotel name + stars + Ref/Supplier subline.
             Wrapped in a min-w-0 flex container so truncation works inside
             the parent flex row. !whitespace-nowrap + !truncate force the
             HotelName link to render on a single line with ellipsis on
             overflow (the component's default break-words behavior caused
             character-per-line wrapping at narrow widths inside this
             constrained navy header). A native title= surfaces the full
-            name on hover. */}
-        <div className="flex items-center gap-2 min-w-0 flex-1 min-h-[28px]">
-          {hotel.sethubDetailsUrl ? (
-            <HotelName
-              hotel={{ hotelName: hotel.hotelName || hotel.hotelCode, sethubDetailsUrl: hotel.sethubDetailsUrl }}
-              truncate
-              className="!text-white hover:!text-white active:!text-white hover:!bg-white/10 active:!bg-white/15 !text-body !font-bold min-w-0"
-            />
-          ) : (
-            <h4
-              className="text-body font-bold text-white truncate min-w-0 max-w-full"
-              title={hotel.hotelName || hotel.hotelCode}
+            name on hover.
+            The subline (Ref + Supplier) fills the parity gap Oliver
+            flagged in Point 3 feedback: staff previously had no way to
+            look up a hotel by the customer-quoted "SETT-XXX-YYY" ref
+            (only visible on the customer PDF), and the WBE supplier
+            code disappeared after add-to-offer. Both now live under
+            the hotel name so staff can quote them if the customer
+            calls, and see which supplier is quoting after the fact. */}
+        <div className="flex flex-col min-w-0 flex-1 min-h-[28px]">
+          <div className="flex items-center gap-2 min-w-0 min-h-[28px]">
+            {hotel.sethubDetailsUrl ? (
+              <HotelName
+                hotel={{ hotelName: hotel.hotelName || hotel.hotelCode, sethubDetailsUrl: hotel.sethubDetailsUrl }}
+                truncate
+                className="!text-white hover:!text-white active:!text-white hover:!bg-white/10 active:!bg-white/15 !text-body !font-bold min-w-0"
+              />
+            ) : (
+              <h4
+                className="text-body font-bold text-white truncate min-w-0 max-w-full"
+                title={hotel.hotelName || hotel.hotelCode}
+              >
+                {hotel.hotelName || hotel.hotelCode}
+              </h4>
+            )}
+            <div
+              className="flex gap-0.5 shrink-0"
+              aria-label={`${hotel.starRating ?? 0} of 5 stars`}
             >
-              {hotel.hotelName || hotel.hotelCode}
-            </h4>
-          )}
-          <div
-            className="flex gap-0.5 shrink-0"
-            aria-label={`${hotel.starRating ?? 0} of 5 stars`}
-          >
-            {Array.from({ length: 5 }).map((_, i) => {
-              const filled = i < (hotel.starRating ?? 0);
-              return (
-                <Star
-                  key={i}
-                  className={`w-3.5 h-3.5 ${filled ? 'fill-sett-primary text-sett-primary' : 'text-white/25'}`}
-                />
-              );
-            })}
+              {Array.from({ length: 5 }).map((_, i) => {
+                const filled = i < (hotel.starRating ?? 0);
+                return (
+                  <Star
+                    key={i}
+                    className={`w-3.5 h-3.5 ${filled ? 'fill-sett-primary text-sett-primary' : 'text-white/25'}`}
+                  />
+                );
+              })}
+            </div>
+            {saving && (
+              <span className="text-caption text-white/70 ml-1 animate-pulse shrink-0">
+                {t.common.loading}
+              </span>
+            )}
           </div>
-          {saving && (
-            <span className="text-caption text-white/70 ml-1 animate-pulse shrink-0">
-              {t.common.loading}
-            </span>
-          )}
+          {/* Ref + Supplier subline. Same fallback chain as the customer
+              PDF card footer: hotelRef → tid → short id. Supplier chip
+              only renders when the BE actually gave us a supplier code
+              (older proposals may not carry it). Middle-dot separator
+              is dropped when either side is absent. */}
+          {(() => {
+            const refValue = hotel.hotelRef ?? hotel.tid ?? null;
+            const supplierValue = hotel.supplierCode ?? null;
+            if (!refValue && !supplierValue) return null;
+            return (
+              <div className="flex items-center gap-2 mt-1 min-w-0">
+                {refValue && (
+                  <span className="font-montserrat text-[11px] font-medium text-white/70 truncate">
+                    {t.offer.reservationRefLabel}{' '}
+                    <span className="text-white/85 font-semibold">{refValue}</span>
+                  </span>
+                )}
+                {refValue && supplierValue && (
+                  <span aria-hidden className="text-white/40 text-[11px] leading-none">·</span>
+                )}
+                {supplierValue && (
+                  <span
+                    className="inline-flex items-center rounded-full bg-white/10 border border-white/20 px-2 py-0.5 font-montserrat text-[10px] font-bold uppercase tracking-[0.05em] text-white/90 shrink-0"
+                    title={t.offer.supplierTooltip}
+                  >
+                    {supplierValue}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Controls cluster — pill, breakdown toggle, remove */}

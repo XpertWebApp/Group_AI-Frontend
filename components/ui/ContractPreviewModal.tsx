@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Download, MapPin } from 'lucide-react';
+import { X, Download, MapPin, Calendar } from 'lucide-react';
 import { ModalOverlay } from './ModalOverlay';
 import { proposalsApi } from '@/lib/api/proposals';
 import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
@@ -463,6 +463,40 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
                 <BankRow label={t.contract.swiftBic} value="EBILAEAD" isLast />
               </div>
             </div>
+
+            {/* ─────────── PAYMENT DEADLINE ─────────── */}
+            {/* Mirrors the BE-rendered customer PDF layout — a dedicated
+                section between Cancellation Conditions and T&Cs. The
+                deadline sits in the same soft-green pill used for the
+                Free Cancellation chip so the customer reads both dates
+                (cancel-by and pay-by) with the same visual weight.
+                Only rendered when proposal.paymentDeadline is set;
+                grandfathered pre-cutover proposals fall back to the
+                BE's "checkoutDate − 30 days" default and don't need a
+                FE section. */}
+            {proposal.paymentDeadline && (
+              <div className="px-8 py-6" style={{ borderBottom: '1px solid #E0E0E0' }}>
+                <h3 className="font-montserrat font-bold text-[16px] uppercase text-sett-navy mb-4" style={{ letterSpacing: '0.05em' }}>
+                  {t.contract.paymentDeadline}
+                </h3>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 border font-montserrat text-[13px] font-semibold text-sett-green-dark"
+                    style={{
+                      background: 'rgba(170,199,55,0.10)',
+                      borderColor: 'rgba(170,199,55,0.55)',
+                    }}
+                  >
+                    <Calendar className="w-3.5 h-3.5" aria-hidden />
+                    {t.contract.paymentDueBy}{' '}
+                    {formatDate(proposal.paymentDeadline)}
+                  </span>
+                </div>
+                <p className="font-montserrat text-[12px] leading-relaxed text-sett-grey mt-3">
+                  {t.contract.paymentDeadlineHint}
+                </p>
+              </div>
+            )}
 
             {/* ─────────── CANCELLATION CONDITIONS ─────────── */}
             {cancellationHtml && (
