@@ -290,7 +290,10 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
                 <div className="space-y-1.5">
                   <MetaRow label={t.contract.emailAddress} value={request.contactEmail ?? '—'} />
                   <MetaRow label={t.contract.phoneNumber} value={request.contactPhone ?? '—'} />
-                  <MetaRow label={t.contract.address} value={request.hotelLocation ?? request.destinationName ?? '—'} />
+                  {/* Customer ADDRESS row removed: the customer has no real
+                      address field, so it was filled with hotelLocation
+                      ("central") / destinationName — meaningless to the
+                      customer. Matches the BE PDF, which dropped it too. */}
                 </div>
               </div>
             </div>
@@ -330,6 +333,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
                     key={hotel.id}
                     hotel={hotel}
                     t={t}
+                    mealCode={request.breakfastPreference}
                   />
                 ))}
               </div>
@@ -646,9 +650,13 @@ function HotelImage({ src, alt }: { src: string | null; alt: string }) {
 function HotelCard({
   hotel,
   t,
+  mealCode,
 }: {
   hotel: import('@/types').ProposalHotel;
   t: ReturnType<typeof useLanguage>['t'];
+  /** Request-level meal-plan code (BB/RO/HB/FB/AI). Rendered as the FIRST
+   *  chip on the card to match the BE PDF, which leads with the meal plan. */
+  mealCode?: string | null;
 }) {
   const roomEntries = hotel.rooms
     ? Object.entries(hotel.rooms as Record<string, { net?: number; sell?: number; qty?: number; nights?: number }>)
@@ -679,6 +687,14 @@ function HotelCard({
   // deploy spec — slice is defensive belt-and-braces (in case any older
   // legacy proposals ever come back with longer lists).
   const facilities = (hotel.facilities ?? []).slice(0, 3);
+
+  // Meal-plan chip — leads the chip row to match the BE PDF (meal first,
+  // then up to 3 facilities → max 4 chips). Map the code to a localised
+  // label; fall back to the raw code (uppercased) for unknown values.
+  const mealCodeUpper = mealCode?.trim().toUpperCase();
+  const mealChip = mealCodeUpper
+    ? ((t.contract.meals as Record<string, string>)[mealCodeUpper] ?? mealCodeUpper)
+    : null;
 
   // Hotel name — clickable when SETTHub URL is present. Link opens in
   // a new tab; never embed external nav inline.
@@ -747,9 +763,19 @@ function HotelCard({
             </p>
           )}
 
-          {/* Facility chips — pill row, max 4 in BE's priority order */}
-          {facilities.length > 0 && (
+          {/* Chip row — meal plan first, then facilities, max 4 in BE's
+              priority order (matches the BE PDF). */}
+          {(mealChip || facilities.length > 0) && (
             <div className="flex flex-wrap gap-2 mt-3">
+              {mealChip && (
+                <span
+                  key="__meal"
+                  className="inline-flex items-center px-3 py-1 rounded-full font-montserrat text-[11px] font-semibold text-sett-navy border border-sett-primary"
+                  style={{ background: 'rgba(170,199,55,0.08)' }}
+                >
+                  {mealChip}
+                </span>
+              )}
               {facilities.map((f) => (
                 <span
                   key={f}

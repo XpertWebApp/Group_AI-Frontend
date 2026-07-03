@@ -209,7 +209,7 @@ export default function PoliciesPage() {
                         minHeight="180px"
                       />
                     ) : (
-                      <ReadOnlyField content={stripHtml(form[tcKey])} onEdit={() => setEditing(true)} clickToEditLabel={t.policiesPage.clickToEdit} />
+                      <ReadOnlyField content={stripHtml(form[tcKey])} />
                     )}
                   </div>
 
@@ -225,7 +225,7 @@ export default function PoliciesPage() {
                         minHeight="180px"
                       />
                     ) : (
-                      <ReadOnlyField content={stripHtml(form[cxlKey])} onEdit={() => setEditing(true)} clickToEditLabel={t.policiesPage.clickToEdit} />
+                      <ReadOnlyField content={stripHtml(form[cxlKey])} />
                     )}
                   </div>
 
@@ -261,40 +261,21 @@ export default function PoliciesPage() {
   );
 }
 
-/* ─── ReadOnlyField — hoverable display panel that doubles as a discovery
- *  affordance for edit mode. On hover, a brand-spec ring + "Click to edit"
- *  overlay surfaces so even users who missed the top-right Edit button can
- *  discover the page is editable by interacting with the content itself.
- *  Designer note: stacked affordances (CTA + helper text + hover hint)
- *  outperform any single signal — what feels redundant to power users is
- *  exactly what onboards first-timers. */
+/* ─── ReadOnlyField — static, non-interactive display panel for read-only
+ *  mode. It does NOT enter edit mode on click and shows no hover/focus
+ *  affordance, so it can't be mistaken for a live input while the READ-ONLY
+ *  badge is showing. Editing is reached only via the top-right EDIT POLICIES
+ *  button. */
 function ReadOnlyField({
   content,
-  onEdit,
-  clickToEditLabel,
 }: {
   content: string;
-  onEdit: () => void;
-  clickToEditLabel: string;
 }) {
-  // QA flagged the stacked-affordance pattern (top-right EDIT POLICIES +
-  // a per-field "CLICK TO EDIT" pill) as visually duplicated — three
-  // identical CTAs on one screen made the user wonder which one was
-  // the canonical action. Resolution: keep the field clickable (still
-  // editable via direct interaction for discoverability), keep the
-  // hover/focus border so the affordance is obvious, but drop the
-  // floating pill that duplicated the top-right button's job. The
-  // aria-label still gives screen-reader users the action verb.
   return (
-    <button
-      type="button"
-      onClick={onEdit}
-      className="group relative w-full min-h-[60px] text-left rounded-[14px] bg-[#F7F7F7] border border-transparent hover:border-sett-primary hover:bg-white hover:shadow-input-focus focus:outline-none focus-visible:border-sett-primary focus-visible:bg-white focus-visible:shadow-input-focus transition-all duration-200 cursor-pointer"
-      aria-label={clickToEditLabel}
-    >
+    <div className="w-full min-h-[60px] rounded-[14px] bg-[#F7F7F7] border border-transparent">
       <span className="block px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed">
         {content}
       </span>
-    </button>
+    </div>
   );
 }

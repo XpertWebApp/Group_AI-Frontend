@@ -217,14 +217,21 @@ export const proposalsApi = {
   async previewPdf(proposalId: string, language?: string, signal?: AbortSignal): Promise<string> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
     const baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+    const timezone = getBrowserTimezone();
     const body: Record<string, string> = {};
     if (language) body.language = language;
+    // Send the viewer's IANA timezone so the BE formats the free-cancellation
+    // "Cancel before" date in it, not UTC — otherwise the PDF date is off by
+    // one day vs the on-screen preview. Sent in both body and header; the BE
+    // accepts either. Omitted when unavailable (BE falls back to UTC).
+    if (timezone) body.timezone = timezone;
     const response = await fetch(`${baseURL}/proposals/${proposalId}/actions/preview-pdf`, {
       method: 'POST',
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',
+        ...(timezone ? { 'x-timezone': timezone } : {}),
       },
       body: JSON.stringify(body),
       signal,
@@ -284,17 +291,33 @@ export const proposalsApi = {
   },
 };
 
+/** The browser's IANA timezone (e.g. "Asia/Kolkata"), forwarded to every PDF
+ *  endpoint so the backend renders the free-cancellation "Cancel before" date
+ *  in the viewer's timezone rather than UTC — without it the PDF date lands one
+ *  day off from the on-screen preview. Returns undefined when Intl is
+ *  unavailable (SSR / very old runtimes); the BE then falls back to UTC. */
+function getBrowserTimezone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Shared download helper — fetches a PDF, pulls the filename from
  *  Content-Disposition, and triggers a browser save-as via a synthetic
  *  <a download> click. Handles auth header + ngrok skip + error surface. */
 async function downloadBlob(path: string): Promise<void> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
   const baseURL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  const timezone = getBrowserTimezone();
   const response = await fetch(`${baseURL}${path}`, {
     method: 'GET',
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       'ngrok-skip-browser-warning': 'true',
+      // Format the cancel-deadline badge in the viewer's timezone, not UTC.
+      ...(timezone ? { 'x-timezone': timezone } : {}),
     },
   });
   if (!response.ok) {
