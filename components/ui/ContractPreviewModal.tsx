@@ -129,6 +129,12 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
   // rooms not directly referenced — guest count comes from request.groupSize.
   void (request.rooms as RoomsConfig | null | undefined);
   const contactName = [request.firstName, request.lastName].filter(Boolean).join(' ') || request.contactName || '—';
+  // Customer phone shown WITH its country/dial code (e.g. "+44 7876787678"),
+  // matching the BE PDF. Prepend the code + a single space when present;
+  // fall back to the bare number (no stray "+"/space) otherwise.
+  const customerPhone = request.contactPhone
+    ? [request.contactPhoneCountryCode, request.contactPhone].filter(Boolean).join(' ')
+    : '—';
 
   const handleDownloadPdf = async () => {
     setDownloading(true);
@@ -289,7 +295,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
                 </div>
                 <div className="space-y-1.5">
                   <MetaRow label={t.contract.emailAddress} value={request.contactEmail ?? '—'} />
-                  <MetaRow label={t.contract.phoneNumber} value={request.contactPhone ?? '—'} />
+                  <MetaRow label={t.contract.phoneNumber} value={customerPhone} />
                   {/* Customer ADDRESS row removed: the customer has no real
                       address field, so it was filled with hotelLocation
                       ("central") / destinationName — meaningless to the
