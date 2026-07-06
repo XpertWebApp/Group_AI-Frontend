@@ -157,10 +157,16 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
 
   const documentCode = `${request.referenceNumber ?? request.id.slice(0, 8)}/${new Date(request.createdAt).getFullYear()}`;
 
-  // Payment-due date — 30 days before checkout, matching the BE PDF.
-  const paymentDueDate = request.checkoutDate
-    ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
-    : null;
+  // Payment-due date — use the customer-facing deadline set on the proposal
+  // (`paymentDeadline`), which is exactly what the BE PDF renders. Only fall
+  // back to the legacy `checkout − 30 days` default for grandfathered
+  // proposals that have no deadline set. Previously this always used the
+  // fallback, so the preview showed a date that didn't match the PDF.
+  const paymentDueDate = activeProposal.paymentDeadline
+    ? new Date(activeProposal.paymentDeadline)
+    : request.checkoutDate
+      ? new Date(new Date(request.checkoutDate).getTime() - 30 * 24 * 60 * 60 * 1000)
+      : null;
 
   return (
     <ModalOverlay open={open} onClose={onClose}>
@@ -883,11 +889,13 @@ function HotelCard({
         </p>
       )}
 
-      {/* ── Card footer: Reservation Ref. — bottom-right per BE PDF ── */}
+      {/* ── Card footer: Reservation Ref. — bottom-right per BE PDF.
+          Divider line above it separates the SUBTOTAL row from the ref,
+          matching the downloaded PDF. ── */}
       {(hotel.hotelRef || hotel.tid) && (
         <div
           className="flex items-center justify-end px-4 py-2"
-          style={{ background: '#F8F9FA' }}
+          style={{ background: '#F8F9FA', borderTop: '1px solid #E0E0E0' }}
         >
           <span className="font-montserrat text-[12px] text-sett-grey">
             <span className="font-bold text-sett-navy">{t.contract.reservationRef}</span>{' '}
