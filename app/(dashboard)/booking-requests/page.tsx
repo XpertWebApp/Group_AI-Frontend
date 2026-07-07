@@ -27,9 +27,17 @@ function formatDate(iso: string | null | undefined): string {
 
 function totalRooms(rooms: RoomsConfig | null | undefined): number | null {
   if (!rooms) return null;
+  // The backend stores the top-level `double` as 0 and keeps the real double
+  // count in the sub-fields `standardDoubleBeds` + `twinBeds` (same derivation
+  // the request-detail page uses). Fall back to the legacy `double` field only
+  // when neither sub-field is present. Without this the ROOMS column showed
+  // "—" for requests whose rooms live in the sub-fields.
+  const doubleCount = (rooms.standardDoubleBeds || rooms.twinBeds)
+    ? (rooms.standardDoubleBeds ?? 0) + (rooms.twinBeds ?? 0)
+    : (rooms.double ?? 0);
   const sum =
     (rooms.single ?? 0) +
-    (rooms.double ?? 0) +
+    doubleCount +
     (rooms.twin ?? 0) +
     (rooms.triple ?? 0) +
     (rooms.quadruple ?? 0) +

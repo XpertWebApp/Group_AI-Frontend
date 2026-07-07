@@ -478,7 +478,7 @@ export default function AddHotelPage() {
   const [starFilters, setStarFilters] = useState<number[]>([]);
   const [maxPrice, setMaxPrice] = useState(3000);
   const [amenityFilters, setAmenityFilters] = useState<number[]>([]);
-  const [activeDropdown, setActiveDropdown] = useState<'stars' | 'price' | 'amenities' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'stars' | 'price' | 'amenities' | 'tripDetails' | null>(null);
   const [availableFacilities, setAvailableFacilities] = useState<Facility[]>([]);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [detailHotel, setDetailHotel] = useState<{ hotelCode: string; hotelName: string; sethubDetailsUrl?: string | null } | null>(null);
@@ -2402,6 +2402,67 @@ export default function AddHotelPage() {
                     })}
                   </div>
                 </FilterDropdown>
+
+                {/* Trip Details — mobile only. The desktop sidebar (below) is
+                    hidden under xl-wide, so surface the same read-only
+                    Destination / Stay Dates / Rooms Required here via a
+                    filter-style button to match the other mobile controls. */}
+                <FilterDropdown
+                  label={t.addHotel.tripDetails}
+                  icon={MapPin}
+                  isOpen={activeDropdown === 'tripDetails'}
+                  onToggle={() => setActiveDropdown(activeDropdown === 'tripDetails' ? null : 'tripDetails')}
+                  onClose={() => setActiveDropdown(null)}
+                >
+                  <div className="flex flex-col gap-3 min-w-[200px]">
+                    {/* Destination */}
+                    <div className="flex flex-col gap-[6px]">
+                      <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                        {t.addHotel.destination}
+                      </label>
+                      <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary truncate">
+                        {request?.destinationName || '—'}
+                      </div>
+                    </div>
+
+                    {/* Stay Dates */}
+                    <div className="flex flex-col gap-[6px]">
+                      <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                        {t.addHotel.stayDates}
+                      </label>
+                      <div className="w-full px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                        {formatDateEU(request?.checkinDate)}
+                        {' - '}
+                        {formatDateEU(request?.checkoutDate)}
+                      </div>
+                    </div>
+
+                    {/* Rooms Required */}
+                    {request?.rooms && (
+                      <div className="flex flex-col gap-[6px]">
+                        <label className="block font-montserrat text-[12px] font-semibold text-sett-text-primary">
+                          {t.addHotel.roomsrequired}
+                        </label>
+                        <div className="space-y-2">
+                          {[
+                            { key: 'roomSingle', label: t.addHotel.roomSingle, value: request.rooms.single },
+                            { key: 'roomStandardDouble', label: t.addHotel.standardDoubleBed, value: request.rooms.standardDoubleBeds },
+                            { key: 'roomTwin', label: t.addHotel.twinBed, value: request.rooms.twinBeds },
+                            { key: 'roomTriple', label: t.addHotel.roomTriple, value: request.rooms.triple },
+                            { key: 'roomQuadruple', label: t.addHotel.roomQuadruple, value: request.rooms.quadruple },
+                          ]
+                            .filter((r) => r.value && r.value > 0)
+                            .map((r) => (
+                              <div key={r.key} className="flex items-center justify-between px-3 py-2 rounded-[10px] border border-sett-border-light bg-[#F7F7F7] font-montserrat text-[14px] text-sett-text-secondary">
+                                <span>{r.label}</span>
+                                <span className="font-semibold text-sett-text-primary">{r.value}</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </FilterDropdown>
               </div>
             </div>
 
@@ -2932,13 +2993,13 @@ export default function AddHotelPage() {
       {/* ── Sticky "View Offer" bar — slides up once first hotel is added ── */}
       <div
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-40 transition-transform duration-300 ease-out',
+          'fixed bottom-0 left-0 right-0 z-40 flex justify-center px-4 md:px-6 transition-transform duration-300 ease-out',
           addedHotels.size > 0 ? 'translate-y-0' : 'translate-y-full'
         )}
       >
-        {/* Backdrop blur strip */}
+        {/* Backdrop blur strip — centered, capped at max-w-5xl */}
         <div
-          className="max-w-5xl mx-4 md:mx-6 xl-wide:mx-auto mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
+          className="w-full max-w-5xl mb-4 rounded-[14px] border border-sett-primary/20 flex items-center justify-between gap-4 px-5 py-3.5"
           style={{
             background: 'rgba(255,255,255,0.97)',
             boxShadow: '0 -4px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(170,199,55,0.15)',

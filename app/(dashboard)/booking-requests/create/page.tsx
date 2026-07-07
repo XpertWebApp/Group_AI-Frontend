@@ -237,6 +237,41 @@ function getStepProgress(step: number, data: FormData): number {
   return passed / checks.length;
 }
 
+// Attachment limits — must mirror the backend (attachments.controller.ts) so
+// we block oversized/wrong-type files on the client with a clear message
+// instead of a raw 413/415 from the server. Note: the live nginx also needs
+// `client_max_body_size` raised (see the BE handover) for 1–10 MB files to
+// actually reach the API — this guard is complementary, not a replacement.
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_ATTACHMENT_MIME = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'text/plain',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+];
+
+/** Returns a localized error message if the file is too big or the wrong type,
+ *  otherwise null. Mirrors the backend allow-list. */
+function validateAttachmentFile(file: File, t: ReturnType<typeof useLanguage>['t']): string | null {
+  if (file.size > MAX_ATTACHMENT_SIZE) {
+    return t.createForm.fileTooLarge
+      .replace('{name}', file.name)
+      .replace('{size}', (file.size / 1024 / 1024).toFixed(1));
+  }
+  // Some browsers report an empty type for uncommon files; the backend still
+  // validates, so only reject when a type is present and not allowed.
+  if (file.type && !ALLOWED_ATTACHMENT_MIME.includes(file.type)) {
+    return t.createForm.fileTypeNotAllowed.replace('{name}', file.name);
+  }
+  return null;
+}
+
 function validateStep(step: number, data: FormData, t: ReturnType<typeof useLanguage>['t']): FieldErrors {
   const errors: FieldErrors = {};
 
@@ -1622,10 +1657,25 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
                   type="file"
                   className="hidden"
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp"
-                  onChange={(e) => updateField('nameListFile', e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    // Reset so picking the same file again after an error still
+                    // fires onChange.
+                    e.target.value = '';
+                    if (!file) return;
+                    const err = validateAttachmentFile(file, t);
+                    if (err) {
+                      toast.error(err);
+                      return; // block: don't store the file, nothing gets uploaded
+                    }
+                    updateField('nameListFile', file);
+                  }}
                 />
               </label>
             )}
+            <p className="mt-1.5 font-montserrat text-[11px] text-sett-text-muted">
+              {t.createForm.fileHint}
+            </p>
           </div>
         </div>
 

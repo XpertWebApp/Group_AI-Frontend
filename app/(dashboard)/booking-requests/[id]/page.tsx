@@ -45,6 +45,7 @@ import { MarginToggle } from '@/components/ui/MarginToggle';
 import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
 import { isOdooLinkRequired, isOdooContactRequiredError } from '@/lib/utils/odooGate';
 import { isPaymentDeadlineRequired, isPaymentDeadlineRequiredError } from '@/lib/utils/paymentDeadlineGate';
+import { linkifyPolicyHtml } from '@/lib/utils/linkifyPolicyHtml';
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -1004,19 +1005,19 @@ export default function RequestDetailPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                     <div
-                      className="border border-sett-border rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
+                      className="min-w-0 border border-sett-border rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
                       style={{ animationDelay: '520ms' }}
                     >
-                      <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{breakfastLabel}</p>
+                      <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary break-words">{breakfastLabel}</p>
                       <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                         {t.offer.breakfastPreference}
                       </p>
                     </div>
                     <div
-                      className="border border-sett-border rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
+                      className="min-w-0 border border-sett-border rounded-[14px] p-3 sm:p-4 text-center animate-card-rise-in"
                       style={{ animationDelay: '580ms' }}
                     >
-                      <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary">{locationLabel}</p>
+                      <p className="font-montserrat text-[14px] font-semibold text-sett-text-primary break-words">{locationLabel}</p>
                       <p className="font-montserrat text-[12px] font-semibold uppercase text-sett-text-accent mt-0.5">
                         {t.offer.hotelLocation}
                       </p>
@@ -1145,7 +1146,7 @@ export default function RequestDetailPage() {
                       <div
                         className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
-                        dangerouslySetInnerHTML={{ __html: request.termsAndConditions }}
+                        dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(request.termsAndConditions) }}
                       />
                     </div>
                   )}
@@ -1160,7 +1161,7 @@ export default function RequestDetailPage() {
                       <div
                         className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
-                        dangerouslySetInnerHTML={{ __html: request.cancellationConditions }}
+                        dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(request.cancellationConditions) }}
                       />
                     </div>
                   )}

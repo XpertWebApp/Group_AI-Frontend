@@ -172,6 +172,10 @@ export const translations = {
       companyNamePlaceholder: 'Company Ltd.',
       nameList: 'NAME LIST',
       uploadFile: 'Upload File',
+      // Attachment validation (must mirror the backend limits).
+      fileHint: 'Max 10 MB. PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP.',
+      fileTooLarge: '"{name}" is {size} MB — the maximum is 10 MB.',
+      fileTypeNotAllowed: '"{name}" is not an allowed file type (PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP).',
       firstName: 'FIRST NAME',
       firstNamePlaceholder: 'e.g., John',
       lastName: 'LAST NAME',
@@ -1523,6 +1527,10 @@ export const translations = {
       companyNamePlaceholder: 'Firma GmbH',
       nameList: 'NAMENSLISTE',
       uploadFile: 'Datei hochladen',
+      // Anhang-Validierung (muss den Backend-Limits entsprechen).
+      fileHint: 'Max. 10 MB. PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP.',
+      fileTooLarge: '„{name}“ ist {size} MB groß — das Maximum sind 10 MB.',
+      fileTypeNotAllowed: '„{name}“ ist kein zulässiger Dateityp (PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP).',
       firstName: 'VORNAME',
       firstNamePlaceholder: 'z.B. Max',
       lastName: 'NACHNAME',

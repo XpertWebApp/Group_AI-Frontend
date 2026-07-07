@@ -62,18 +62,18 @@ export function NationalityPicker({
   );
 
   // Type-ahead filter: matches name (primary, case-insensitive) AND code
-  // (secondary, exact prefix). When query is empty, show all so the user
-  // can scroll through if preferred. Capped at 50 visible to keep DOM
-  // small — 50 is generous since most searches narrow within a few chars.
+  // (secondary, exact prefix). When query is empty, show ALL entries so the
+  // user can scroll the full list. The list is ~200 rows — trivial for the
+  // DOM inside the max-height scroll container, so no cap/virtualization is
+  // needed. (A previous 50-item cap hid most of the list from scrolling.)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return nationalities.slice(0, 50);
-    const matches = nationalities.filter((n) => {
+    if (!q) return nationalities;
+    return nationalities.filter((n) => {
       const nameMatch = (n.name ?? '').toLowerCase().includes(q);
       const codeMatch = n.code.toLowerCase().startsWith(q);
       return nameMatch || codeMatch;
     });
-    return matches.slice(0, 50);
   }, [nationalities, query]);
 
   // Outside-click + Escape close. Same pattern as OdooCompanyPicker.

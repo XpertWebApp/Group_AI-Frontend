@@ -85,9 +85,18 @@ export const requestsApi = {
   },
 
   async get(id: string): Promise<BookingRequest | null> {
-    const { data } = await apiClient.get<ApiResponse<BookingRequest>>(`/requests/${id}`);
-    if (!data.success || !data.data) return null;
-    return data.data;
+    try {
+      const { data } = await apiClient.get<ApiResponse<BookingRequest>>(`/requests/${id}`);
+      if (!data.success || !data.data) return null;
+      return data.data;
+    } catch (err) {
+      // Network / server failure (offline, 5xx, Cloudflare 530 origin-down).
+      // This getter is typed `| null`, so degrade gracefully instead of
+      // throwing an unhandled rejection that crashes the page — some callers
+      // (e.g. the add-hotel loader) only `.then()` without a `.catch()`.
+      console.error(`Failed to load request ${id}:`, err);
+      return null;
+    }
   },
 
   async getSummary(id: string): Promise<unknown> {

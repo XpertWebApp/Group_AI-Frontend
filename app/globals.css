@@ -122,7 +122,13 @@
   0%   { opacity: 0; transform: translateY(4px); }
   100% { opacity: 1; transform: translateY(0); }
 }
-.animate-card-rise-in  { animation: card-rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* fill-mode `backwards` (not `both`): the 100% keyframe equals the card's
+   natural resting state, so we don't retain a `transform` after the animation.
+   A retained transform composites the card onto its own layer, which makes its
+   1px `border-sett-border` hairline drop out on sub-pixel edges at certain
+   viewport widths. Reverting to no-transform at rest keeps the border crisp on
+   every screen size while the entrance animation looks identical. */
+.animate-card-rise-in  { animation: card-rise-in 480ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 .animate-badge-pop-in  { animation: badge-pop-in 460ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-value-count-in { animation: value-count-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .animate-label-fade-up { animation: label-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
@@ -836,6 +842,14 @@ input[type="date"]:invalid::-webkit-datetime-edit {
 }
 .sett-rich-editor li {
   margin: 0.15em 0;
+}
+/* Links in policy text (T&C / Cancellation) — clearly clickable and wrapping
+   so a long pasted URL never overflows the container. They open in a new tab
+   (target set by linkifyPolicyHtml). */
+.sett-rich-editor a {
+  color: #6E8B1E;
+  text-decoration: underline;
+  word-break: break-word;
 }
 /* Nested lists get tighter spacing + alternating markers. */
 .sett-rich-editor ul ul,

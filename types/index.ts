@@ -223,6 +223,11 @@ export interface ProposalHotel {
    *  are optional so the FE preview renders correctly before / after the
    *  BE enrichment lands — every consumer must `?? null`-guard. */
   imageUrl?: string | null;
+  /** Ordered image fallback chain (GIATA primary → all WBE keys), same list the
+   *  Add Hotel search card uses. The Offer Preview cascades through this on
+   *  `<img onError>` so a broken GIATA primary falls back to a working WBE
+   *  photo. Optional — falls back to the single `imageUrl` when absent. */
+  imageUrls?: string[] | null;
   description?: string | null;
   facilities?: string[] | null;
 }

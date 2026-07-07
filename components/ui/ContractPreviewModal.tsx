@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, Download, MapPin } from 'lucide-react';
 import { ModalOverlay } from './ModalOverlay';
 import { proposalsApi } from '@/lib/api/proposals';
+import { linkifyPolicyHtml } from '@/lib/utils/linkifyPolicyHtml';
 import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { translations } from '@/lib/i18n/translations';
@@ -116,14 +117,18 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
   // Falls back to the parent-supplied proposal during the in-flight window.
   const activeProposal = localisedProposal ?? proposal;
 
-  const termsHtml =
+  const rawTermsHtml =
     (previewLang === 'de' ? policies?.termsConditionsDe : policies?.termsConditionsEn)
     ?? request.termsAndConditions
     ?? '';
-  const cancellationHtml =
+  const rawCancellationHtml =
     (previewLang === 'de' ? policies?.cancellationConditionsDe : policies?.cancellationConditionsEn)
     ?? request.cancellationConditions
     ?? '';
+  // Make links in the policy text clickable and open in a new tab (existing
+  // <a> tags + bare pasted URLs). Memoised so we don't re-parse on every render.
+  const termsHtml = useMemo(() => linkifyPolicyHtml(rawTermsHtml), [rawTermsHtml]);
+  const cancellationHtml = useMemo(() => linkifyPolicyHtml(rawCancellationHtml), [rawCancellationHtml]);
   const hotels = (activeProposal.hotels ?? []).filter((h) => h.includedInTotal !== false);
   const services = (activeProposal.services ?? []).filter((sv) => sv.includedInTotal !== false);
   // rooms not directly referenced — guest count comes from request.groupSize.
@@ -618,14 +623,33 @@ function StarRating({ rating }: { rating: number | null | undefined }) {
  *  Designer note: a blank box is information too. The tooltip + dashed
  *  border tell staff "this isn't a bug, the image just isn't available
  *  yet" without polluting the preview with intrusive copy. */
-function HotelImage({ src, alt }: { src: string | null; alt: string }) {
-  const [errored, setErrored] = useState(false);
-  const showImage = !!src && !errored;
+function HotelImage({ srcs, alt }: { srcs: string[]; alt: string }) {
+  // Cascade through the hotel's ordered image chain (BE `imageUrls[]`: GIATA
+  // primary → all WBE keys), advancing to the next candidate on load error —
+  // mirrors the Add Hotel search card. The GIATA "primary" is often a broken
+  // placeholder, so a single URL frequently failed here; falling back lands on
+  // a working WBE photo. When the whole chain is exhausted we show the "no
+  // image" placeholder.
+  const [idx, setIdx] = useState(0);
+  // Reset when the chain content changes (e.g. locale re-fetch swaps proposals).
+  const chainKey = srcs.join('|');
+  useEffect(() => { setIdx(0); }, [chainKey]);
 
-  const tooltip = !src
+  // Resolve each URL the same way the add-hotel page does: absolute URLs and
+  // `/api/` paths are used as-is; a bare relative path/key is prefixed with the
+  // API base (else it 404s against the FE origin).
+  const raw = idx < srcs.length ? srcs[idx] : null;
+  const resolvedSrc = raw
+    ? raw.startsWith('http') || raw.startsWith('/api/')
+      ? raw
+      : `${process.env.NEXT_PUBLIC_API_URL ?? '/api/v1'}${raw}`
+    : null;
+
+  const showImage = !!resolvedSrc;
+  const tooltip = srcs.length === 0
     ? 'No image available for this hotel yet'
-    : errored
-      ? `Image failed to load: ${src}`
+    : !resolvedSrc
+      ? `All ${srcs.length} image candidate(s) failed to load`
       : '';
 
   return (
@@ -639,13 +663,16 @@ function HotelImage({ src, alt }: { src: string | null; alt: string }) {
         border: showImage ? '1px solid #E0E0E0' : '1px dashed #C0C0C0',
       }}
     >
-      {showImage && src ? (
+      {showImage && resolvedSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          // key by URL so switching candidates remounts and re-fires onError
+          // if the next one also fails.
+          key={resolvedSrc}
+          src={resolvedSrc}
           alt={alt}
           className="w-full h-full object-cover"
-          onError={() => setErrored(true)}
+          onError={() => setIdx((i) => i + 1)}
         />
       ) : null}
     </div>
@@ -738,15 +765,45 @@ function HotelCard({
       }}
     >
       {/* ── Top section: image + meta + free-cancel pill ── */}
-      <div className="flex gap-4 p-4 relative">
-        <HotelImage src={hotel.imageUrl ?? null} alt={hotelName} />
+      <div className="flex gap-4 p-4">
+        <HotelImage
+          srcs={hotel.imageUrls?.length ? hotel.imageUrls : (hotel.imageUrl ? [hotel.imageUrl] : [])}
+          alt={hotelName}
+        />
 
         {/* Right column — name, stars, address, description, chips */}
-        <div className="flex-1 min-w-0 pr-[160px]">
-          {/* Name + stars */}
-          <div className="flex flex-col gap-1">
-            {nameEl}
-            <StarRating rating={hotel.starRating ?? null} />
+        <div className="flex-1 min-w-0">
+          {/* Name + stars (left) with the free-cancellation pill (right).
+              In-flow flex row with min-w-0 on the name box + shrink-0 on the
+              pill, so a longer localized pill label (e.g. German "Kostenfreie
+              Stornierung") never overlaps the hotel name — the name wraps
+              instead. Replaces the old absolute pill + fixed pr-[160px] hack
+              that only left room for the shorter English label. */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex flex-col gap-1">
+              {nameEl}
+              <StarRating rating={hotel.starRating ?? null} />
+            </div>
+
+            {/* Free-cancellation pill — top-right, matching the BE PDF. */}
+            {hotel.freeCancellation && (
+              <div
+                className="shrink-0 inline-flex flex-col items-end px-3 py-1.5 rounded-[6px]"
+                style={{
+                  background: 'rgba(170,199,55,0.10)',
+                  border: '1px solid #AAC737',
+                }}
+              >
+                <span className="font-montserrat font-bold text-[12px] text-sett-green-dark whitespace-nowrap">
+                  ✓ {t.contract.freeCancellation}
+                </span>
+                {cancelDate && (
+                  <span className="font-montserrat text-[11px] text-sett-navy whitespace-nowrap mt-0.5">
+                    {t.contract.cancelBefore} {cancelDate}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Address — pin icon + comma-joined line */}
@@ -800,27 +857,6 @@ function HotelCard({
             </div>
           )}
         </div>
-
-        {/* Free-cancellation pill — anchored top-right of the card top
-            section, matching the BE PDF placement. */}
-        {hotel.freeCancellation && (
-          <div
-            className="absolute top-4 right-4 inline-flex flex-col items-end px-3 py-1.5 rounded-[6px]"
-            style={{
-              background: 'rgba(170,199,55,0.10)',
-              border: '1px solid #AAC737',
-            }}
-          >
-            <span className="font-montserrat font-bold text-[12px] text-sett-green-dark whitespace-nowrap">
-              ✓ {t.contract.freeCancellation}
-            </span>
-            {cancelDate && (
-              <span className="font-montserrat text-[11px] text-sett-navy whitespace-nowrap mt-0.5">
-                {t.contract.cancelBefore} {cancelDate}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* ── Room table (or fallback) ── */}
