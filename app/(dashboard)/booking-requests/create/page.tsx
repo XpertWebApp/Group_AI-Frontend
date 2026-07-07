@@ -14,7 +14,7 @@ import { StepperNav } from '@/components/ui/StepperNav';
 import { RoomCounter } from '@/components/ui/RoomCounter';
 import { PhoneInputSplit } from '@/components/ui/PhoneInputSplit';
 import { Spinner } from '@/components/ui/Loader';
-import { linkifyPolicyHtml } from '@/lib/utils/linkifyPolicyHtml';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { NationalityPicker } from '@/components/ui/NationalityPicker';
 import { cn } from '@/lib/utils/cn';
 import { destinationsApi, getCountryName } from '@/lib/api/destinations';
@@ -730,7 +730,7 @@ function CreateBookingRequestPageInner() {
             <CustomerDetailsStep formData={formData} updateField={updateField} errors={errors} />
           )}
           {currentStep === 3 && (
-            <PoliciesStep formData={formData} />
+            <PoliciesStep formData={formData} updateField={updateField} />
           )}
         </div>
 
@@ -1752,32 +1752,12 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
 
 /* ─────────────── Step 4: Policies ─────────────── */
 
-/** Read-only render of a policy HTML block (Terms / Cancellation). Policies are
- *  authored in Settings → Policies and are NOT editable during request
- *  creation — shown here for reference only. `linkifyPolicyHtml` makes any
- *  links open in a new tab. */
-function ReadOnlyPolicy({ html, minHeight }: { html: string; minHeight: string }) {
-  const content = html?.trim() ? linkifyPolicyHtml(html) : '';
-  return content ? (
-    <div
-      className="sett-rich-editor w-full rounded-input border border-sett-border bg-[#F7F7F7] px-4 py-3 font-montserrat text-[14px] text-sett-text-secondary overflow-auto"
-      style={{ minHeight }}
-      dangerouslySetInnerHTML={{ __html: content }}
-    />
-  ) : (
-    <div
-      className="w-full rounded-input border border-sett-border bg-[#F7F7F7] px-4 py-3 font-montserrat text-[14px] text-sett-text-muted"
-      style={{ minHeight }}
-    >
-      —
-    </div>
-  );
-}
-
 function PoliciesStep({
   formData,
+  updateField,
 }: {
   formData: FormData;
+  updateField: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }) {
   const { t } = useLanguage();
   return (
@@ -1791,14 +1771,22 @@ function PoliciesStep({
           <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.termsAndConditions}
           </label>
-          <ReadOnlyPolicy html={formData.termsAndConditions} minHeight="160px" />
+          <RichTextEditor
+            value={formData.termsAndConditions}
+            onChange={(val) => updateField('termsAndConditions', val)}
+            minHeight="160px"
+          />
         </div>
 
         <div>
           <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
             {t.createForm.cancellationConditions}
           </label>
-          <ReadOnlyPolicy html={formData.cancellationConditions} minHeight="120px" />
+          <RichTextEditor
+            value={formData.cancellationConditions}
+            onChange={(val) => updateField('cancellationConditions', val)}
+            minHeight="120px"
+          />
         </div>
       </div>
     </>

@@ -334,6 +334,14 @@ export interface HotelSearchResult {
   supplierSplit?: SupplierSplitItem[];
   perTypeAllocations?: PerTypeAllocation[];
   note?: string | null;
+  /** Supplier "Important Information" (WBE DayPrices.EssentialInfo) — check-in/
+   *  out hours, parking, etc. Raw third-party HTML; render as stripped plain
+   *  text, never via dangerouslySetInnerHTML. Null when the supplier gave none. */
+  essentialInfo?: string | null;
+  /** German machine-translation (DeepL) of `essentialInfo`, shipped alongside
+   *  the English so the EN↔DE toggle is instant client-side (like
+   *  `descriptions`). Falls back to `essentialInfo` when null. */
+  essentialInfoDe?: string | null;
   description?: string | null;
   descriptionLanguage?: string | null;
   descriptionSource?: string | null;

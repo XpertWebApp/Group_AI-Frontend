@@ -287,6 +287,76 @@ function FilterDropdown({
 
 const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
 
+// Strip supplier "Important Information" HTML (WBE EssentialInfo) to tidy plain
+// text. The value is raw third-party HTML, so it is NEVER rendered as HTML —
+// tags are removed, whitespace collapsed, and the run-on "." separators
+// normalised into readable sentences.
+function essentialInfoToText(html: string | null | undefined): string {
+  if (!html) return '';
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\.\s*/g, '. ')
+    .trim();
+}
+
+/** "Important information" block for a hotel card. Renders the supplier's
+ *  EssentialInfo (stripped to plain text) in a subtle brand-tinted panel,
+ *  clamped to 2 lines with a "Read more / Read less" toggle. The toggle only
+ *  appears when the text actually overflows the clamp (measured), so short
+ *  notes don't get a pointless button. */
+function EssentialInfo({ en, de }: { en?: string | null; de?: string | null }) {
+  const { t, locale } = useLanguage();
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const pRef = useRef<HTMLParagraphElement>(null);
+
+  // Both languages ship in the payload (like `descriptions`), so the EN↔DE
+  // toggle switches instantly with no re-fetch. Prefer the German translation
+  // when DE is selected; fall back to English when it's null.
+  const raw = locale === 'de' ? (de ?? en) : en;
+  const info = essentialInfoToText(raw);
+
+  // Measure once (in the clamped state) whether the text is long enough to
+  // warrant a toggle. Runs whenever the text changes.
+  useEffect(() => {
+    const el = pRef.current;
+    if (!el) return;
+    setOverflows(el.scrollHeight > el.clientHeight + 1);
+  }, [info]);
+
+  if (!info) return null;
+
+  return (
+    <div className="mt-3 rounded-[10px] border border-sett-primary/20 bg-sett-light-green-bg/50 px-3 py-2">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Info className="w-3.5 h-3.5 text-sett-primary shrink-0" aria-hidden />
+        <span className="font-montserrat text-[11px] font-semibold uppercase tracking-[0.04em] text-sett-text-accent">
+          {t.addHotel.importantInformation}
+        </span>
+      </div>
+      <p
+        ref={pRef}
+        className={cn(
+          'font-montserrat text-[12px] text-sett-text-secondary leading-relaxed',
+          !expanded && 'line-clamp-2',
+        )}
+      >
+        {info}
+      </p>
+      {(overflows || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 font-montserrat text-[12px] font-semibold text-sett-primary hover:text-sett-green-dark transition-colors"
+        >
+          {expanded ? t.addHotel.readLess : t.addHotel.readMore}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Helper to construct proper image URL for both CDN and proxy paths
 function getImageUrl(imageUrl: string | null | undefined): string {
   if (!imageUrl) return PLACEHOLDER_IMAGE;
@@ -3573,6 +3643,10 @@ function HotelResultCard({
               })}
             </div>
           )}
+
+          {/* Important information (WBE EssentialInfo) — check-in/out hours,
+              parking, etc. Clamped to 2 lines with a Read more/less toggle. */}
+          <EssentialInfo en={hotel.essentialInfo} de={hotel.essentialInfoDe} />
 
           {/* ── Room Table (desktop) ──
               Column-width tuning for the 1280–1327px viewport range:
