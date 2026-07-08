@@ -9,6 +9,41 @@
  * and is already rendered with dangerouslySetInnerHTML — this only augments the
  * links, it does not sanitize untrusted input.
  */
+/**
+ * Strip editor-chrome / non-content markup that can leak into saved policy HTML
+ * (e.g. a rich-text toolbar's buttons/icons baked into the value). Policy text
+ * is prose + links + lists + emphasis, so buttons, icons, form controls, and
+ * scripts are never legitimate content. Also drops the empty wrapper elements
+ * left behind (which render as stray grey bars). Use this before loading a
+ * policy value into the editor AND before rendering it.
+ */
+export function sanitizePolicyHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  if (typeof document === 'undefined' || typeof DOMParser === 'undefined') {
+    // SSR / non-DOM fallback: remove the obvious chrome blocks by regex.
+    return html.replace(
+      /<(script|style|button|svg|input|textarea|select)\b[^>]*>[\s\S]*?<\/\1>/gi,
+      '',
+    );
+  }
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const root = doc.body.firstElementChild as HTMLElement | null;
+  if (!root) return html;
+  root
+    .querySelectorAll('script, style, button, svg, input, textarea, select, [role="toolbar"], [contenteditable]')
+    .forEach((el) => el.remove());
+  // Removing the toolbar's buttons/icons can leave its empty wrapper behind,
+  // which still renders as a stray (grey) bar. Drop leftover empty container
+  // elements — div/span with no text and no real content. Paragraphs are left
+  // alone to preserve spacing.
+  root.querySelectorAll('div, span').forEach((el) => {
+    if (!el.textContent?.trim() && !el.querySelector('a, img, li, br, hr, table')) {
+      el.remove();
+    }
+  });
+  return root.innerHTML;
+}
+
 export function linkifyPolicyHtml(html: string | null | undefined): string {
   if (!html) return '';
 
@@ -16,7 +51,8 @@ export function linkifyPolicyHtml(html: string | null | undefined): string {
   // a tag/attribute (e.g. an existing href), and never double-link text that is
   // already inside an <a>.
   if (typeof document !== 'undefined' && typeof DOMParser !== 'undefined') {
-    const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+    // Strip editor-chrome first so the rendered output is clean.
+    const doc = new DOMParser().parseFromString(`<div>${sanitizePolicyHtml(html)}</div>`, 'text/html');
     const root = doc.body.firstElementChild as HTMLElement | null;
     if (!root) return html;
 

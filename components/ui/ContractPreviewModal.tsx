@@ -117,13 +117,19 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
   // Falls back to the parent-supplied proposal during the in-flight window.
   const activeProposal = localisedProposal ?? proposal;
 
+  // Per-offer policies win: when the request has its own Terms / Cancellation
+  // text (edited on the offer), show that; otherwise fall back to the global
+  // Settings policy for the active language. (Per-offer text is a single field,
+  // so it shows the same in EN and DE.)
   const rawTermsHtml =
-    (previewLang === 'de' ? policies?.termsConditionsDe : policies?.termsConditionsEn)
-    ?? request.termsAndConditions
+    (request.termsAndConditions?.trim()
+      ? request.termsAndConditions
+      : (previewLang === 'de' ? policies?.termsConditionsDe : policies?.termsConditionsEn))
     ?? '';
   const rawCancellationHtml =
-    (previewLang === 'de' ? policies?.cancellationConditionsDe : policies?.cancellationConditionsEn)
-    ?? request.cancellationConditions
+    (request.cancellationConditions?.trim()
+      ? request.cancellationConditions
+      : (previewLang === 'de' ? policies?.cancellationConditionsDe : policies?.cancellationConditionsEn))
     ?? '';
   // Make links in the policy text clickable and open in a new tab (existing
   // <a> tags + bare pasted URLs). Memoised so we don't re-parse on every render.

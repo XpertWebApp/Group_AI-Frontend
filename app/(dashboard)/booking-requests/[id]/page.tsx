@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Badge, getStatusBadgeVariant } from '@/components/ui/Badge';
 import { HotelName } from '@/components/ui/HotelName';
 import { AddServiceModal } from '@/components/forms/AddServiceModal';
@@ -45,7 +46,7 @@ import { MarginToggle } from '@/components/ui/MarginToggle';
 import { OdooLinkRequiredModal } from '@/components/ui/OdooLinkRequiredModal';
 import { isOdooLinkRequired, isOdooContactRequiredError } from '@/lib/utils/odooGate';
 import { isPaymentDeadlineRequired, isPaymentDeadlineRequiredError } from '@/lib/utils/paymentDeadlineGate';
-import { linkifyPolicyHtml } from '@/lib/utils/linkifyPolicyHtml';
+import { linkifyPolicyHtml, sanitizePolicyHtml } from '@/lib/utils/linkifyPolicyHtml';
 import { RequestSummarySkeleton } from '@/components/ui/Loader';
 import { requestsApi } from '@/lib/api/requests';
 import { proposalsApi } from '@/lib/api/proposals';
@@ -202,6 +203,13 @@ export default function RequestDetailPage() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [editRequestOpen, setEditRequestOpen] = useState(false);
+  // Inline per-offer policy editing (Terms / Cancellation) — saved on the
+  // request so it overrides the global Settings policy for this offer only,
+  // and shows in the preview/PDF.
+  const [editingPolicies, setEditingPolicies] = useState(false);
+  const [savingPolicies, setSavingPolicies] = useState(false);
+  const [termsDraft, setTermsDraft] = useState('');
+  const [cancelDraft, setCancelDraft] = useState('');
   // ODOO_CONTACT_REQUIRED gate modal — opens when staff try to send a
   // post-cutover offer without linking an Odoo company (§2.3).
   const [odooGateOpen, setOdooGateOpen] = useState(false);
@@ -380,6 +388,35 @@ export default function RequestDetailPage() {
       }
     } else {
       router.push(`/booking-requests/${id}/add-hotel?proposalId=${proposal.id}`);
+    }
+  };
+
+  const openPoliciesEdit = () => {
+    // Strip any leftover editor-chrome baked into old saved values so the
+    // editor loads clean content (no fake toolbar/empty bars).
+    setTermsDraft(sanitizePolicyHtml(request?.termsAndConditions ?? ''));
+    setCancelDraft(sanitizePolicyHtml(request?.cancellationConditions ?? ''));
+    setEditingPolicies(true);
+  };
+
+  const handleSavePolicies = async () => {
+    setSavingPolicies(true);
+    try {
+      await requestsApi.update(id, {
+        termsAndConditions: termsDraft,
+        cancellationConditions: cancelDraft,
+      });
+      // Merge locally so the detail page + preview reflect immediately (the
+      // preview reads request.termsAndConditions / cancellationConditions).
+      setRequest((prev) =>
+        prev ? { ...prev, termsAndConditions: termsDraft, cancellationConditions: cancelDraft } : prev,
+      );
+      setEditingPolicies(false);
+      toast.success(t.toasts.policiesSaved);
+    } catch {
+      toast.error(t.toasts.policiesSaveFailed);
+    } finally {
+      setSavingPolicies(false);
     }
   };
 
@@ -1136,12 +1173,48 @@ export default function RequestDetailPage() {
 
                 {/* ── Policies ── */}
                 <div>
-                  <h3
-                    className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-3 animate-sidebar-fade-up"
-                    style={{ animationDelay: '40ms' }}
-                  >
-                    {t.offer.policies}
-                  </h3>
+                  <div className="flex items-center gap-2 mb-3 animate-sidebar-fade-up" style={{ animationDelay: '40ms' }}>
+                    <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary">
+                      {t.offer.policies}
+                    </h3>
+                    {!editingPolicies && (
+                      <button
+                        type="button"
+                        onClick={openPoliciesEdit}
+                        className="inline-flex items-center justify-center w-6 h-6 rounded-md text-sett-primary hover:bg-sett-light-green-bg hover:text-sett-green-dark transition-colors"
+                        title={t.common.edit}
+                        aria-label={t.common.edit}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {editingPolicies ? (
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-label text-sett-text-accent uppercase tracking-wide mb-1.5">
+                          {t.offer.termsConditions}
+                        </p>
+                        <RichTextEditor value={termsDraft} onChange={setTermsDraft} minHeight="140px" />
+                      </div>
+                      <div>
+                        <p className="text-label text-sett-text-accent uppercase tracking-wide mb-1.5">
+                          {t.offer.cancellationConditions}
+                        </p>
+                        <RichTextEditor value={cancelDraft} onChange={setCancelDraft} minHeight="120px" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="primary" size="sm" disabled={savingPolicies} onClick={handleSavePolicies}>
+                          {savingPolicies ? t.common.loading : t.common.save}
+                        </Button>
+                        <Button variant="secondary" size="sm" disabled={savingPolicies} onClick={() => setEditingPolicies(false)}>
+                          {t.common.cancel}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   {request.termsAndConditions && request.termsAndConditions.replace(/<[^>]*>/g, '').trim() && (
                     <div
                       className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50 animate-card-rise-in"
@@ -1174,6 +1247,8 @@ export default function RequestDetailPage() {
                         dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(request.cancellationConditions) }}
                       />
                     </div>
+                  )}
+                  </>
                   )}
                 </div>
               </div>
