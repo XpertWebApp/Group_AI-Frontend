@@ -244,7 +244,11 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
               <img
                 src="/Logos/group-offer-header-transparent.png"
                 alt="24 H Group Offer"
-                style={{ height: 56 }}
+                // Brighten the logo so it reads clearly against the dark navy
+                // header band. Values kept in sync with the BE PDF template
+                // (pdfGeneration.service.ts `.doc-header .logo`) so the preview
+                // and the downloaded PDF look identical.
+                style={{ height: 56, filter: 'brightness(1.7) contrast(1.1)' }}
               />
               <div className="flex flex-col items-end" style={{ gap: 4 }}>
                 <span

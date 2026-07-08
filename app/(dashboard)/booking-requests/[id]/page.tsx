@@ -393,6 +393,16 @@ export default function RequestDetailPage() {
       );
       setRemoveHotelTarget(null);
       toast.success(t.toasts.hotelRemoved);
+    } catch (err: unknown) {
+      // e.g. 409 Conflict when the hotel can't be removed in the proposal's
+      // current state. Surface the backend message (or a fallback) instead of
+      // letting the axios error crash the page with an unhandled runtime error.
+      const ax = await import('axios');
+      const backendMessage = ax.isAxiosError(err)
+        ? (err.response?.data?.message as string | undefined)
+        : undefined;
+      toast.error(backendMessage || t.toasts.hotelRemoveFailed);
+      setRemoveHotelTarget(null);
     } finally {
       setActionLoading(false);
     }
