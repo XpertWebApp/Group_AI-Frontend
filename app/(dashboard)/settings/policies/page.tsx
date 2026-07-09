@@ -11,6 +11,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { translations } from '@/lib/i18n/translations';
 import { settingsApi, type PoliciesSettings } from '@/lib/api/settings';
 import { cn } from '@/lib/utils/cn';
+import { linkifyPolicyHtml } from '@/lib/utils/linkifyPolicyHtml';
 
 const EMPTY: PoliciesSettings = {
   termsConditionsEn: '', termsConditionsDe: '', cancellationConditionsEn: '', cancellationConditionsDe: '',
@@ -106,12 +107,6 @@ export default function PoliciesPage() {
   );
 
   // Strip HTML tags for view mode display
-  const stripHtml = (html: string) => {
-    if (!html) return '—';
-    const text = html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-    return text || '—';
-  };
-
   return (
     <>
       <Header title={t.settings.title} />
@@ -209,7 +204,7 @@ export default function PoliciesPage() {
                         minHeight="180px"
                       />
                     ) : (
-                      <ReadOnlyField content={stripHtml(form[tcKey])} />
+                      <ReadOnlyField html={form[tcKey]} />
                     )}
                   </div>
 
@@ -225,7 +220,7 @@ export default function PoliciesPage() {
                         minHeight="180px"
                       />
                     ) : (
-                      <ReadOnlyField content={stripHtml(form[cxlKey])} />
+                      <ReadOnlyField html={form[cxlKey]} />
                     )}
                   </div>
 
@@ -267,15 +262,36 @@ export default function PoliciesPage() {
  *  badge is showing. Editing is reached only via the top-right EDIT POLICIES
  *  button. */
 function ReadOnlyField({
-  content,
+  html,
 }: {
-  content: string;
+  html: string;
 }) {
+  // Show the saved policy exactly as the editor rendered it — bold, italic,
+  // underline, alignment, lists, line breaks and clickable links — instead of a
+  // flattened plain-text blob. The value is passed through linkifyPolicyHtml
+  // (which sanitizes editor chrome and opens links in a new tab), the same
+  // pipeline used in the offer preview / PDF, so read-only matches edit mode.
+  const plain = (html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+
   return (
     <div className="w-full min-h-[60px] rounded-[14px] bg-[#F7F7F7] border border-transparent">
-      <span className="block px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed">
-        {content}
-      </span>
+      {plain ? (
+        <div
+          className={cn(
+            'px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed',
+            '[&_p]:mb-2 [&_p:last-child]:mb-0',
+            '[&_strong]:font-semibold [&_b]:font-semibold [&_em]:italic [&_i]:italic [&_u]:underline',
+            '[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_li]:mb-1',
+            '[&_a]:text-sett-primary [&_a]:underline [&_a]:break-words',
+            '[&_h1]:font-bold [&_h1]:text-[16px] [&_h2]:font-bold [&_h3]:font-semibold',
+          )}
+          dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(html) }}
+        />
+      ) : (
+        <span className="block px-3 py-3 font-montserrat text-[14px] text-[#1D1D1D] leading-relaxed">
+          —
+        </span>
+      )}
     </div>
   );
 }

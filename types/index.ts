@@ -105,6 +105,13 @@ export interface BookingRequest {
   // Step 4: Policies
   termsAndConditions?: string | null;
   cancellationConditions?: string | null;
+  // German auto-translations of the per-offer policies (populated by the BE via
+  // the same free Google-translate path used for hotel essentialInfoDe). The FE
+  // shows these under the DE locale and falls back to the base field when null,
+  // so nothing breaks until the BE ships them. See
+  // per-offer-policies-german-be-handover.md.
+  termsAndConditionsDe?: string | null;
+  cancellationConditionsDe?: string | null;
 
   // System
   status: BookingRequestStatus;

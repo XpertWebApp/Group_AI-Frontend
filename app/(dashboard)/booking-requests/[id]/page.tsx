@@ -159,7 +159,32 @@ export default function RequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+
+  // Localize the offer status shown in the header badge (was rendering the raw
+  // English enum, e.g. "Draft", even under the German UI). Mirrors the mapping
+  // used on the list/dashboard pages; unknown statuses fall back to title-case.
+  const statusLabel = (status: string): string => {
+    const map: Record<string, string> = {
+      pending: t.requests.pending,
+      draft: t.requests.draft,
+      sent: t.requests.sent,
+      declined: t.requests.declined,
+      processing: t.requests.processing,
+      ai_generated: t.requests.aiGenerated,
+      completed: t.requests.completed,
+      cancelled: t.requests.cancelled,
+      approved: t.requests.approved,
+      needs_manual_handling: t.requests.needsManualHandling,
+    };
+    return map[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  // Pick the policy text for the active locale: under DE prefer the BE-supplied
+  // German translation and fall back to the base (English) value when it's not
+  // yet populated, so the block never goes blank.
+  const policyForLocale = (base?: string | null, de?: string | null): string =>
+    (locale === 'de' ? (de ?? base) : base) ?? '';
 
   const [request, setRequest] = useState<BookingRequest | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
@@ -690,9 +715,7 @@ export default function RequestDetailPage() {
             {t.offer.offer} #{request.referenceNumber ?? id.slice(0, 4)}
           </span>
           <Badge variant={getStatusBadgeVariant(proposal?.status ?? request.status)}>
-            {(proposal?.status ?? request.status)
-              .replace(/_/g, ' ')
-              .replace(/\b\w/g, (c) => c.toUpperCase())}
+            {statusLabel(proposal?.status ?? request.status)}
           </Badge>
         </div>
 
@@ -1215,7 +1238,7 @@ export default function RequestDetailPage() {
                     </div>
                   ) : (
                   <>
-                  {request.termsAndConditions && request.termsAndConditions.replace(/<[^>]*>/g, '').trim() && (
+                  {policyForLocale(request.termsAndConditions, request.termsAndConditionsDe).replace(/<[^>]*>/g, '').trim() && (
                     <div
                       className="bg-sett-fill rounded-card px-4 py-3 mb-3 border border-sett-border/50 animate-card-rise-in"
                       style={{ animationDelay: '120ms' }}
@@ -1229,11 +1252,11 @@ export default function RequestDetailPage() {
                       <div
                         className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
-                        dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(request.termsAndConditions) }}
+                        dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(policyForLocale(request.termsAndConditions, request.termsAndConditionsDe)) }}
                       />
                     </div>
                   )}
-                  {request.cancellationConditions && request.cancellationConditions.replace(/<[^>]*>/g, '').trim() && (
+                  {policyForLocale(request.cancellationConditions, request.cancellationConditionsDe).replace(/<[^>]*>/g, '').trim() && (
                     <div
                       className="bg-sett-fill rounded-card px-4 py-3 border border-sett-border/50 animate-card-rise-in"
                       style={{ animationDelay: '200ms' }}
@@ -1244,7 +1267,7 @@ export default function RequestDetailPage() {
                       <div
                         className="sett-rich-editor font-montserrat text-[14px] font-semibold text-sett-text-primary"
                         style={{ lineHeight: '22px' }}
-                        dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(request.cancellationConditions) }}
+                        dangerouslySetInnerHTML={{ __html: linkifyPolicyHtml(policyForLocale(request.cancellationConditions, request.cancellationConditionsDe)) }}
                       />
                     </div>
                   )}

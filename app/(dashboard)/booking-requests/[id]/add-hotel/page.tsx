@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, forwardRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import DatePicker from 'react-datepicker';
@@ -29,6 +29,7 @@ import { proposalsApi } from '@/lib/api/proposals';
 import { hotelsApi } from '@/lib/api/hotels';
 import { formatDateEU } from '@/lib/dateFormatter';
 import { cn } from '@/lib/utils/cn';
+import { sanitizeEssentialInfoHtml } from '@/lib/utils/sanitizeEssentialInfoHtml';
 import { groupTypeRequiresAge } from '@/lib/utils/groupType';
 import { selectedStars, hotelStarBucket, hotelMatchesSelectedStars } from '@/lib/utils/starRatings';
 import type {
@@ -287,45 +288,36 @@ function FilterDropdown({
 
 const PLACEHOLDER_IMAGE = '/icons/placeholder-hotel.svg';
 
-// Strip supplier "Important Information" HTML (WBE EssentialInfo) to tidy plain
-// text. The value is raw third-party HTML, so it is NEVER rendered as HTML —
-// tags are removed, whitespace collapsed, and the run-on "." separators
-// normalised into readable sentences.
-function essentialInfoToText(html: string | null | undefined): string {
-  if (!html) return '';
-  return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*\.\s*/g, '. ')
-    .trim();
-}
-
 /** "Important information" block for a hotel card. Renders the supplier's
- *  EssentialInfo (stripped to plain text) in a subtle brand-tinted panel,
- *  clamped to 2 lines with a "Read more / Read less" toggle. The toggle only
- *  appears when the text actually overflows the clamp (measured), so short
- *  notes don't get a pointless button. */
+ *  EssentialInfo as SANITIZED, structured HTML (paragraphs, line breaks and
+ *  bullet lists preserved) in a subtle brand-tinted panel, collapsed to ~2
+ *  lines with a "Read more / Read less" toggle. The value is raw third-party
+ *  HTML, so it is passed through `sanitizeEssentialInfoHtml` first — only a
+ *  whitelist of formatting tags survives (all attributes/scripts stripped) —
+ *  before it is rendered with dangerouslySetInnerHTML. The toggle only appears
+ *  when the content actually overflows the collapse (measured), so short notes
+ *  don't get a pointless button. */
 function EssentialInfo({ en, de }: { en?: string | null; de?: string | null }) {
   const { t, locale } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
-  const pRef = useRef<HTMLParagraphElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   // Both languages ship in the payload (like `descriptions`), so the EN↔DE
   // toggle switches instantly with no re-fetch. Prefer the German translation
   // when DE is selected; fall back to English when it's null.
   const raw = locale === 'de' ? (de ?? en) : en;
-  const info = essentialInfoToText(raw);
+  const html = useMemo(() => sanitizeEssentialInfoHtml(raw), [raw]);
 
-  // Measure once (in the clamped state) whether the text is long enough to
-  // warrant a toggle. Runs whenever the text changes.
+  // Measure (in the collapsed state) whether the content is tall enough to
+  // warrant a toggle. Runs whenever the sanitized HTML changes.
   useEffect(() => {
-    const el = pRef.current;
+    const el = bodyRef.current;
     if (!el) return;
     setOverflows(el.scrollHeight > el.clientHeight + 1);
-  }, [info]);
+  }, [html]);
 
-  if (!info) return null;
+  if (!html) return null;
 
   return (
     <div className="mt-3 rounded-[10px] border border-sett-primary/20 bg-sett-light-green-bg/50 px-3 py-2">
@@ -335,15 +327,20 @@ function EssentialInfo({ en, de }: { en?: string | null; de?: string | null }) {
           {t.addHotel.importantInformation}
         </span>
       </div>
-      <p
-        ref={pRef}
+      <div
+        ref={bodyRef}
         className={cn(
           'font-montserrat text-[12px] text-sett-text-secondary leading-relaxed',
-          !expanded && 'line-clamp-2',
+          // Style the injected structural HTML so it reads as formatted prose.
+          '[&_p]:mb-1.5 [&_p:last-child]:mb-0',
+          '[&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1',
+          '[&_li]:mb-0.5',
+          '[&_strong]:font-semibold [&_b]:font-semibold',
+          '[&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-0.5 [&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-0.5',
+          !expanded && 'max-h-[3.25rem] overflow-hidden',
         )}
-      >
-        {info}
-      </p>
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
       {(overflows || expanded) && (
         <button
           type="button"
@@ -3440,18 +3437,9 @@ function HotelResultCard({
                 style={{ animationDelay: '120ms' }}
               >
                 <StarRating rating={Number(hotel.starRating)} size={18} />
-                {showCapacityBadge && (
-                  // §UX: tooltip surfaces the BE-supplied note verbatim
-                  // for power users; the X-of-Y count and action prompt
-                  // sit below the badge row for visibility without hover.
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-destructive/10 border border-sett-destructive/30 text-sett-destructive shrink-0 cursor-help"
-                    title={hotel.note ?? undefined}
-                  >
-                    <AlertTriangle className="w-3 h-3" />
-                    {localizeCapacityStatus(hotel.capacityStatus, t.addHotel)}
-                  </span>
-                )}
+                {/* "Limited Capacity" / capacity-status badge removed per client
+                    feedback — this kind of capacity-verification warning should
+                    not appear on the hotel card. */}
                 {showYouthFriendlyBadge && hotel.youthFriendly && (
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sett-light-green-bg border border-sett-primary text-sett-green-dark shrink-0"
@@ -3777,7 +3765,11 @@ function HotelResultCard({
           {/* Notes — backend warning banner. Pattern-matched + localized
               against the i18n dictionary; falls back to the BE string if
               no pattern matches so untranslated notes still surface. */}
-          {hotel.note && (
+          {/* The "Room availability equals requested amount — capacity should be
+              verified with the hotel" note is suppressed per client feedback
+              (same capacity-warning kind as the removed badge). Other BE notes
+              still surface. */}
+          {hotel.note && !/Room availability equals requested amount/i.test(hotel.note) && (
             <div
               className="mt-3 animate-sidebar-fade-up"
               style={{ animationDelay: '380ms' }}
