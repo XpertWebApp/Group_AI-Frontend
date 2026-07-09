@@ -248,7 +248,7 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
                   on navy, effectively invisible. The transparent PNG
                   variant is the correct asset for this surface. */}
               <img
-                src="/Logos/group-offer-header-transparent.png"
+                src="/Logos/s-e-t-t-groups-logo-black-font (3).png"
                 alt="24 H Group Offer"
                 // Brighten the logo so it reads clearly against the dark navy
                 // header band. Values kept in sync with the BE PDF template

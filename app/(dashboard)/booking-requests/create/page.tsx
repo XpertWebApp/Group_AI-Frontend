@@ -242,7 +242,15 @@ function getStepProgress(step: number, data: FormData): number {
 // instead of a raw 413/415 from the server. Note: the live nginx also needs
 // `client_max_body_size` raised (see the BE handover) for 1–10 MB files to
 // actually reach the API — this guard is complementary, not a replacement.
-const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB
+// Max upload size in MB. The API accepts 10 MB, BUT the live nginx proxy caps
+// the request body at its 1 MB default and 413s anything larger BEFORE it
+// reaches the API. So we cap the FE at what the server actually accepts — the
+// user gets a clear "too large" message instead of a 413, and no oversized
+// request is ever sent. Configurable via NEXT_PUBLIC_MAX_UPLOAD_MB: once nginx's
+// client_max_body_size is raised (see attachment-413-nginx-infra-handover.md),
+// set NEXT_PUBLIC_MAX_UPLOAD_MB=10 to use the full API limit.
+const MAX_ATTACHMENT_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB) || 1;
+const MAX_ATTACHMENT_SIZE = MAX_ATTACHMENT_MB * 1024 * 1024;
 const ALLOWED_ATTACHMENT_MIME = [
   'application/pdf',
   'application/msword',
@@ -262,7 +270,8 @@ function validateAttachmentFile(file: File, t: ReturnType<typeof useLanguage>['t
   if (file.size > MAX_ATTACHMENT_SIZE) {
     return t.createForm.fileTooLarge
       .replace('{name}', file.name)
-      .replace('{size}', (file.size / 1024 / 1024).toFixed(1));
+      .replace('{size}', (file.size / 1024 / 1024).toFixed(1))
+      .replace('{max}', String(MAX_ATTACHMENT_MB));
   }
   // Some browsers report an empty type for uncommon files; the backend still
   // validates, so only reject when a type is present and not allowed.
@@ -675,8 +684,14 @@ function CreateBookingRequestPageInner() {
       if (formData.nameListFile) {
         try {
           await requestsApi.uploadAttachments(requestId, [formData.nameListFile]);
-        } catch {
-          toast.error(t.toasts.fileUploadFailed);
+        } catch (err) {
+          // 413 = the server (nginx) rejected the body as too large — distinct
+          // from a generic upload failure, so show a clearer message. The FE
+          // already blocks >10MB; a 413 here means the server's body limit is
+          // below the API's 10MB (infra: raise nginx client_max_body_size).
+          const ax = await import('axios');
+          const is413 = ax.isAxiosError(err) && err.response?.status === 413;
+          toast.error(is413 ? t.toasts.fileTooLargeUpload : t.toasts.fileUploadFailed);
         }
       }
 
@@ -1674,7 +1689,7 @@ function CustomerDetailsStep({ formData, updateField, errors }: StepProps) {
               </label>
             )}
             <p className="mt-1.5 font-montserrat text-[11px] text-sett-text-muted">
-              {t.createForm.fileHint}
+              {t.createForm.fileHint.replace('{max}', String(MAX_ATTACHMENT_MB))}
             </p>
           </div>
         </div>

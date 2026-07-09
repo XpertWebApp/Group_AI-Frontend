@@ -173,8 +173,8 @@ export const translations = {
       nameList: 'NAME LIST',
       uploadFile: 'Upload File',
       // Attachment validation (must mirror the backend limits).
-      fileHint: 'Max 10 MB. PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP.',
-      fileTooLarge: '"{name}" is {size} MB — the maximum is 10 MB.',
+      fileHint: 'Max {max} MB. PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP.',
+      fileTooLarge: '"{name}" is {size} MB — the maximum is {max} MB.',
       fileTypeNotAllowed: '"{name}" is not an allowed file type (PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP).',
       firstName: 'FIRST NAME',
       firstNamePlaceholder: 'e.g., John',
@@ -891,6 +891,7 @@ export const translations = {
       staffDeleted: 'Staff member deleted.',
       settingsSaved: 'Settings saved successfully!',
       fileUploadFailed: 'File upload failed. The request was saved — please try uploading again.',
+      fileTooLargeUpload: 'The file is too large to upload (server limit). The request was saved — please upload a smaller file or contact support.',
     },
 
     // ── Modals ──
@@ -1534,8 +1535,8 @@ export const translations = {
       nameList: 'NAMENSLISTE',
       uploadFile: 'Datei hochladen',
       // Anhang-Validierung (muss den Backend-Limits entsprechen).
-      fileHint: 'Max. 10 MB. PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP.',
-      fileTooLarge: '„{name}“ ist {size} MB groß — das Maximum sind 10 MB.',
+      fileHint: 'Max. {max} MB. PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP.',
+      fileTooLarge: '„{name}“ ist {size} MB groß — das Maximum sind {max} MB.',
       fileTypeNotAllowed: '„{name}“ ist kein zulässiger Dateityp (PDF, DOC, DOCX, XLS, XLSX, CSV, TXT, JPEG, PNG, WEBP).',
       firstName: 'VORNAME',
       firstNamePlaceholder: 'z.B. Max',
@@ -2222,6 +2223,7 @@ export const translations = {
       staffDeleted: 'Mitarbeiter gelöscht.',
       settingsSaved: 'Einstellungen erfolgreich gespeichert!',
       fileUploadFailed: 'Datei-Upload fehlgeschlagen. Die Anfrage wurde gespeichert – bitte erneut versuchen.',
+      fileTooLargeUpload: 'Die Datei ist zu groß zum Hochladen (Serverlimit). Die Anfrage wurde gespeichert – bitte laden Sie eine kleinere Datei hoch oder wenden Sie sich an den Support.',
     },
 
     // ── Modals ──

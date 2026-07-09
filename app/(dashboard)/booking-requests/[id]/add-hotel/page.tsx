@@ -2112,8 +2112,11 @@ export default function AddHotelPage() {
         {/* Manual request card + sidebar — when no hotels found */}
         {phase === 'done' && manualRequestOnly && (
           <div className="flex flex-col xl-wide:flex-row gap-6 xl-wide:flex-1 xl-wide:min-h-0">
-            {/* ── Left Sidebar: Trip Details (Information Only) ── */}
-            <aside ref={sidebarRef} className="xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto h-full hidden xl-wide:flex xl-wide:flex-col">
+            {/* ── Left Sidebar: Trip Details (Information Only) ──
+                Visible on ALL screen sizes: on mobile it stacks above the
+                "No Hotels Available" card (this empty state has no mobile
+                filter bar), so trip details stay reachable when resized. */}
+            <aside ref={sidebarRef} className="w-full xl-wide:w-[300px] shrink-0 xl-wide:overflow-y-auto h-full flex flex-col">
               <div className="bg-white xl-wide:rounded-[14px] xl-wide:border xl-wide:border-sett-border-light p-5 animate-card-rise-in flex-1 overflow-y-auto" style={{ animationDelay: '160ms' }}>
                 <h3 className="font-montserrat text-[16px] font-semibold text-sett-text-primary mb-5">{t.addHotel.tripDetails}</h3>
                 {editingTripDetails && (
@@ -2183,11 +2186,11 @@ export default function AddHotelPage() {
                   </div>
 
                   {editingTripDetails && (
-                    <div className="flex gap-2 pb-2">
+                    <div className="flex flex-col gap-2 pb-2">
                       <Button
                         variant="primary"
                         size="sm"
-                        className="flex-1"
+                        className="w-full"
                         disabled={!editCheckinDate || savingTripDetails}
                         onClick={handleSaveTripDetails}
                       >
@@ -2196,6 +2199,7 @@ export default function AddHotelPage() {
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="w-full"
                         onClick={() => setEditingTripDetails(false)}
                         disabled={savingTripDetails}
                       >
@@ -2231,8 +2235,8 @@ export default function AddHotelPage() {
                     </div>
                   )}
 
-                  {/* Desktop Only Filters */}
-                  <div className="hidden xl-wide:block space-y-5 pt-5 border-t border-sett-border-light">
+                  {/* Filters — shown on all screen sizes in this empty state (it has no mobile filter bar). */}
+                  <div className="block space-y-5 pt-5 border-t border-sett-border-light">
                     {/* Star Rating */}
                     <div className="flex flex-col gap-3">
                       <label className="block font-montserrat text-[14px] font-semibold text-sett-text-primary">
@@ -2607,11 +2611,11 @@ export default function AddHotelPage() {
                   </div>
 
                   {editingTripDetails && (
-                    <div className="flex gap-2 pb-2">
+                    <div className="flex flex-col gap-2 pb-2">
                       <Button
                         variant="primary"
                         size="sm"
-                        className="flex-1"
+                        className="w-full"
                         disabled={!editCheckinDate || savingTripDetails}
                         onClick={handleSaveTripDetails}
                       >
@@ -2620,6 +2624,7 @@ export default function AddHotelPage() {
                       <Button
                         variant="secondary"
                         size="sm"
+                        className="w-full"
                         onClick={() => setEditingTripDetails(false)}
                         disabled={savingTripDetails}
                       >
