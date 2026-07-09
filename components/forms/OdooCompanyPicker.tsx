@@ -35,6 +35,10 @@ interface Props {
   /** Override input style — defaults to the §5.5 brand spec. Pass an empty
    *  string if a host form needs a different look. */
   inputClassName?: string;
+  /** Override the label style so it matches a host form's other field labels
+   *  (line-height + bottom margin), keeping the input boxes aligned across a
+   *  shared grid row. Defaults to the picker's own §5.5 label style. */
+  labelClassName?: string;
   /** Auto-focus the input on mount (used in form steps that just became active). */
   autoFocus?: boolean;
   /** Fires once when staff pick a row from the dropdown. Receives the full
@@ -63,6 +67,7 @@ export function OdooCompanyPicker({
   className,
   style,
   inputClassName,
+  labelClassName,
   autoFocus,
   onPicked,
 }: Props) {
@@ -215,7 +220,7 @@ export function OdooCompanyPicker({
 
   return (
     <div className={className} style={style} ref={wrapperRef}>
-      <label className="block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5">
+      <label className={labelClassName ?? 'block font-montserrat text-[12px] font-semibold leading-normal tracking-[0.05em] text-sett-text-primary uppercase mb-1.5'}>
         {labelText} {required && <span className="text-sett-destructive">*</span>}
       </label>
 

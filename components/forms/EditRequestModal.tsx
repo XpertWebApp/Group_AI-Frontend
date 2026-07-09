@@ -1159,6 +1159,7 @@ export function EditRequestModal({ open, request, proposal, onClose, onSaved }: 
                 label={t.offer.editCompanyName}
                 required
                 error={fieldErrors.companyName}
+                labelClassName={labelCls}
               />
               <div>
                 <label className={labelCls}>{t.offer.editFirstName}</label>
