@@ -337,7 +337,9 @@ function EssentialInfo({ en, de }: { en?: string | null; de?: string | null }) {
           '[&_li]:mb-0.5',
           '[&_strong]:font-semibold [&_b]:font-semibold',
           '[&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-0.5 [&_h4]:font-semibold [&_h4]:mt-2 [&_h4]:mb-0.5',
-          !expanded && 'max-h-[3.25rem] overflow-hidden',
+          // Collapse to whole lines (clean line-boundary clip) rather than a
+          // fixed pixel height that cut a line in half and crowded "Read more".
+          !expanded && 'line-clamp-2',
         )}
         dangerouslySetInnerHTML={{ __html: html }}
       />
@@ -345,7 +347,7 @@ function EssentialInfo({ en, de }: { en?: string | null; de?: string | null }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-1 font-montserrat text-[12px] font-semibold text-sett-primary hover:text-sett-green-dark transition-colors"
+          className="mt-1.5 font-montserrat text-[12px] font-semibold text-sett-primary hover:text-sett-green-dark transition-colors"
         >
           {expanded ? t.addHotel.readLess : t.addHotel.readMore}
         </button>
@@ -2183,11 +2185,11 @@ export default function AddHotelPage() {
                   </div>
 
                   {editingTripDetails && (
-                    <div className="flex flex-col gap-2 pb-2">
+                    <div className="flex items-center gap-2 pb-2">
                       <Button
                         variant="primary"
                         size="sm"
-                        className="w-full"
+                        className="flex-1"
                         disabled={!editCheckinDate || savingTripDetails}
                         onClick={handleSaveTripDetails}
                       >
@@ -2196,11 +2198,11 @@ export default function AddHotelPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="w-full"
+                        className="flex-1"
                         onClick={() => setEditingTripDetails(false)}
                         disabled={savingTripDetails}
                       >
-                        Cancel
+                        {t.common.cancel}
                       </Button>
                     </div>
                   )}
@@ -2608,11 +2610,11 @@ export default function AddHotelPage() {
                   </div>
 
                   {editingTripDetails && (
-                    <div className="flex flex-col gap-2 pb-2">
+                    <div className="flex items-center gap-2 pb-2">
                       <Button
                         variant="primary"
                         size="sm"
-                        className="w-full"
+                        className="flex-1"
                         disabled={!editCheckinDate || savingTripDetails}
                         onClick={handleSaveTripDetails}
                       >
@@ -2621,11 +2623,11 @@ export default function AddHotelPage() {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="w-full"
+                        className="flex-1"
                         onClick={() => setEditingTripDetails(false)}
                         disabled={savingTripDetails}
                       >
-                        Cancel
+                        {t.common.cancel}
                       </Button>
                     </div>
                   )}

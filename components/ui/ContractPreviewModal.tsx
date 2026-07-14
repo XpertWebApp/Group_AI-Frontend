@@ -119,18 +119,32 @@ export function ContractPreviewModal({ open, onClose, request, proposal, pdfLang
 
   // Per-offer policies win: when the request has its own Terms / Cancellation
   // text (edited on the offer), show that; otherwise fall back to the global
-  // Settings policy for the active language. (Per-offer text is a single field,
-  // so it shows the same in EN and DE.)
-  const rawTermsHtml =
-    (request.termsAndConditions?.trim()
-      ? request.termsAndConditions
-      : (previewLang === 'de' ? policies?.termsConditionsDe : policies?.termsConditionsEn))
-    ?? '';
-  const rawCancellationHtml =
-    (request.cancellationConditions?.trim()
-      ? request.cancellationConditions
-      : (previewLang === 'de' ? policies?.cancellationConditionsDe : policies?.cancellationConditionsEn))
-    ?? '';
+  // Settings policy for the active language. Under DE we prefer the BE-supplied
+  // German translation of the per-offer text (`*ConditionsDe`) and fall back to
+  // the base (English) per-offer field until the BE ships it — matching the
+  // offer detail page. See per-offer-policies-german-be-handover.md.
+  const pickPolicy = (
+    base: string | null | undefined,
+    de: string | null | undefined,
+    settingsEn: string | null | undefined,
+    settingsDe: string | null | undefined,
+  ): string => {
+    const perOffer = previewLang === 'de' ? (de?.trim() ? de : base) : base;
+    if (perOffer?.trim()) return perOffer;
+    return (previewLang === 'de' ? settingsDe : settingsEn) ?? '';
+  };
+  const rawTermsHtml = pickPolicy(
+    request.termsAndConditions,
+    request.termsAndConditionsDe,
+    policies?.termsConditionsEn,
+    policies?.termsConditionsDe,
+  );
+  const rawCancellationHtml = pickPolicy(
+    request.cancellationConditions,
+    request.cancellationConditionsDe,
+    policies?.cancellationConditionsEn,
+    policies?.cancellationConditionsDe,
+  );
   // Make links in the policy text clickable and open in a new tab (existing
   // <a> tags + bare pasted URLs). Memoised so we don't re-parse on every render.
   const termsHtml = useMemo(() => linkifyPolicyHtml(rawTermsHtml), [rawTermsHtml]);
